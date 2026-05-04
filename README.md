@@ -157,4 +157,4 @@ uvicorn sales_tracker.app.main:app --reload
 
 ## 📄 License
 
-MIT
+All Rights Reserved
