@@ -1,3 +1,11 @@
 .env
+venv
+sales_tracker/app/services/__pycache__
+sales_tracker/app/jobs/__pycache__
+sales_tracker/app/models/__pycache__
+sales_tracker/app/schemas/__pycache__
+sales_tracker/app/utils/__pycache__
 __pycache__/
 *.pyc
+*.pyo
+.env
