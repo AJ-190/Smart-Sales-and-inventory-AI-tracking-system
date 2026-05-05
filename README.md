@@ -47,6 +47,7 @@ buissness-bot-v1/
 │       ├── oauth2.py        # JWT auth logic
 │       ├── utils.py         # Helper functions
 │       ├── routers/         # Route handlers
+        ├── services/        #services (logic)
 │       └── core/
 │           └── config.py    # Environment config
 ├── alembic/                 # Database migrations
