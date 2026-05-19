@@ -115,8 +115,9 @@ Authorization: Bearer <your_token>
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/approvals/send_approval` | POST | Send a business join approval request |
+| `/approvals/send_approval` | POST | Send a business join approval request (default pending) |
 | `/approvals/get_approvals/{business_id}` | GET | Get all pending approvals for a business |
+| `/approvals/confirm_approvals/{business_id}`| POST| Confirm approvals (approve/reject)
 
 ---
 
