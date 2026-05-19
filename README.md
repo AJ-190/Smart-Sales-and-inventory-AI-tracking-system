@@ -39,18 +39,16 @@ A production-ready REST API for small businesses to manage inventory, track sale
 
 ```
 buissness-bot-v1/
-├── sales_tracker/
-│   └── app/
-│       ├── main.py          # App entry point, router registration
-│       ├── models.py        # Database models
-│       ├── schemas.py       # Pydantic schemas
-│       ├── database.py      # DB connection
-│       ├── oauth2.py        # JWT auth logic
-│       ├── utils.py         # Helper functions
-│       ├── routers/         # Route handlers
-│       ├── services/        # Business logic
-│       └── core/
-│           └── config.py    # Environment config
+├── app/
+│   ├── main.py          # App entry point, router registration
+│   ├── models.py        # Database models
+│   ├── schemas.py       # Pydantic schemas
+│   ├── database.py      # DB connection
+│   ├── routers/         # Route handlers
+│   ├── services/        # Business logic
+│   ├── jobs/            # Background jobs
+│   └── core/
+│       └── config.py    # Environment config
 ├── alembic/                 # Database migrations
 ├── tests/                   # Pytest test suite
 ├── render.yaml              # Render deployment config
@@ -163,7 +161,7 @@ pip install -r requirements.txt
 alembic upgrade head
 
 # Start the server
-uvicorn sales_tracker.app.main:app --reload
+uvicorn app.main:app --reload
 ```
 
 ---
