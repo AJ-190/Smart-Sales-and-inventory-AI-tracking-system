@@ -1,5 +1,4 @@
 from sched import scheduler
-
 from fastapi import FastAPI
 from app.database import Base, engine
 from app.routers import admin_end_report, business, oauth, products, reports, sales, approvals
