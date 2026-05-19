@@ -5,7 +5,7 @@ from sqlalchemy import pool
 from dotenv import load_dotenv
 load_dotenv()
 
-from sales_tracker.app.models import Base
+from app.models import Base
 import os
 from alembic import context
 
