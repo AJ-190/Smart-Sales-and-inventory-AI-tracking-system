@@ -22,7 +22,7 @@ def get_approvals(
     return approval_service.get_approvals(business_id,status, db, current_user)
 
 
-@router.post("/conirm_approvals/{business_id}", response_model=schemas.ApprovalsResponse)
+@router.post("/confirm_approvals/{business_id}", response_model=schemas.ApprovalsResponse)
 def confirm_approval(post: schemas.Direction,
                      business_id: int,
                      db: Session = Depends(database.get_db),
