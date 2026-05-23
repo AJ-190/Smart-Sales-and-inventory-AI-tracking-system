@@ -17,7 +17,7 @@ def get_member(db, current_user):
 
 
 
-def add_product(business_id, post: schemas.ProductCreate, db: Session, current_user):
+def add_product(business_id, post: schemas.Productcreate, db: Session, current_user):
     if current_user.role not in [models.RoleEnum.admin, models.RoleEnum.super_admin, models.RoleEnum.manager]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to perform this action")
     
