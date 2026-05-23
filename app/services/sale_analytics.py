@@ -7,7 +7,7 @@ from app.services import sale_service
 from app import schemas
 from app.services.sale_service import get_member
 from app.utils import dependencies
-from sqlalchemy import func
+from sqlalchemy import func, cast, Date
 from app.core import security
 from fastapi import HTTPException, status, Depends
 from datetime import datetime, date
@@ -48,8 +48,8 @@ def view_profit(
             func.sum(models.Sale.total_amount - models.Sale.profit).label("total_cost")
         )
         .filter(models.Sale.business_id == business_id)
-        .filter(func.date(models.Sale.created_at) >= date)
-        .filter(func.date(models.Sale.created_at) <= end_date)
+        .filter(cast(models.Sale.created_at, Date) >= date)
+        .filter(cast(models.Sale.created_at, Date) <= end_date)
         .first()
     )
     
@@ -90,9 +90,14 @@ def get_summery(business_id, db:Session, current_user, date, end_date):
         .filter(func.date(models.Sale.created_at) >= date)
         .filter(func.date(models.Sale.created_at) <= end_date)
     )
-    
-    sold_quantity, total_revenue, total_profit,Total_sales = summery.first() or 0
-    profit_margin = (total_profit/ total_revenue * 100) if total_revenue  >= 0 else 0
+    result = summery.first()
+
+    sold_quantity = result.sold_quantity or 0
+    total_revenue = result.total_revenue or 0.0
+    total_profit = result.total_profit or 0.0
+    Total_sales = result.Total_sales or 0
+
+    profit_margin = (total_profit / total_revenue * 100) if total_revenue > 0 else 0
 
     cash_total = (
         db.query(func.count(models.Sale.payment_method)
@@ -144,6 +149,7 @@ def get_summery(business_id, db:Session, current_user, date, end_date):
         "total_revenue": total_revenue,
         "total_profit": total_profit,
         "total_sales": Total_sales,
+        "profit_margin": profit_margin,
         "sold_quantity": sold_quantity,
         "cash_total": cash_total,
         "momo_total": momo_total,

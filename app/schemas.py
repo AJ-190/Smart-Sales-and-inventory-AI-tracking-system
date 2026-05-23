@@ -196,6 +196,7 @@ class SaleSummery(BaseModel):
     sold_quantity: float
     total_revenue: float
     total_sales: float
+    profit_margin: float
     cash_total: float
     momo_total: float
     card_total: float

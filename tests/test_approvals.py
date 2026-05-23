@@ -64,7 +64,7 @@ def test_get_approvals_unauthorized_cross( authorized_user_client,test_get_busin
 
 def test_reject_approval(authorized_sup_client, test_get_businesses, test_send_approval):
     res = authorized_sup_client.post(
-        f"/approvals/conirm_approvals/{test_get_businesses[0].business.business_id}",
+        f"/approvals/confirm_approvals/{test_get_businesses[0].business.business_id}",
         json={"approval_id":test_send_approval.approval_id, "dir":0 }
     )
     
@@ -75,7 +75,7 @@ def test_reject_approval(authorized_sup_client, test_get_businesses, test_send_a
     
 def test_reject_approval_unauthorized(authorized_user_client,test_get_businesses, test_send_approval, authorized_user_client_test_businesses):
     res = authorized_user_client.post(
-        f"/approvals/conirm_approvals/{test_get_businesses[0].business.business_id}",
+        f"/approvals/confirm_approvals/{test_get_businesses[0].business.business_id}",
         json={"approval_id":test_send_approval.approval_id, "dir":0 }
     )
     assert res.status_code == 404
@@ -83,14 +83,14 @@ def test_reject_approval_unauthorized(authorized_user_client,test_get_businesses
  
 def test_reject_already_rejected(authorized_sup_client,test_get_businesses,test_send_approval):
     res = authorized_sup_client.post(
-        f"/approvals/conirm_approvals/{test_get_businesses[0].business.business_id}",
+        f"/approvals/confirm_approvals/{test_get_businesses[0].business.business_id}",
         json={"approval_id": test_send_approval.approval_id, "dir": 0}
     )
     
     assert res.status_code == 200
     
     res = authorized_sup_client.post(
-        f"/approvals/conirm_approvals/{test_get_businesses[0].business.business_id}",
+        f"/approvals/confirm_approvals/{test_get_businesses[0].business.business_id}",
         json={"approval_id": test_send_approval.approval_id, "dir": 0}
     )
     assert res.status_code == 409
@@ -99,7 +99,7 @@ def test_reject_already_rejected(authorized_sup_client,test_get_businesses,test_
 
 def test_approved_approval(authorized_sup_client, test_get_businesses, test_send_approval):
     res = authorized_sup_client.post(
-        f"/approvals/conirm_approvals/{test_get_businesses[0].business.business_id}",
+        f"/approvals/confirm_approvals/{test_get_businesses[0].business.business_id}",
         json={"approval_id":test_send_approval.approval_id, "dir":1 }
     )
     
@@ -111,7 +111,7 @@ def test_approved_approval(authorized_sup_client, test_get_businesses, test_send
     
 def test_approved_approval_unauthorized(authorized_user_client,test_get_businesses, test_send_approval, authorized_user_client_test_businesses):
     res = authorized_user_client.post(
-        f"/approvals/conirm_approvals/{test_get_businesses[0].business.business_id}",
+        f"/approvals/confirm_approvals/{test_get_businesses[0].business.business_id}",
         json={"approval_id":test_send_approval.approval_id, "dir":1 }
     )
     assert res.status_code == 404
@@ -121,14 +121,14 @@ def test_approved_approval_unauthorized(authorized_user_client,test_get_business
 
 def test_approved_already_rejected(authorized_sup_client,test_get_businesses,test_send_approval):
     res = authorized_sup_client.post(
-        f"/approvals/conirm_approvals/{test_get_businesses[0].business.business_id}",
+        f"/approvals/confirm_approvals/{test_get_businesses[0].business.business_id}",
         json={"approval_id": test_send_approval.approval_id, "dir": 1}
     )
     
     assert res.status_code == 200
     
     res = authorized_sup_client.post(
-        f"/approvals/conirm_approvals/{test_get_businesses[0].business.business_id}",
+        f"/approvals/confirm_approvals/{test_get_businesses[0].business.business_id}",
         json={"approval_id": test_send_approval.approval_id, "dir": 1}
     )
     assert res.status_code == 409
