@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app import database, models
 from app.core import config
 from app.models import Business
-from app.schemas import ProductCreate, ProductResponse, ProductUpdate, Restock
+from app.schemas import Productcreate, ProductResponse, ProductUpdate, Restock
 from app import schemas
 from app.utils import dependencies
 from app.services import products_service
@@ -13,7 +13,7 @@ from app.core import security
 router = APIRouter(prefix="/products", tags=['Products'])
 
 @router.post("/{business_id}", response_model=ProductResponse, status_code=201)
-def add_product(business_id: int, post: schemas.Productcreate, db: Session = Depends(database.get_db), current_user:Business = Depends(dependencies.get_current_user)):
+def add_product(business_id: int, post: Productcreate, db: Session = Depends(database.get_db), current_user:Business = Depends(dependencies.get_current_user)):
    return products_service.add_product(business_id,post, db, current_user)
 
 
