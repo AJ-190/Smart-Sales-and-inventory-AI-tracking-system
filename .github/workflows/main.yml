@@ -27,7 +27,7 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       SUPER_ADMIN_EMAIL: ${{secrets.SUPER_ADMIN_EMAIL}}
-      SUPER_ADMIN_PASSWORD: ${{secrets.SUPER_ADMIN_PASSWORD}}
+      SUPER_ADMIN_APP_PASSWORD: ${{secrets.SUPER_ADMIN_PASSWORD}}
       SUPER_ADMIN_NAME: ${{secrets.SUPER_ADMIN_NAME}}
 
     steps:
