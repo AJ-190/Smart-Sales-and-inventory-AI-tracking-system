@@ -80,15 +80,7 @@ class Business_Admin(BaseModel):
 
 #---Products-----
 
-class Productcreate(BaseModel): 
-    name: str
-    price: float
-    cost_price: float
-    description: Optional[str] = None
-    category: Optional[str] = None
-    sku: Optional[str] = None
-    quantity: int
-    low_stock_threshold: Optional[int] = None
+
     
 
         
@@ -104,6 +96,18 @@ class UsersOutUsers(BaseModel):
     
     model_config = ConfigDict(from_attributes=True)
         
+        
+class Productcreate(BaseModel): 
+    name: str
+    price: float
+    cost_price: float
+    description: Optional[str] = None
+    category: Optional[str] = None
+    sku: Optional[str] = None
+    quantity: int
+    low_stock_threshold: Optional[int] = None        
+
+
 class ProductResponse(BaseModel):
     product_id  : int
     name        : str
