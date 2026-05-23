@@ -44,7 +44,8 @@ jobs:
 
       - name: Run migrations
         run: alembic upgrade head
-
+      - name: verify pytes installation
+        run: pip install pytest
       - name: Run tests
         run: pytest -v
             
