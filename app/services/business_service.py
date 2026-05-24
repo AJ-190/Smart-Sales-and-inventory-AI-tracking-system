@@ -105,7 +105,7 @@ def get_business(id, db: Session, current_user):
     
     result = business_data.first()
     
-    if not business_data:
+    if not result:
         raise HTTPException(status_code=status.HTTP_40_NOT_FOUND,detail=f"No busines with the id:{id} found")
     
 
