@@ -102,15 +102,17 @@ def get_business(id, db: Session, current_user):
         business_data = business_data.filter(models.BusinessMember.member_id == current_user.member_id)
     
     
-    
+        
     result = business_data.first()
-    
+
     if not result:
-        raise HTTPException(status_code=status.HTTP_40_NOT_FOUND,detail=f"No busines with the id:{id} found")
-    
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No business with id {id} found"
+        )
 
         
-    business, members = business_data.first()
+    business, members = result
     return {"business": business, "members": members}
 
     
