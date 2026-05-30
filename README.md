@@ -1,5 +1,11 @@
 # Smart Sales & Inventory AI Tracking System
 
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-brightgreen)
+![Python](https://img.shields.io/badge/Python-3.14-blue)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-336791)
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Deploy](https://img.shields.io/badge/deployed-Render-46E3B7)
+
 A production-ready REST API for small businesses to manage inventory, track sales, handle business approvals, and receive automated performance reports — built with FastAPI and PostgreSQL.
 
 ---
@@ -38,7 +44,7 @@ A production-ready REST API for small businesses to manage inventory, track sale
 ## Project Structure
 
 ```
-buissness-bot-v1/
+business-bot-v1/
 ├── app/
 │   ├── main.py          # App entry point, router registration
 │   ├── models.py        # Database models
@@ -49,11 +55,11 @@ buissness-bot-v1/
 │   ├── jobs/            # Background jobs
 │   └── core/
 │       └── config.py    # Environment config
-├── alembic/                 # Database migrations
-├── tests/                   # Pytest test suite
-├── render.yaml              # Render deployment config
+├── alembic/             # Database migrations
+├── tests/               # Pytest test suite
+├── render.yaml          # Render deployment config
 ├── requirements.txt
-└── .env                     # Environment variables (not committed)
+└── .env                 # Environment variables (not committed)
 ```
 
 ---
@@ -115,7 +121,7 @@ Authorization: Bearer <your_token>
 |---|---|---|
 | `/approvals/send_approval` | POST | Send a business join approval request (default pending) |
 | `/approvals/get_approvals/{business_id}` | GET | Get all pending approvals for a business |
-| `/approvals/confirm_approvals/{business_id}`| POST| Confirm approvals (approve/reject)
+| `/approvals/confirm_approvals/{business_id}` | POST | Confirm approvals (approve/reject) |
 
 ---
 
@@ -178,10 +184,21 @@ pytest -v -s
 # Run specific test file
 pytest -v tests/test_sales.py
 ```
-```
 
 ---
 
-## 📄 License
+## Author
 
-All Rights Reserved
+**Addy Samuel**  
+Backend Engineer — building for African markets  
+[GitHub](https://github.com/AJ-190) · [LinkedIn](https://linkedin.com/in/your-profile)
+
+---
+
+## License
+
+This project is licensed under the MIT License.
+
+
+
+
