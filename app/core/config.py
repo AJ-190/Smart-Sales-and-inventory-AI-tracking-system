@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     SUPER_ADMIN_EMAIL: str = os.getenv("SUPER_ADMIN_EMAIL")
     SUPER_ADMIN_APP_PASSWORD: str = os.getenv("SUPER_ADMIN_APP_PASSWORD")
     SUPER_ADMIN_NAME: str = os.getenv("SUPER_ADMIN_NAME")
+    REFRESH_TOKEN_TIME: int = 7 * 24 * 60
     
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 settings = Settings()

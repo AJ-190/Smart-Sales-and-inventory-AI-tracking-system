@@ -35,4 +35,9 @@ def login(user_credentials: OAuth2PasswordRequestForm = Depends(), db: Session =
         "role": user.role
     })
 
-    return {"access_token": token, "token_type": "Bearer"}
+    return {"access_token": token, "token_type": "Bearer",
+            "refresh_token": security.refresh_token({
+                "sub": str(user.user_id),
+                "role": user.role
+            })
+    }

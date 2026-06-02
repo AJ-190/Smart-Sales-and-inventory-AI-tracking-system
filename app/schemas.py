@@ -7,7 +7,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 
 class UserSignUp(BaseModel):
     name: str
-    email: str
+    email: EmailStr
     password: str
     phone: str
 

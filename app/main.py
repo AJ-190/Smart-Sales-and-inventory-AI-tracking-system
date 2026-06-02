@@ -28,4 +28,4 @@ app.include_router(approvals.router)
 
 @app.get("/")
 def root():
-    return "API is running "
+    return "API is running"
