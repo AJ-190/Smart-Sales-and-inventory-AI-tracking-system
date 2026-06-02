@@ -1,10 +1,8 @@
-from sched import scheduler
 from fastapi import FastAPI
 from app.database import Base, engine
 from app.routers import admin_end_report, business, oauth, products, reports, sales, approvals
 from app.routers import users
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
 from app.services.scheduler import start_scheduler, scheduler
 Base.metadata.create_all(bind = engine)
 

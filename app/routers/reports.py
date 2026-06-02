@@ -1,16 +1,10 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app import database, models
-from app.core import config
-from app.core import security
 from app import schemas
-from app.jobs.sales_report import summery
 from app.services import sale_analytics
 from app.utils import dependencies
-from datetime import date, datetime
-from app.services import scheduler
 from datetime import date
-from app.jobs import email_report
  
 
 router = APIRouter(prefix="/reports", tags=['Report'])

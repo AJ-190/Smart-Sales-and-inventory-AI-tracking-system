@@ -51,26 +51,18 @@ class BusinessWithMemberCount(BaseModel):
     
     model_config = ConfigDict(from_attributes=True)
         
-class UserSignUpResponse(BusinessReposnse):
+class UserSignUpResponse(BaseModel):
     business_id: Optional[int] = None
     user_id: int
     name: str
     email: str
     role: str
     is_active: bool = True
-    
+
     model_config = ConfigDict(from_attributes=True)
-    
 
 class BusinessCreate(BaseModel):
     name : str
-
-class BusinessReposnse(BaseModel):
-    business_id: int
-    name: str
-    is_active: bool = True
-    
-    model_config = ConfigDict(from_attributes=True)
         
 class BusinessUpdate(BaseModel):
     name: Optional[str] = None
@@ -129,7 +121,7 @@ class Restock(BaseModel):
     
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
-    price: Optional[int] = None
+    price: Optional[float] = None
     description: Optional[str] = None
     category: Optional[str] = None
     low_stock_threshold: Optional[int] = None

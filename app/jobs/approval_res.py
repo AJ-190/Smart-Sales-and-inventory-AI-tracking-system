@@ -3,7 +3,7 @@ import smtplib
 from dotenv import load_dotenv
 import time
 
-load_dotenv
+load_dotenv()
 import os
 
 

@@ -145,7 +145,7 @@ def delete_user(id, db: Session,current_user ):
     if not user_:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
-    if current_user.role == models.RoleEnum.admin and current_user.business_id != current_user.business_id:
+    if current_user.role == models.RoleEnum.admin and current_user.business_id != user_.user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to delete users from other businesses")
     
     db.delete(user_)

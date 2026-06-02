@@ -37,24 +37,27 @@ def _get_period_range(period: str) -> tuple[datetime, datetime]:
 
 
 
-def summery(period: str, db:Session = next(database.get_db())
-            ):
-    start, end = _get_period_range(period)
-    users = (
-        db.query(models.BusinessMember)
-        .filter(models.BusinessMember.role in(
-            [models.RoleEnum.admin,
-             models.RoleEnum.super_admin,
-             models.RoleEnum.manager]
-            ))
-        ).all()
-
+def summery(period: str):
+    db = next(database.get_db())
     try:
+        start, end = _get_period_range(period)
+        users = (
+            db.query(models.BusinessMember)
+            .filter(models.BusinessMember.role.in_(
+                [models.RoleEnum.admin,
+                 models.RoleEnum.super_admin,
+                 models.RoleEnum.manager]
+                ))
+            .all()
+        )
+
         for user in users:
-            sale_analytics.get_summery(db, user, start, end)
+            sale_analytics.get_summery(user.business_id, db, user, start, end)
             print(f"[CRON] summary done for {user.user_id}")
     except Exception as e:
-        logger.error(f"Error generating {period} sales summary: {e}") 
+        logger.error(f"Error generating {period} sales summary: {e}")
+    finally:
+        db.close() 
         
         
 def daily_sale_summery():

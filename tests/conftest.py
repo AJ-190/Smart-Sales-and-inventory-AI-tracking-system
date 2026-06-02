@@ -161,10 +161,11 @@ def authorized_sup_products_create(authorized_sup_client, test_get_businesses):
     
     created = []
     for product in products:
-        authorized_sup_client.post(
-            f"/products/{test_get_businesses[0].business_id}"
+        res = authorized_sup_client.post(
+            f"/products/{test_get_businesses[0].business_id}",
+            json=product
         )
-        created.append(schemas.Productcreate(**product.json()))
+        created.append(schemas.ProductResponse(**res.json()))
         
     return created
 
@@ -182,11 +183,13 @@ def test_business(authorized_sup_client):
         {"name": "Core.AI"}
     ]
     
+    created = []
     for business in businesses:
-        authorized_sup_client.post(
+        res = authorized_sup_client.post(
             "/businesses/create",
             json=business
         )
+        created.append(res)
         
 
         
@@ -289,9 +292,8 @@ def test_send_approval(authorized_user_client, test_get_business_key, ):
 @pytest.fixture
 def test_approve_approval_(authorized_sup_client,test_get_businesses, test_send_approval, authorized_user_client_test_businesses):
     res = authorized_sup_client.post(
-        f"/approvals/conirm_approvals/{test_get_businesses[0].business.business_id}",
+        f"/approvals/confirm_approvals/{test_get_businesses[0].business.business_id}",
         json={"approval_id": test_send_approval.approval_id, "dir": 1}
     )
     
-    approval = [schemas.ApprovalsResponse(**approval) for approval in res.json()]
-    return approval[0]
+    return schemas.ApprovalsResponse(**res.json())

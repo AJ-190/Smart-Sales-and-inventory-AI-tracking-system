@@ -1,12 +1,9 @@
 
 from fastapi import status, HTTPException , Depends, APIRouter
 from app import database, models
-from app.core import config
-from app.core import security
 from app import schemas
 from sqlalchemy.orm import Session
 from app.services import users_service
-
 from app.utils import dependencies
 
 

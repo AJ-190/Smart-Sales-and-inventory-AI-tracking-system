@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app import database, models
-from app.models import Business
 from app import schemas
 from app.utils import dependencies
 from typing import Optional
@@ -14,7 +13,7 @@ router = APIRouter(prefix="/sales", tags=['Sales'])
 @router.post("/{business_id}", status_code=201, response_model=schemas.SaleResponse)
 async def add_sale(business_id: int, post:schemas.SaleCreate,
              db: Session = Depends(database.get_db),
-             current_user: Business = Depends(dependencies.get_current_user)):
+             current_user: models.Users = Depends(dependencies.get_current_user)):
     return sale_service.add_sale(business_id, post,db, current_user)
 
 from datetime import date

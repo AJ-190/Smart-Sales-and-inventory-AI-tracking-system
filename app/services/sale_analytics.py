@@ -1,22 +1,16 @@
-from tracemalloc import start
 from sqlalchemy.orm import Session
 from app import database, models
-from app.core import config
 from app.jobs import email_report
-from app.services import sale_service
 from app import schemas
 from app.services.sale_service import get_member
-from app.utils import dependencies
 from sqlalchemy import func, cast, Date
-from app.core import security
 from fastapi import HTTPException, status, Depends
 from datetime import datetime, date
-from app.jobs import email_report
 
 def date_validator(date, end_date):
-    today = datetime.utcnow().date()
     if not date or not end_date:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="BBoth start date and end date must eb provided")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Both start date and end date must be provided")
+    today = datetime.utcnow().date()
     if date > today or end_date > today:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot retrieve future data")
     if end_date < date:
@@ -29,8 +23,6 @@ def view_profit(
                 current_user, date: date | None = None, 
                 end_date: date| None = None):
     
-
-    
     if current_user.role not in [
         models.RoleEnum.admin, 
         models.RoleEnum.super_admin
@@ -38,8 +30,8 @@ def view_profit(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
         detail="Unauthorized to perform this action")
     
-    
-    date_validator(date, end_date)
+    if date and end_date:
+        date_validator(date, end_date)
     
     profit = (
         db.query(
@@ -75,21 +67,21 @@ def get_summery(business_id, db:Session, current_user, date, end_date):
     ]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
     
-
-    
-    summery = (
+    query = (
         db.query( 
                  func.sum(models.SalesItem.quantity).label("sold_quantity") ,
                  func.sum(models.Sale.total_amount).label("total_revenue"),
                  func.sum(models.Sale.profit).label("total_profit"),
                  func.count(models.Sale.sale_id).label("Total_sales")
                  )
-        
         .join(models.SalesItem, models.Sale.sale_id == models.SalesItem.sale_id)
         .filter(models.Sale.business_id == business_id)
-        .filter(func.date(models.Sale.created_at) >= date)
-        .filter(func.date(models.Sale.created_at) <= end_date)
     )
+    if date:
+        query = query.filter(func.date(models.Sale.created_at) >= date)
+    if end_date:
+        query = query.filter(func.date(models.Sale.created_at) <= end_date)
+    summery = query
     result = summery.first()
 
     sold_quantity = result.sold_quantity or 0
@@ -99,33 +91,37 @@ def get_summery(business_id, db:Session, current_user, date, end_date):
 
     profit_margin = (total_profit / total_revenue * 100) if total_revenue > 0 else 0
 
-    cash_total = (
-        db.query(func.count(models.Sale.payment_method)
-                 .filter(models.Sale.business_id == business_id)
-                 .filter(models.Sale.payment_method == models.PaymentMethod.cash)
-                 .filter(func.date(models.Sale.created_at) >= date)
-                 .filter(func.date(models.Sale.created_at) <= end_date)
-                 ).scalar() 
+    cash_q = db.query(func.count(models.Sale.sale_id)).filter(
+        models.Sale.business_id == business_id,
+        models.Sale.payment_method == models.PaymentMethod.cash,
     )
-    
-    momo_total = (
-        db.query(func.count(models.Sale.payment_method).label("total_momo"))
-        .filter(models.Sale.business_id == business_id)
-        .filter(models.Sale.payment_method == models.PaymentMethod.mobile_money)
-        .filter(func.date(models.Sale.created_at) >= date)
-        .filter(func.date(models.Sale.created_at) <= end_date)
-        .scalar() 
-    )
-    card_total = (
-        db.query(func.count(models.Sale.payment_method).label("card_total"))
-        .filter(models.Sale.business_id == business_id)
-        .filter(models.Sale.payment_method == models.PaymentMethod.card)
-        .filter(func.date(models.Sale.created_at) >= date)
-        .filter(func.date(models.Sale.created_at) <= end_date)
-        .scalar() 
-    )
+    if date:
+        cash_q = cash_q.filter(func.date(models.Sale.created_at) >= date)
+    if end_date:
+        cash_q = cash_q.filter(func.date(models.Sale.created_at) <= end_date)
+    cash_total = cash_q.scalar() or 0
 
-    best_selling = (
+    momo_q = db.query(func.count(models.Sale.sale_id)).filter(
+        models.Sale.business_id == business_id,
+        models.Sale.payment_method == models.PaymentMethod.mobile_money,
+    )
+    if date:
+        momo_q = momo_q.filter(func.date(models.Sale.created_at) >= date)
+    if end_date:
+        momo_q = momo_q.filter(func.date(models.Sale.created_at) <= end_date)
+    momo_total = momo_q.scalar() or 0
+
+    card_q = db.query(func.count(models.Sale.sale_id)).filter(
+        models.Sale.business_id == business_id,
+        models.Sale.payment_method == models.PaymentMethod.card,
+    )
+    if date:
+        card_q = card_q.filter(func.date(models.Sale.created_at) >= date)
+    if end_date:
+        card_q = card_q.filter(func.date(models.Sale.created_at) <= end_date)
+    card_total = card_q.scalar() or 0
+
+    best_q = (
         db.query(
             models.Product.name,
             func.sum(models.SalesItem.quantity).label("total_quantity")
@@ -133,12 +129,12 @@ def get_summery(business_id, db:Session, current_user, date, end_date):
         .join(models.SalesItem, models.Product.product_id == models.SalesItem.product_id)
         .join(models.Sale, models.Sale.sale_id == models.SalesItem.sale_id)
         .filter(models.Sale.business_id == business_id)
-        .filter(func.date(models.Sale.created_at) >= date)
-        .filter(func.date(models.Sale.created_at) <= end_date)
-        .group_by(models.Product.name)
-        .order_by(func.sum(models.SalesItem.quantity).desc())
-        .first()
     )
+    if date:
+        best_q = best_q.filter(func.date(models.Sale.created_at) >= date)
+    if end_date:
+        best_q = best_q.filter(func.date(models.Sale.created_at) <= end_date)
+    best_selling = best_q.group_by(models.Product.name).order_by(func.sum(models.SalesItem.quantity).desc()).first()
 
 
     best_selling_product = best_selling.name if best_selling else "N/A"
@@ -179,6 +175,4 @@ def check_stock(db:Session, current_user):
     
     if not stock:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No products are low in stock")
-    quantity, name = stock
-    
-    return name, quantity
+    return stock

@@ -4,7 +4,6 @@ from sqlalchemy import func
 from app import models
 from app.core import config
 from app.core import security
-from app.routers import sales
 from fastapi import status, HTTPException, Depends, APIRouter
 from app.utils import dependencies
 from app import schemas
@@ -73,7 +72,7 @@ def add_sale(business_id, post: schemas.SaleCreate, db: Session, current_user):
         user_id        = member.user_id,
         business_id    = business_id,
         total_amount   = total_amount,
-        amount_paid    = total_cost,
+        amount_paid    = total_amount,
         payment_method = post.payment_method,
         profit         = total_profit,
     )
