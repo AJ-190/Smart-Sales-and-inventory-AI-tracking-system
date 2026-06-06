@@ -9,3 +9,7 @@ SalesMobileApp
 node_modules
 .expo/dev/logs/start.log
 .expo/README.md
+tsconfig.json
+package.json
+package-lock.json
+app.json
