@@ -125,6 +125,13 @@ Authorization: Bearer <your_token>
 | `/approvals/confirm_approvals/{business_id}` | POST | Confirm approvals (approve/reject) |
 
 ---
+## Customers
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/customers/{business_id}` | POST | Create a new customer account|
+| `/customers/{business_id}/` | GET | Get all customers in the business|
+
 
 ## Automated Reports
 
