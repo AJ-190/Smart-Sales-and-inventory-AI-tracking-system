@@ -4,5 +4,15 @@ __pycache__/
 *.pyc
 *.pyo
 .env
-
+.expo/devices.json
 SalesMobileApp
+node_modules
+.expo/dev/logs/start.log
+.expo/README.md
+alembic/versions/2dede6b41206_added_debt_table.py
+alembic/versions/3a4665428505_added_relationship_between_sale_and_.py
+Revision ID: 2dede6b41206
+Revises: 1a2b3c4d5e6f
+Create Date: 2024-06-01 12:00:00.000000
+alembic/versions/e04873be4e2f_added_refresh_column.py
+ tsconfig.json

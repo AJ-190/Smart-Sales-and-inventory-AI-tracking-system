@@ -236,17 +236,17 @@ def test_products_create(authorized_user_client, authorized_user_client_test_bus
 @pytest.fixture
 def test_create_sale_cli(authorized_user_client, authorized_user_client_cre_bus, test_products_create):
     sales = [
-        {"payment_method": "momo",
+        {"payment_method": "momo", "amount_paid": 16000,
          "list_items": [
              {"product_id": test_products_create[0].product_id, "quantity": 2},
              {"product_id": test_products_create[1].product_id, "quantity": 2}
          ]},
-        {"payment_method": "momo",
+        {"payment_method": "momo", "amount_paid": 16000,
          "list_items": [
              {"product_id": test_products_create[0].product_id, "quantity": 2},
              {"product_id": test_products_create[1].product_id, "quantity": 2}
          ]},
-        {"payment_method": "momo",
+        {"payment_method": "momo", "amount_paid": 16000,
          "list_items": [
              {"product_id": test_products_create[0].product_id, "quantity": 2},
              {"product_id": test_products_create[1].product_id, "quantity": 2}

@@ -1,13 +1,11 @@
 
 from fastapi import status, HTTPException , Depends
-from app import database, models
-from app.core import config
-from app.core import security
+from app import models
 from app import schemas
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.services.users_service import update_user, get_user
-from app.utils import dependencies
+
 
 def add_business(post, db: Session, current_user):
     existing = (

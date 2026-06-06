@@ -1,9 +1,11 @@
 import uuid
 import enum
 from sqlalchemy import Column, String, Float, Boolean, Integer, DateTime, ForeignKey, Enum, UniqueConstraint
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 from app.database import Base
+from datetime import datetime, date
+
 
 
 class RoleEnum(str, enum.Enum):
@@ -59,6 +61,7 @@ class Business(Base):
     business_id = Column(Integer, primary_key=True, autoincrement=True)
     name        = Column(String, nullable=False)
     business_key     = Column(String, unique=True, default=lambda: str(uuid.uuid4()))
+    refresh_token = Column(String, nullable=True)
     is_active   = Column(Boolean, default=True)
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -67,7 +70,7 @@ class Business(Base):
     sales     = relationship("Sale", back_populates="business")
     customers = relationship("Customer", back_populates="business")
     approvals = relationship("Approvals", back_populates="business")
-
+    debts     = relationship("Debt", back_populates="business")
 
 class BusinessMember(Base):
     __tablename__ = "business_members"
@@ -114,12 +117,12 @@ class Customer(Base):
     name        = Column(String, nullable=False)
     phone       = Column(String, nullable=True)
     email       = Column(String, nullable=True)
-    debt        = Column(Float, default=0.0)
+    address     = Column(String, nullable=True)
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
 
     business = relationship("Business", back_populates="customers")
     sales    = relationship("Sale", back_populates="customer")
-
+    debts    = relationship("Debt", back_populates="customer")
 
 
 class Product(Base):
@@ -162,7 +165,7 @@ class Sale(Base):
     customer    = relationship("Customer", back_populates="sales")
     user        = relationship("Users", back_populates="sales")
     sales_items = relationship("SalesItem", back_populates="sale", cascade="all, delete-orphan")
-
+    debt = relationship("Debt", back_populates="sale", uselist=False, cascade="all, delete-orphan")
 
 
 
@@ -179,3 +182,20 @@ class SalesItem(Base):
 
     product = relationship("Product", back_populates="sales_items")
     sale    = relationship("Sale", back_populates="sales_items")
+    
+    
+class Debt(Base):
+    __tablename__ = "debts"
+    
+    debt_id :Mapped[int] = mapped_column(primary_key=True, autoincrement=True, nullable=False)
+    sale_id: Mapped[int] = mapped_column(ForeignKey("sales.sale_id"), nullable=True)
+    business_id : Mapped[int] = mapped_column(ForeignKey("businesses.business_id"), nullable=False)
+    customer_id : Mapped[int] = mapped_column(ForeignKey("customers.customer_id"), nullable=False)
+    amount : Mapped[float] = mapped_column(Float, nullable=False)
+    due_date : Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_paid : Mapped[Boolean] = mapped_column(Boolean, default=False)
+    created_at : Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+     
+    business = relationship("Business", back_populates="debts")
+    customer = relationship("Customer", back_populates="debts")
+    sale = relationship("Sale", back_populates="debt")

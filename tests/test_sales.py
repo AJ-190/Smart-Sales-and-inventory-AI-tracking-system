@@ -5,6 +5,7 @@ def test_create_sale(authorized_user_client,authorized_user_client_cre_bus, test
     res = authorized_user_client.post(
     f"/sales/{authorized_user_client_cre_bus[0].business_id}",
     json={"payment_method": "momo",
+          "amount_paid": 16000,
           "list_items":[
              { "product_id": test_products_create[0].product_id, "quantity": 2},
              { "product_id": test_products_create[1].product_id, "quantity": 2}
@@ -38,6 +39,7 @@ def test_sale_no_product(authorized_user_client,authorized_user_client_cre_bus, 
     res = authorized_user_client.post(
     f"/sales/{authorized_user_client_cre_bus[0].business_id}",
     json={"payment_method": "momo",
+          "amount_paid": 8000,
           "list_items":[
              { "product_id": 7, "quantity": 2},
              { "product_id": 7, "quantity": 2}
@@ -50,6 +52,7 @@ def test_sale_quantity_higher(authorized_user_client,authorized_user_client_cre_
     res = authorized_user_client.post(
     f"/sales/{authorized_user_client_cre_bus[0].business_id}",
     json={"payment_method": "momo",
+          "amount_paid": 8000,
           "list_items":[
              { "product_id": test_products_create[0].product_id, "quantity": 10000},
              { "product_id": test_products_create[1].product_id, "quantity": 20000}

@@ -1,10 +1,11 @@
 from fastapi import APIRouter, status, HTTPException, Depends
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm
+from markdown_it import token
 from app import database, models
 from app import schemas
 from sqlalchemy.orm import Session
 from app.core import security
-from app.utils import dependencies
+
 
 
 
@@ -35,9 +36,9 @@ def login(user_credentials: OAuth2PasswordRequestForm = Depends(), db: Session =
         "role": user.role
     })
 
-    return {"access_token": token, "token_type": "Bearer",
-            "refresh_token": security.refresh_token({
-                "sub": str(user.user_id),
-                "role": user.role
-            })
-    }
+    refresh = security.refresh_token({
+        "sub": str(user.user_id),
+        "role": user.role
+    })
+    
+    return {"access_token": token, "refresh_token": refresh, "token_type": "bearer"}

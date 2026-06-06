@@ -44,3 +44,12 @@ def get_low_stock(
     current_user: models.Users = Depends(dependencies.get_current_user)
 ):
     return sale_analytics.check_stock(db, current_user)
+
+
+@router.get("/analytics/debts/{business_id}", response_model=list[schemas.DebtResponse])
+def get_debts(
+    business_id: int, 
+    db: Session = Depends(database.get_db),
+    current_user: models.Users = Depends(dependencies.get_current_user)
+):
+    return sale_analytics.get_debts(business_id, db, current_user)

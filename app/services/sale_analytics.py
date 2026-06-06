@@ -176,3 +176,26 @@ def check_stock(db:Session, current_user):
     if not stock:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No products are low in stock")
     return stock
+
+
+def get_debts(business_id, db: Session, current_user):
+    if current_user.role not in [
+        models.RoleEnum.admin, 
+        models.RoleEnum.super_admin,
+        models.RoleEnum.manager
+    ]:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
+                            detail="Unauthorized to perform this action")
+    
+    debts = (
+        db.query(func.sum(models.Debt.amount).label("total_debt"))
+        .filter(models.Debt.business_id == business_id)
+        .filter(models.Debt.is_paid == False)
+        .first()
+    )
+    
+    
+    if not debts:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No customers with outstanding debts found")
+    
+    return debts

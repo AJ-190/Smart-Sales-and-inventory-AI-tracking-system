@@ -152,11 +152,16 @@ class Token(BaseModel):
 class SaleItemCreate(BaseModel):
     product_id: int
     quantity: int
-    
+
+
 
 class SaleCreate(BaseModel):
     payment_method: str
+    amount_paid: float
     list_items: list[SaleItemCreate]
+    customer_id: Optional[int] = None
+    due_date : Optional[datetime] = None
+    
     
     
 class SaleItemResponse(BaseModel):
@@ -166,6 +171,16 @@ class SaleItemResponse(BaseModel):
     unit_price : float
     subtotal   : float
     profit     : float
+
+    model_config = ConfigDict(from_attributes=True)
+    
+class DebtResponse(BaseModel):
+    debt_id: int
+    business_id: int
+    customer_id: int
+    amount: float
+    due_date: datetime
+    is_paid: bool
 
     model_config = ConfigDict(from_attributes=True)
     
@@ -179,9 +194,12 @@ class SaleResponse(BaseModel):
     notes: Optional[str] = None
     created_at: datetime
     sales_items: list[SaleItemResponse] = []
+    debt: DebtResponse | None = None
     
     model_config = ConfigDict(from_attributes=True)
-        
+    
+    
+     
 class ProfitResponse(BaseModel):
     profit:float
     revenue: float
@@ -246,3 +264,20 @@ class Business_key(BaseModel):
 class Direction(BaseModel):
     approval_id: int
     dir: Annotated[int, Field(le=1, ge=0)] 
+    
+    
+    
+class CustomerCreate(BaseModel):
+    name: str
+    phone: str
+    email: str
+    address: str
+    
+class CustomerResponse(BaseModel):
+    customer_id: int
+    business_id: int
+    name: str
+    phone: str
+    email: str
+
+    model_config = ConfigDict(from_attributes=True)

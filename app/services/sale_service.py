@@ -2,15 +2,12 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app import models
-from app.core import config
-from app.core import security
 from fastapi import status, HTTPException, Depends, APIRouter
-from app.utils import dependencies
 from app import schemas
 from app.services.products_service import get_member
 from datetime import timedelta, datetime, date
 from sqlalchemy import func, cast, Date
-
+from sqlalchemy.orm import joinedload
 
 
 def add_sale(business_id, post: schemas.SaleCreate, db: Session, current_user):
@@ -28,7 +25,7 @@ def add_sale(business_id, post: schemas.SaleCreate, db: Session, current_user):
     total_cost   = 0
     items_list   = []
 
-    # Single loop — validate, calculate, collect
+    
     for item in post.list_items:
         product = (
             db.query(models.Product)
@@ -58,6 +55,7 @@ def add_sale(business_id, post: schemas.SaleCreate, db: Session, current_user):
         total_cost   += item_cost
         total_profit += item_profit
         
+
         product.quantity -= item.quantity  
 
         items_list.append({
@@ -72,23 +70,56 @@ def add_sale(business_id, post: schemas.SaleCreate, db: Session, current_user):
         user_id        = member.user_id,
         business_id    = business_id,
         total_amount   = total_amount,
-        amount_paid    = total_amount,
+        amount_paid    = post.amount_paid,
         payment_method = post.payment_method,
         profit         = total_profit,
     )
     db.add(sale)
     db.flush()
+    
+    debt = total_amount - post.amount_paid
 
+        
     for sale_item in items_list:
         sale_data = models.SalesItem(
             sale_id = sale.sale_id,
             **sale_item
         )
         db.add(sale_data)
+        
+    if debt > 0:
+        if not post.customer_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Customer ID must be provided for sales with outstanding debt")
+        
+        check_customer_reg = (
+            db.query(models.Customer)
+            .filter(models.Customer.business_id == business_id)
+            .filter(models.Customer.customer_id == post.customer_id)
+            .first()
+        )
 
+        if not check_customer_reg:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Customer with the ID: {post.customer_id} not found")
+        
+        new_debt = models.Debt(
+            business_id = business_id,
+            customer_id = post.customer_id,
+            sale_id = sale.sale_id,
+            amount = debt,
+            due_date = post.due_date or (datetime.utcnow() + timedelta(days=30))
+        )
+        db.add(new_debt)
+    
     db.commit()
-    db.refresh(sale)
-    return sale
+    sale_ = (
+        db.query(models.Sale)
+        .options(
+            joinedload(models.Sale.sales_items),
+            joinedload(models.Sale.debt))
+        .filter(models.Sale.sale_id == sale.sale_id)
+        .first()
+    )
+    return sale_
 
 def get_sales(
     business_id: int,
@@ -194,7 +225,6 @@ def delete_sale(business_id,id, db:Session, current_user):
     ]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
     
-    member = get_member(db, current_user)
     
     sale = (
         db.query(models.Sale)

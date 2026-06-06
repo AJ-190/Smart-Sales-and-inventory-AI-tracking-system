@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.database import Base, engine
-from app.routers import admin_end_report, business, oauth, products, reports, sales, approvals
+from app.routers import admin_end_report, business, oauth, products, reports, sales, approvals , customers
 from app.routers import users
 from contextlib import asynccontextmanager
 from app.services.scheduler import start_scheduler, scheduler
@@ -23,6 +23,7 @@ app.include_router(users.router)
 app.include_router(reports.router)
 app.include_router(admin_end_report.router)
 app.include_router(approvals.router)
+app.include_router(customers.router)
 
 @app.get("/")
 def root():

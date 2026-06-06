@@ -22,10 +22,10 @@ def access_token(data: dict):
     return token
 
 def refresh_token(data: dict):
-    to_code = data.copy()
+    to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_TIME)
-    to_code.update({"exp": expire})
-    token = jwt.encode(to_code, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    to_encode.update({"exp": expire})
+    token = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return token
 
 def verify_token(token: str) -> dict:
