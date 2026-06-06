@@ -25,6 +25,7 @@ A production-ready REST API for small businesses to manage inventory, track sale
 - **Sales Tracking** — Record, retrieve, update, and delete sales transactions with automatic calculations
 - **Business Approvals** — Request and manage business join approvals with role-based access control
 - **Automated Reports** — Daily, weekly, and monthly sales summaries sent via email to admins and managers using background cron jobs
+- **Customer Debt Tracker and Auto Reminders** - Never lose track of who owes you, we remind them so you don't have to.
 
 ---
 
