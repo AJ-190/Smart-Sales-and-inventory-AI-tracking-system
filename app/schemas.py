@@ -272,7 +272,7 @@ class CustomerCreate(BaseModel):
     name: str
     phone: str
     email: str
-    address: str
+    address: Optional[str] = None
     
 class CustomerResponse(BaseModel):
     customer_id: int
@@ -282,3 +282,10 @@ class CustomerResponse(BaseModel):
     email: str
 
     model_config = ConfigDict(from_attributes=True)
+    
+class CustomerUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    

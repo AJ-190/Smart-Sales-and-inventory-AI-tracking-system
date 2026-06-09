@@ -1,6 +1,6 @@
 import uuid
 import enum
-from sqlalchemy import Column, String, Float, Boolean, Integer, DateTime, ForeignKey, Enum, UniqueConstraint
+from sqlalchemy import Column, String, Float, Boolean, Integer, DateTime, ForeignKey, Enum, UniqueConstraint, text
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 from app.database import Base
@@ -118,6 +118,7 @@ class Customer(Base):
     phone       = Column(String, nullable=True)
     email       = Column(String, nullable=True)
     address     = Column(String, nullable=True)
+    is_active   = Column(Boolean, default=True, nullable=False, server_default=text("True"))
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
 
     business = relationship("Business", back_populates="customers")
