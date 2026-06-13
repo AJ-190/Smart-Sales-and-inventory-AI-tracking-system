@@ -10,6 +10,7 @@ from src.auth import utils as auth_utils
 import src.users.models
 import src.businesses.models
 import src.debts.models
+import src.customers.models
 
 from src.users import schemas as user_schemas
 from src.businesses import schemas as biz_schemas

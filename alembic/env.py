@@ -9,6 +9,7 @@ from src.database import Base
 import src.users.models
 import src.businesses.models
 import src.debts.models
+import src.customers.models
 import os
 from alembic import context
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Optional
-from datetime import date as dt, date, datetime
+from datetime import date
 from src.database import get_db
 from src.businesses import schemas, service as biz_service
 from src.auth import dependencies as auth_deps
@@ -140,49 +140,6 @@ def confirm_approval(post: schemas.Direction,
                      db: Session = Depends(get_db),
                      current_user=Depends(auth_deps.get_current_user)):
     return biz_service.con_del_approval(post, business_id, db, current_user)
-
-
-@router.post("/business/customers/{business_id}", response_model=schemas.CustomerResponse)
-def create_customer(
-    business_id: int,
-    post: schemas.CustomerCreate,
-    db: Session = Depends(get_db),
-    current_user=Depends(auth_deps.get_current_user),
-):
-    return biz_service.create_customer(db, current_user, post, business_id)
-
-
-@router.get("/business/customers/{business_id}", response_model=list[schemas.CustomerResponse])
-def get_customers(
-    business_id: int,
-    db: Session = Depends(get_db),
-    current_user=Depends(auth_deps.get_current_user),
-    search: str | None = None,
-    skip: int = 0,
-    limit: int = 10
-):
-    return biz_service.get_customers(business_id, db, current_user, search, skip, limit)
-
-
-@router.get("/business/customers/{business_id}/{customer_id}", response_model=schemas.CustomerResponse)
-def get_customer(business_id: int, customer_id: int,
-                 db: Session = Depends(get_db),
-                 current_user=Depends(auth_deps.get_current_user)):
-    return biz_service.get_customer(business_id, customer_id, db, current_user)
-
-
-@router.put("/business/customers/{business_id}/{customer_id}", response_model=schemas.CustomerResponse)
-def update_customer(post: schemas.CustomerUpdate, business_id: int, customer_id: int,
-                    db: Session = Depends(get_db),
-                    current_user=Depends(auth_deps.get_current_user)):
-    return biz_service.update_customer(post, business_id, customer_id, db, current_user)
-
-
-@router.delete("/business/customers/{business_id}/{customer_id}", status_code=204)
-def delete_user(business_id: int, customer_id: int,
-                db: Session = Depends(get_db),
-                current_user=Depends(auth_deps.get_current_user)):
-    return biz_service.delete_customer(business_id, customer_id, db, current_user)
 
 
 @router.get("/reports/profit/{business_id}", response_model=schemas.ProfitResponse)

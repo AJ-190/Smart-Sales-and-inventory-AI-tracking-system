@@ -4,6 +4,7 @@ from src.businesses.router import router as main_router
 from src.auth.router import router as auth_router
 from src.users.router import router as users_router
 from src.debts.router import router as debts_router
+from src.customers.router import router as customers_router
 from contextlib import asynccontextmanager
 from src.celery_tasks.scheduler import start_scheduler, scheduler
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,6 +33,7 @@ app.include_router(main_router)
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(debts_router)
+app.include_router(customers_router)
 
 
 @app.get("/")
