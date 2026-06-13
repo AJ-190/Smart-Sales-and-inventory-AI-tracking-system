@@ -1,5 +1,5 @@
 import pytest
-from app import schemas, models
+from src.businesses import schemas, models as bm
 
 
 def test_send_approval(authorized_user_client,test_get_businesses, test_get_business_key):
@@ -14,7 +14,7 @@ def test_send_approval(authorized_user_client,test_get_businesses, test_get_busi
     assert res.status_code == 201
     approval = schemas.ApprovalsResponseUser(**res.json())
     assert approval.business_id == test_get_businesses[0].business.business_id
-    assert approval.status == models.ApprovalStatus.pending
+    assert approval.status == bm.ApprovalStatus.pending
 
 def test_send_approval_invalid_business_key(authorized_user_client, test_get_businesses):
     res = authorized_user_client.post(
@@ -71,7 +71,7 @@ def test_reject_approval(authorized_sup_client, test_get_businesses, test_send_a
     assert res.status_code == 200
     approval = schemas.ApprovalsResponse(**res.json())
     assert approval.approval_id == test_send_approval.approval_id
-    assert approval.status == models.ApprovalStatus.rejected
+    assert approval.status == bm.ApprovalStatus.rejected
     
 def test_reject_approval_unauthorized(authorized_user_client,test_get_businesses, test_send_approval, authorized_user_client_test_businesses):
     res = authorized_user_client.post(
@@ -106,7 +106,7 @@ def test_approved_approval(authorized_sup_client, test_get_businesses, test_send
     assert res.status_code == 200
     approval = schemas.ApprovalsResponse(**res.json())
     assert approval.approval_id == test_send_approval.approval_id
-    assert approval.status == models.ApprovalStatus.approved
+    assert approval.status == bm.ApprovalStatus.approved
     
     
 def test_approved_approval_unauthorized(authorized_user_client,test_get_businesses, test_send_approval, authorized_user_client_test_businesses):

@@ -1,5 +1,5 @@
 import pytest
-from app import schemas
+from src.businesses import schemas
 
 
 def test_daily_sales_report(authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli):

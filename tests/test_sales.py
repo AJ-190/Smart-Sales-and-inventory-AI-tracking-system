@@ -1,5 +1,5 @@
 import pytest
-from app import schemas, models
+from src.businesses import schemas, models as bm
 
 def test_create_sale(authorized_user_client,authorized_user_client_cre_bus, test_products_create, session):
     res = authorized_user_client.post(
@@ -16,8 +16,8 @@ def test_create_sale(authorized_user_client,authorized_user_client_cre_bus, test
     assert sale .sales_items[0].product_id == test_products_create[0].product_id
 
     product =( 
-              session.query(models.Product)
-              .filter(models.Product.product_id == test_products_create[0].product_id)
+              session.query(bm.Product)
+              .filter(bm.Product.product_id == test_products_create[0].product_id)
               .first()
               )
     assert product.quantity == 8

@@ -5,7 +5,10 @@ from sqlalchemy import pool
 from dotenv import load_dotenv
 load_dotenv()
 
-from app.models import Base
+from src.database import Base
+import src.users.models
+import src.businesses.models
+import src.debts.models
 import os
 from alembic import context
 

@@ -1,4 +1,5 @@
-from app import schemas, models
+from src.users import schemas, models as um
+from src.auth import schemas as auth_schemas
 import pytest
 
 def test_endpoint(client):
@@ -19,7 +20,7 @@ def test_user_create(client):
     user = schemas.UserSignUpResponse(**res.json())
     assert user.name == data['name']
     assert user.email == data['email']
-    assert user.role == models.RoleEnum.super_admin
+    assert user.role == um.RoleEnum.super_admin
     assert res.status_code == 201
     
 def test_create_user_duplicate_email(client, test_user):
@@ -42,7 +43,7 @@ def test_login_user(client, test_user):
         data={"username": "adysamuel68@gmail.com",
               "password": "passwordY123"})
     
-    post = schemas.Token(**res.json())
+    post = auth_schemas.Token(**res.json())
     assert post.token_type == "bearer"
     assert res.status_code == 200
 

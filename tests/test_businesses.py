@@ -1,5 +1,5 @@
 import pytest
-from app import models, schemas
+from src.businesses import schemas
 
 
 def test_business_create(authorized_sup_client, test_user):
