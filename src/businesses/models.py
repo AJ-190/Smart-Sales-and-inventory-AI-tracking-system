@@ -5,7 +5,6 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from src.database import Base
 from src.users.models import RoleEnum
-from src.customers.models import Customer
 
 
 class PaymentMethod(str, enum.Enum):

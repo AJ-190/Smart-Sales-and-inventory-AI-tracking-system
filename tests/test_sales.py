@@ -1,7 +1,10 @@
+import asyncio
 import pytest
-from src.businesses import schemas, models as bm
+from sqlalchemy import select
+from src.sales import schemas
+from src.businesses import models as bm
 
-def test_create_sale(authorized_user_client,authorized_user_client_cre_bus, test_products_create, session):
+def test_create_sale(authorized_user_client, authorized_user_client_cre_bus, test_products_create, session):
     res = authorized_user_client.post(
     f"/sales/{authorized_user_client_cre_bus[0].business_id}",
     json={"payment_method": "momo",
@@ -15,11 +18,12 @@ def test_create_sale(authorized_user_client,authorized_user_client_cre_bus, test
     sale = schemas.SaleResponse(**res.json())
     assert sale .sales_items[0].product_id == test_products_create[0].product_id
 
-    product =( 
-              session.query(bm.Product)
-              .filter(bm.Product.product_id == test_products_create[0].product_id)
-              .first()
-              )
+    async def get_product():
+        result = await session.execute(
+            select(bm.Product).where(bm.Product.product_id == test_products_create[0].product_id)
+        )
+        return result.scalars().first()
+    product = asyncio.run(get_product())
     assert product.quantity == 8
     
 def test_create_sale_unauthorized(client,authorized_user_client_cre_bus, test_products_create):

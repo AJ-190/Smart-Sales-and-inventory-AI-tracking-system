@@ -13,3 +13,7 @@ tsconfig.json
 package.json
 package-lock.json
 app.json
+external_services
+src/sales/__init__.py
+src/products/__init__.py
+src/analytics/__init__.py

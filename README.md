@@ -26,6 +26,8 @@ A production-ready REST API for small businesses to manage inventory, track sale
 - **Business Approvals** — Request and manage business join approvals with role-based access control
 - **Customer Management** — Create, update, and manage customers per business
 - **Debt Tracking** — Track outstanding customer debts with auto-reminders
+- **Dashboard & Analytics** — Aggregated KPIs, revenue breakdowns, profit margins, payment method splits, and best-selling product insights
+- **Weather Integration** — Live weather data via Open-Meteo API
 - **Automated Reports** — Daily, weekly, and monthly sales summaries sent via email to admins and managers using background cron jobs
 
 ---
@@ -33,13 +35,16 @@ A production-ready REST API for small businesses to manage inventory, track sale
 ## Tech Stack
 
 | Layer | Technology |
-|---|---|
+|---|---|---|
 | Framework | FastAPI |
-| Database | PostgreSQL |
-| Auth | JWT (OAuth2) |
-| Background Jobs | APScheduler / Celery |
-| Email | SMTP |
+| Database | PostgreSQL (SQLAlchemy ORM) |
+| Auth | JWT (OAuth2 + Argon2 hashing) |
+| Background Jobs | APScheduler |
+| Email | SMTP (Gmail) |
+| Caching | Redis *(optional — connector available)* |
+| External APIs | Open-Meteo (weather) |
 | Deployment | Render / Railway |
+| Mobile Client | React Native (Expo) |
 
 ---
 
@@ -49,50 +54,56 @@ A production-ready REST API for small businesses to manage inventory, track sale
 src/
 ├── main.py                # App entry point, CORS, router registration
 ├── config.py              # Pydantic settings (env vars)
-├── database.py            # SQLAlchemy engine, session, Base
+├── database.py            # SQLAlchemy engine, session factory, Base
+├── httpx_client.py        # Shared HTTPX async client dependency
+├── redis_cllient.py       # Redis async connection helper *(optional)*
 ├── auth/                  # Authentication module
-│   ├── router.py          #   /auth/register, /auth/login
+│   ├── router.py          #   /auth/login, /auth/refresh, /auth/logout
 │   ├── schemas.py         #   Request/response models
-│   ├── service.py         #   Registration & login logic
+│   ├── service.py         #   Login, refresh, logout logic
 │   ├── dependencies.py    #   OAuth2 scheme, get_current_user
-│   └── utils.py           #   Password hashing, JWT helpers
+│   └── utils.py           #   Password hashing (Argon2), JWT helpers
 ├── users/                 # User management module
-│   ├── router.py          #   /users endpoints
+│   ├── router.py          #   /users/sign_up, /users/* CRUD
 │   ├── models.py          #   Users, BusinessMember, RoleEnum
 │   ├── schemas.py         #   Request/response models
-│   ├── service.py         #   User CRUD logic
-│   └── dependencies.py    #   Role-based access helpers
-├── businesses/            # Business, product, sales, approvals module
-│   ├── router.py          #   /businesses, /products, /sales, /approvals, /reports, /admin/crons
+│   └── service.py         #   User CRUD logic
+├── businesses/            # Business, product, sales, approvals, reports
+│   ├── router.py          #   All business/product/sale/approval/report endpoints
 │   ├── models.py          #   Business, Product, Sale, SalesItem, Debt, Approvals
 │   ├── schemas.py         #   Request/response models
-│   └── service.py         #   Business logic
+│   └── service.py         #   All business logic
 ├── customers/             # Customer management module
-│   ├── router.py          #   /business/customers endpoints
+│   ├── router.py          #   /business/customers/* CRUD
 │   ├── models.py          #   Customer model
 │   ├── schemas.py         #   Request/response models
 │   └── service.py         #   Customer CRUD logic
 ├── debts/                 # Debt tracking module
-│   ├── router.py          #   /debts endpoints
+│   ├── router.py          #   /debts endpoint
 │   ├── models.py          #   Re-exports Debt from businesses
 │   ├── schemas.py         #   Request/response models
-│   └── service.py         #   Debt management logic
+│   └── service.py         #   Debt query logic
+├── external_services/     # Third-party API integrations
+│   ├── weather_api.py     #   /weather/{city_name} endpoint
+│   └── weather.py         #   Open-Meteo API client
 ├── celery_tasks/          # Background job module
-│   ├── worker.py          #   Celery app
-│   ├── tasks.py           #   Daily/weekly/monthly summary tasks
-│   ├── scheduler.py       #   APScheduler job definitions
-│   └── email_report.py    #   Email report builder
+│   ├── tasks.py           #   Daily/weekly/monthly summary generators
+│   ├── scheduler.py       #   APScheduler cron job definitions
+│   └── email_report.py    #   HTML email builder (Gmail SMTP)
 ├── middleware/
 │   └── logging.py         # Request logging middleware
 └── errors/
     └── handlers.py        # Global exception handlers
 
 alembic/                   # Database migrations
-tests/                     # Pytest test suite
-├── conftest.py            # Shared fixtures
+tests/                     # Pytest test suite (70+ tests)
+├── conftest.py            # Shared fixtures, factories
 ├── auth/
+│   └── test_auth.py
 ├── users/
+│   └── test_users.py
 ├── debts/
+│   └── test_debts.py
 ├── test_businesses.py
 ├── test_products.py
 ├── test_sales.py
@@ -118,8 +129,25 @@ Authorization: Bearer <your_token>
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/auth/register` | POST | Create a new user account |
-| `/auth/login` | POST | Login and receive JWT token |
+| `/users/sign_up` | POST | Create a new user account |
+| `/auth/login` | POST | Login and receive JWT + refresh token |
+| `/auth/refresh` | POST | Refresh an expired access token |
+| `/auth/logout` | POST | Invalidate refresh token |
+
+---
+
+## Users
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/users/sign_up` | POST | Register a new user |
+| `/users/` | GET | List all users with business names (super admin) |
+| `/users/members` | GET | List members of current business |
+| `/users/all_users` | GET | List all users (super admin) |
+| `/users/{id}` | GET | Get a single user |
+| `/users/{id}` | PUT | Update a user |
+| `/users/{id}` | DELETE | Delete a user |
+| `/users/{id}/activate` | PUT | Toggle user active status |
 
 ---
 
@@ -193,12 +221,39 @@ Authorization: Bearer <your_token>
 
 ---
 
-## Reports & Analytics
+## Weather
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/weather/{city_name}` | GET | Live weather data (Open-Meteo) |
+
+---
+
+## Dashboard / Analytics
+
+A combined dashboard endpoint can aggregate all KPIs into a single response.  
+The following data points are available via existing endpoints:
+
+| Metric | Source |
+|---|---|
+| Total Revenue | `Sale.total_amount` sum |
+| Total Profit | `Sale.profit` sum |
+| Profit Margin | (profit / revenue) × 100 |
+| Sales Count | `Sale.sale_id` count |
+| Units Sold | `SalesItem.quantity` sum |
+| Payment Split | Cash / Card / Mobile Money counts |
+| Best-Selling Product | Product with highest units sold |
+| Low Stock Items | Products below threshold |
+| Outstanding Debt | Unpaid `Debt.amount` sum |
+| Active Products | Product count |
+| Total Customers | Customer count |
+
+**Existing analytics endpoints:**
 
 | Endpoint | Method | Description |
 |---|---|---|
 | `/reports/profit/{business_id}` | GET | View profit, revenue, cost |
-| `/reports/analytics/summery/{business_id}` | GET | Full sales summary (emailed) |
+| `/reports/analytics/summery/{business_id}` | GET | Full sales summary (also emailed) |
 | `/reports/analytics/low_stock` | GET | Low stock alert list |
 | `/reports/analytics/debts/{business_id}` | GET | Outstanding debt totals |
 
@@ -230,11 +285,15 @@ Background cron jobs run on schedule and email reports to business admins and ma
 Create a `.env` file in the project root:
 
 ```env
-DATABASE_URL=postgresql://user:password@host/dbname
-SECRET_KEY=your_secret_key
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+SECRET_KEY=your_jwt_secret_key
+ALGORITHM=HS256
+ACCESS_TOKEN_TIME=60
+REFRESH_TOKEN_TIME=10080
 SUPER_ADMIN_EMAIL=admin@example.com
-SUPER_ADMIN_APP_PASSWORD=your_email_app_password
+SUPER_ADMIN_APP_PASSWORD=your_gmail_app_password
 SUPER_ADMIN_NAME=Admin Name
+API_AUTH_KEY=your_api_auth_key
 ```
 
 ---
@@ -258,6 +317,9 @@ alembic upgrade head
 
 # Start the server
 uvicorn src.main:app --reload
+
+# Run with production settings
+uvicorn src.main:app --host 0.0.0.0 --port 8000
 ```
 
 ---

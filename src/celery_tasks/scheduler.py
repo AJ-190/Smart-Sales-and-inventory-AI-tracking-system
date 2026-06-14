@@ -1,4 +1,4 @@
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from src.celery_tasks.tasks import (
     daily_sale_summery,
@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-scheduler = AsyncIOScheduler(timezone="UTC")
+scheduler = BackgroundScheduler(timezone="UTC")
 
 
 def start_scheduler():

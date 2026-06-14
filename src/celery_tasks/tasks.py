@@ -1,9 +1,9 @@
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
-from sqlalchemy.orm import Session
-from src.database import get_db
-from src.businesses import models as bm
-from src.businesses import service as biz_service
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.analytics import service as analytics_service
 
 logger = logging.getLogger(__name__)
 
@@ -31,37 +31,44 @@ def _get_period_range(period: str):
     return start, end
 
 
-def summery(period: str):
-    db = next(get_db())
-    try:
+async def summery(period: str, db: AsyncSession | None = None):
+    from src.users import models as um
+
+    async def _run(db: AsyncSession):
         start, end = _get_period_range(period)
-        from src.users import models as um
-        users = (
-            db.query(um.BusinessMember)
-            .filter(um.BusinessMember.role.in_(
-                [um.RoleEnum.admin,
-                 um.RoleEnum.super_admin,
-                 um.RoleEnum.manager]
-            ))
-            .all()
+        result = await db.execute(
+            select(um.BusinessMember).where(
+                um.BusinessMember.role.in_([
+                    um.RoleEnum.admin,
+                    um.RoleEnum.super_admin,
+                    um.RoleEnum.manager
+                ])
+            )
         )
+        users = result.scalars().all()
 
         for user in users:
-            biz_service.get_summery(user.business_id, db, user, start, end)
-            print(f"[CRON] summary done for {user.user_id}")
-    except Exception as e:
-        logger.error(f"Error generating {period} sales summary: {e}")
-    finally:
-        db.close()
+            try:
+                await analytics_service.get_summery(user.business_id, db, user, start, end)
+                print(f"[CRON] summary done for {user.user_id}")
+            except Exception as e:
+                logger.error(f"Error generating summary for user {user.user_id}: {e}")
+
+    if db is not None:
+        await _run(db)
+    else:
+        from src.database import AsyncSessionLocal
+        async with AsyncSessionLocal() as session:
+            await _run(session)
 
 
 def daily_sale_summery():
-    summery("daily")
+    asyncio.run(summery("daily"))
 
 
 def weekly_sale_summery():
-    summery("weekly")
+    asyncio.run(summery("weekly"))
 
 
 def monthly_sale_summery():
-    summery("monthly")
+    asyncio.run(summery("monthly"))

@@ -1,12 +1,12 @@
 from fastapi import status, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import select, or_
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.customers import models as cm
 from src.customers import schemas
 from src.users import models as um
 
 
-def role_permission_check(current_user):
+async def role_permission_check(current_user):
     if current_user.role not in [
         um.RoleEnum.super_admin,
         um.RoleEnum.admin,
@@ -17,34 +17,36 @@ def role_permission_check(current_user):
                             detail="Unauthorized to perform this action")
 
 
-def check_current_user_business(db: Session, current_user, business_id: int):
-    business = (
-        db.query(um.BusinessMember)
-        .filter(um.BusinessMember.user_id == current_user.user_id)
-        .filter(um.BusinessMember.business_id == business_id)
-        .first()
+async def check_current_user_business(db: AsyncSession, current_user, business_id: int):
+    result = await db.execute(
+        select(um.BusinessMember)
+        .where(um.BusinessMember.user_id == current_user.user_id)
+        .where(um.BusinessMember.business_id == business_id)
     )
+    business = result.first()
 
     if not business:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to perform this action")
 
 
-def create_customer(db: Session, current_user, customer: schemas.CustomerCreate, business_id: int):
-    role_permission_check(current_user)
+async def create_customer(db: AsyncSession, current_user, customer: schemas.CustomerCreate, business_id: int):
+    await role_permission_check(current_user)
 
-    check_current_user_business(db, current_user, business_id)
-    check_customer_exist = (
-        db.query(cm.Customer)
-        .filter(cm.Customer.business_id == business_id)
-        .filter(cm.Customer.email == customer.email)
-        .first()
+    await check_current_user_business(db, current_user, business_id)
+
+    email_result = await db.execute(
+        select(cm.Customer)
+        .where(cm.Customer.business_id == business_id)
+        .where(cm.Customer.email == customer.email)
     )
-    check_customer_exist_phone = (
-        db.query(cm.Customer)
-        .filter(cm.Customer.business_id == business_id)
-        .filter(cm.Customer.phone == customer.phone)
-        .first()
+    check_customer_exist = email_result.scalar_one_or_none()
+
+    phone_result = await db.execute(
+        select(cm.Customer)
+        .where(cm.Customer.business_id == business_id)
+        .where(cm.Customer.phone == customer.phone)
     )
+    check_customer_exist_phone = phone_result.scalar_one_or_none()
 
     if check_customer_exist and check_customer_exist.is_active == False:
         for key, value in customer.model_dump(exclude_unset=True).items():
@@ -58,33 +60,34 @@ def create_customer(db: Session, current_user, customer: schemas.CustomerCreate,
     user = cm.Customer(**customer.model_dump(), business_id=business_id)
 
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
     return user
 
 
-def get_customers(business_id, db: Session, current_user, search, skip, limit):
-    role_permission_check(current_user)
+async def get_customers(business_id, db: AsyncSession, current_user, search, skip, limit):
+    await role_permission_check(current_user)
 
-    check_current_user_business(db, current_user, business_id)
-    base_query = (
-        db.query(cm.Customer)
-        .filter(cm.Customer.business_id == business_id)
-        .filter(cm.Customer.is_active == True)
+    await check_current_user_business(db, current_user, business_id)
+    query = (
+        select(cm.Customer)
+        .where(cm.Customer.business_id == business_id)
+        .where(cm.Customer.is_active == True)
     )
 
     if search:
         search_query = f"%{search}%"
-        base_query = (
-            base_query.filter(
-                or_(
-                    cm.Customer.name.ilike(search_query),
-                    cm.Customer.email.ilike(search_query),
-                    cm.Customer.phone.ilike(search_query)
-                )
+        query = query.where(
+            or_(
+                cm.Customer.name.ilike(search_query),
+                cm.Customer.email.ilike(search_query),
+                cm.Customer.phone.ilike(search_query)
             )
         )
-    customers = base_query.order_by(cm.Customer.created_at.desc()).limit(limit).offset(skip).all()
+    query = query.order_by(cm.Customer.created_at.desc()).limit(limit).offset(skip)
+    result = await db.execute(query)
+    customers = result.scalars().all()
+
     if not customers:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -93,18 +96,18 @@ def get_customers(business_id, db: Session, current_user, search, skip, limit):
     return customers
 
 
-def get_customer(business_id, customer_id, db: Session, current_user):
-    role_permission_check(current_user)
+async def get_customer(business_id, customer_id, db: AsyncSession, current_user):
+    await role_permission_check(current_user)
 
-    check_current_user_business(db, current_user, business_id)
+    await check_current_user_business(db, current_user, business_id)
 
-    customer = (
-        db.query(cm.Customer)
-        .filter(cm.Customer.business_id == business_id)
-        .filter(cm.Customer.customer_id == customer_id)
-        .filter(cm.Customer.is_active == True)
-        .first()
+    result = await db.execute(
+        select(cm.Customer)
+        .where(cm.Customer.business_id == business_id)
+        .where(cm.Customer.customer_id == customer_id)
+        .where(cm.Customer.is_active == True)
     )
+    customer = result.scalar_one_or_none()
 
     if not customer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
@@ -112,45 +115,47 @@ def get_customer(business_id, customer_id, db: Session, current_user):
     return customer
 
 
-def update_customer(post: schemas.CustomerUpdate, business_id, customer_id, db: Session, current_user):
-    role_permission_check(current_user)
-    check_current_user_business(db, current_user, business_id)
+async def update_customer(post: schemas.CustomerUpdate, business_id, customer_id, db: AsyncSession, current_user):
+    await role_permission_check(current_user)
+    await check_current_user_business(db, current_user, business_id)
 
-    customer = (
-        db.query(cm.Customer)
-        .filter(cm.Customer.customer_id == customer_id)
-        .filter(cm.Customer.business_id == business_id)
-        .filter(cm.Customer.is_active == True)
-        .first()
+    result = await db.execute(
+        select(cm.Customer)
+        .where(cm.Customer.customer_id == customer_id)
+        .where(cm.Customer.business_id == business_id)
+        .where(cm.Customer.is_active == True)
     )
+    customer = result.scalar_one_or_none()
 
     if not customer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Customer not found")
 
-    base_query = (
-        db.query(cm.Customer)
-        .filter(cm.Customer.business_id == business_id)
-    )
-
     if customer.email:
-        email_check = base_query.filter(cm.Customer.email == customer.email)
+        email_check_result = await db.execute(
+            select(cm.Customer).where(cm.Customer.email == customer.email)
+        )
+        email_check = email_check_result.first()
         if email_check:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action, check email")
 
     if customer.phone:
-        phone_check = base_query.filter(cm.Customer.phone == customer.phone).first()
+        phone_check_result = await db.execute(
+            select(cm.Customer).where(cm.Customer.phone == customer.phone)
+        )
+        phone_check = phone_check_result.first()
         if phone_check:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action, check phone_number")
+
     for key, value in post.model_dump(exclude_unset=True).items():
         setattr(customer, key, value)
 
-    db.commit()
-    db.refresh(customer)
+    await db.commit()
+    await db.refresh(customer)
     return customer
 
 
-def delete_customer(business_id, customer_id, db: Session, current_user):
+async def delete_customer(business_id, customer_id, db: AsyncSession, current_user):
     if current_user.role not in [
         um.RoleEnum.super_admin,
         um.RoleEnum.admin,
@@ -158,20 +163,20 @@ def delete_customer(business_id, customer_id, db: Session, current_user):
     ]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
 
-    check_current_user_business(db, current_user, business_id)
+    await check_current_user_business(db, current_user, business_id)
 
-    customer = (
-        db.query(cm.Customer)
-        .filter(cm.Customer.customer_id == customer_id)
-        .filter(cm.Customer.business_id == business_id)
-        .filter(cm.Customer.is_active == True)
-        .first()
+    result = await db.execute(
+        select(cm.Customer)
+        .where(cm.Customer.customer_id == customer_id)
+        .where(cm.Customer.business_id == business_id)
+        .where(cm.Customer.is_active == True)
     )
+    customer = result.scalar_one_or_none()
 
     if not customer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
     customer.is_active = False
 
-    db.commit()
+    await db.commit()
 
     return {"msg": "Customer is deleted successfully"}

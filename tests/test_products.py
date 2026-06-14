@@ -1,5 +1,5 @@
 import pytest
-from src.businesses import schemas
+from src.products import schemas
 def test_create_product(authorized_user_client, authorized_user_client_test_businesses):
     product = {
         "name": "Macbook",

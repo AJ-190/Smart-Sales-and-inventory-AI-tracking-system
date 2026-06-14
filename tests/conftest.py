@@ -1,8 +1,8 @@
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from src.database import get_db, Base
+import asyncio
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import StaticPool
+from src.database import get_db, Base
 from src.main import app
 from fastapi.testclient import TestClient
 from src.auth import utils as auth_utils
@@ -14,37 +14,36 @@ import src.customers.models
 
 from src.users import schemas as user_schemas
 from src.businesses import schemas as biz_schemas
-
-
-SQLITE_DATABASE = "sqlite://"
+from src.products import schemas as product_schemas
+from src.sales import schemas as sale_schemas
 
 
 @pytest.fixture(scope="session")
-def db_engine():
-    engine = create_engine(
-        SQLITE_DATABASE,
-        connect_args={'check_same_thread': False},
-        poolclass=StaticPool)
-    return engine
-
-
-@pytest.fixture(scope="function")
-def session(db_engine):
-    Base.metadata.drop_all(bind=db_engine)
-    Base.metadata.create_all(bind=db_engine)
-
-    TestSessionLocal = sessionmaker(
-        autocommit=False,
-        autoflush=False,
-        bind=db_engine
+def async_engine():
+    engine = create_async_engine(
+        "sqlite+aiosqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
-    db = TestSessionLocal()
+    async def init():
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    asyncio.run(init())
+    yield engine
+
+
+@pytest.fixture
+def session(async_engine):
+    async def reset():
+        async with async_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+    asyncio.run(reset())
+    db = async_sessionmaker(bind=async_engine, expire_on_commit=False)()
     yield db
 
-    db.close()
 
-
-@pytest.fixture(scope="function")
+@pytest.fixture
 def client(session):
     def overrides_get_db():
         yield session
@@ -93,9 +92,13 @@ def token(test_user):
 
 @pytest.fixture
 def authorized_sup_client(session, token):
+    def overrides_get_db():
+        yield session
+    app.dependency_overrides[get_db] = overrides_get_db
     authorized = TestClient(app)
     authorized.headers = {"Authorization": f"Bearer {token}"}
-    return authorized
+    yield authorized
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -115,7 +118,6 @@ def authorized_user_client(token_1, session):
         "Authorization": f"Bearer {token_1}"
     }
     yield authorized
-
     app.dependency_overrides.clear()
 
 
@@ -178,7 +180,7 @@ def authorized_sup_products_create(authorized_sup_client, test_get_businesses):
             f"/products/{test_get_businesses[0].business_id}",
             json=product
         )
-        created.append(biz_schemas.ProductResponse(**res.json()))
+        created.append(product_schemas.ProductResponse(**res.json()))
 
     return created
 
@@ -197,13 +199,11 @@ def test_business(authorized_sup_client):
         {"name": "Core.AI"}
     ]
 
-    created = []
     for business in businesses:
-        res = authorized_sup_client.post(
+        authorized_sup_client.post(
             "/businesses/create",
             json=business
         )
-        created.append(res)
 
 
 @pytest.fixture
@@ -237,7 +237,7 @@ def test_products_create(authorized_user_client, authorized_user_client_test_bus
             f"/products/{authorized_user_client_test_businesses[0].business_id}",
             json=product
         )
-        created.append(biz_schemas.ProductResponse(**res.json()))
+        created.append(product_schemas.ProductResponse(**res.json()))
     return created
 
 
@@ -267,7 +267,7 @@ def test_create_sale_cli(authorized_user_client, authorized_user_client_cre_bus,
             f"/sales/{authorized_user_client_cre_bus[0].business_id}",
             json=sale
         )
-        products.append(biz_schemas.SaleResponse(**res.json()))
+        products.append(sale_schemas.SaleResponse(**res.json()))
 
     return products
 

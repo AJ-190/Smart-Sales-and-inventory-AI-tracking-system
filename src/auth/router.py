@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
 from src.database import get_db
 from src.auth import schemas, service as auth_service
 
@@ -8,24 +7,24 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/login", response_model=schemas.Token)
-def login(
+async def login(
     user_credentials: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    db = Depends(get_db)
 ):
-    return auth_service.login(user_credentials, db)
+    return await auth_service.login(user_credentials, db)
 
 
 @router.post("/refresh", response_model=schemas.Token)
-def refresh(
+async def refresh(
     payload: schemas.Token,
-    db: Session = Depends(get_db)
+    db = Depends(get_db)
 ):
-    return auth_service.refresh(payload, db)
+    return await auth_service.refresh(payload, db)
 
 
 @router.post("/logout")
-def logout(
+async def logout(
     payload: schemas.Token,
-    db: Session = Depends(get_db)
+    db = Depends(get_db)
 ):
-    return auth_service.logout(payload, db)
+    return await auth_service.logout(payload, db)

@@ -1,19 +1,23 @@
 from fastapi import FastAPI
-from src.database import Base, engine
+from fastapi.middleware.cors import CORSMiddleware
+from src.database import engine, Base
 from src.businesses.router import router as main_router
+from src.products.router import router as products_router
+from src.sales.router import router as sales_router
+from src.analytics.router import router as analytics_router
 from src.auth.router import router as auth_router
 from src.users.router import router as users_router
 from src.debts.router import router as debts_router
 from src.customers.router import router as customers_router
-from contextlib import asynccontextmanager
+from src.external_services.weather_api import router as weather_router
 from src.celery_tasks.scheduler import start_scheduler, scheduler
-from fastapi.middleware.cors import CORSMiddleware
-
-Base.metadata.create_all(bind=engine)
+from contextlib import asynccontextmanager
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     start_scheduler()
     yield
     scheduler.shutdown()
@@ -28,8 +32,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+app.include_router(weather_router)
 app.include_router(main_router)
+app.include_router(products_router)
+app.include_router(sales_router)
+app.include_router(analytics_router)
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(debts_router)
@@ -37,5 +44,5 @@ app.include_router(customers_router)
 
 
 @app.get("/")
-def root():
+async def root():
     return "API is running"
