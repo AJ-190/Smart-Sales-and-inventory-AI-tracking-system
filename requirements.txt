@@ -1,3 +1,4 @@
+aiosqlite==0.22.1
 alembic==1.18.4
 annotated-doc==0.0.4
 annotated-types==0.7.0
@@ -33,6 +34,8 @@ MarkupSafe==3.0.3
 mdurl==0.1.2
 passlib==1.7.4
 psycopg2-binary==2.9.11
+pytest==9.0.3
+redis==8.0.0
 pyasn1==0.6.3
 pycparser==3.0
 pydantic==2.13.1
