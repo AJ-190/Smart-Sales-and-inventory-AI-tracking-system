@@ -17,3 +17,8 @@ external_services
 src/sales/__init__.py
 src/products/__init__.py
 src/analytics/__init__.py
+tsconfig.json
+app.json
+procfile
+package-lock.json
+package.json
