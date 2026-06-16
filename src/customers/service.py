@@ -133,7 +133,9 @@ async def update_customer(post: schemas.CustomerUpdate, business_id, customer_id
 
     if customer.email:
         email_check_result = await db.execute(
-            select(cm.Customer).where(cm.Customer.email == customer.email)
+            select(cm.Customer)
+            .where(cm.Customer.email == customer.email)
+            .where(cm.Customer.customer_id != customer.customer_id)
         )
         email_check = email_check_result.first()
         if email_check:
@@ -141,7 +143,9 @@ async def update_customer(post: schemas.CustomerUpdate, business_id, customer_id
 
     if customer.phone:
         phone_check_result = await db.execute(
-            select(cm.Customer).where(cm.Customer.phone == customer.phone)
+            select(cm.Customer)
+            .where(cm.Customer.phone == customer.phone)
+            .where(cm.Customer.customer_id != customer.customer_id)
         )
         phone_check = phone_check_result.first()
         if phone_check:

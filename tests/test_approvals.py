@@ -18,7 +18,7 @@ def test_send_approval(authorized_user_client,test_get_businesses, test_get_busi
 
 def test_send_approval_invalid_business_key(authorized_user_client, test_get_businesses):
     res = authorized_user_client.post(
-        f"approvals/send_approval/",
+        f"/approvals/send_approval/",
         json={"business_key": "HSSHSHSHS",
               "reason": "I wanna be cashier",
               "role": "cashier"

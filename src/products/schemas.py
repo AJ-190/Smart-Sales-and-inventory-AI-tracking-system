@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
-from src.businesses.schemas import BusinessReposnse
+from src.businesses.schemas import BusinessResponse
 
 
 class Productcreate(BaseModel):
@@ -26,7 +26,7 @@ class ProductResponse(BaseModel):
     quantity: int
     is_active: bool
     created_at: datetime
-    business: BusinessReposnse
+    business: BusinessResponse
 
     model_config = ConfigDict(from_attributes=True)
 

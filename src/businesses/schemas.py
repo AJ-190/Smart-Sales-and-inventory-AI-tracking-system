@@ -3,7 +3,7 @@ from typing import Optional, Annotated
 from src.users.schemas import UsersOut
 
 
-class BusinessReposnse(BaseModel):
+class BusinessResponse(BaseModel):
     business_id: int
     name: str
     is_active: bool = True
@@ -12,7 +12,7 @@ class BusinessReposnse(BaseModel):
 
 
 class BusinessWithMemberCount(BaseModel):
-    business: BusinessReposnse
+    business: BusinessResponse
     members: int
 
     model_config = ConfigDict(from_attributes=True)

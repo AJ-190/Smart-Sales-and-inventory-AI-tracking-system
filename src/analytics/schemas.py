@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict
 class ProfitResponse(BaseModel):
     profit: float
     revenue: float
+    total_cost: float
 
 
 class SaleSummery(BaseModel):

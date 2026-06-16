@@ -1,3 +1,4 @@
+from functools import lru_cache
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
@@ -12,14 +13,21 @@ if ASYNC_DATABASE_URL.startswith("postgresql://"):
 engine = create_engine(SYNC_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-async_engine = create_async_engine(ASYNC_DATABASE_URL)
-AsyncSessionLocal = async_sessionmaker(async_engine, expire_on_commit=False)
-
 Base = declarative_base()
 
 
+@lru_cache
+def get_async_engine():
+    return create_async_engine(ASYNC_DATABASE_URL)
+
+
+@lru_cache
+def get_async_session_maker():
+    return async_sessionmaker(get_async_engine(), expire_on_commit=False)
+
+
 async def get_db():
-    async with AsyncSessionLocal() as db:
+    async with get_async_session_maker() as db:
         try:
             yield db
         finally:

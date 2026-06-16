@@ -6,7 +6,7 @@ from src.auth import dependencies as auth_deps
 router = APIRouter()
 
 
-@router.post("/businesses/create", status_code=201, response_model=schemas.BusinessReposnse)
+@router.post("/businesses/create", status_code=201, response_model=schemas.BusinessResponse)
 async def create_business(post: schemas.BusinessCreate, db=Depends(get_db), current_user=Depends(auth_deps.get_current_user)):
     return await biz_service.add_business(post, db, current_user)
 
@@ -26,7 +26,7 @@ async def get_business(id: int, db=Depends(get_db), current_user=Depends(auth_de
     return await biz_service.get_business(id, db, current_user)
 
 
-@router.put("/businesses/{id}", response_model=schemas.BusinessReposnse)
+@router.put("/businesses/{id}", response_model=schemas.BusinessResponse)
 async def update_response(id: int, post: schemas.BusinessUpdate, db=Depends(get_db), current_user=Depends(auth_deps.get_current_user)):
     return await biz_service.update_business(id, post, db, current_user)
 

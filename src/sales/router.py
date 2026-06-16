@@ -27,7 +27,7 @@ async def get_sales(
 
 
 @router.get("/sales/{business_id}/{id}", response_model=schemas.SaleResponse)
-async def get_sale(id: int, db=Depends(get_db), current_user=Depends(auth_deps.get_current_user)):
+async def get_sale(business_id: int, id: int, db=Depends(get_db), current_user=Depends(auth_deps.get_current_user)):
     return await sale_service.get_sale(id, db, current_user)
 
 

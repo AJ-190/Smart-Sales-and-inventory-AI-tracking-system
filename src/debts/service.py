@@ -19,9 +19,10 @@ async def get_debts(business_id, db: AsyncSession, current_user):
         .where(bm.Debt.business_id == business_id)
         .where(bm.Debt.is_paid == False)
     )
-    debts = result.first()
+    row = result.first()
+    total_debt = row[0] if row else None
 
-    if not debts:
+    if total_debt is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No customers with outstanding debts found")
 
-    return debts
+    return {"total_debt": float(total_debt)}

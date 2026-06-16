@@ -11,4 +11,4 @@ async def get_debts(
     db=Depends(get_db),
     current_user=Depends(auth_deps.get_current_user)
 ):
-    return await debt_service.get_debts(None, db, current_user)
+    return await debt_service.get_debts(current_user.business_id, db, current_user)

@@ -57,8 +57,8 @@ async def summery(period: str, db: AsyncSession | None = None):
     if db is not None:
         await _run(db)
     else:
-        from src.database import AsyncSessionLocal
-        async with AsyncSessionLocal() as session:
+        from src.database import get_async_session_maker
+        async with get_async_session_maker() as session:
             await _run(session)
 
 

@@ -134,7 +134,7 @@ def authorized_user_client_cre_bus(authorized_user_client):
             "/businesses/create",
             json=business
         )
-        created.append(biz_schemas.BusinessReposnse(**res.json()))
+        created.append(biz_schemas.BusinessResponse(**res.json()))
     return created
 
 

@@ -93,7 +93,6 @@ async def update_product(business_id, id, post: schemas.ProductUpdate, db: Async
         (await db.execute(
             select(bm.Product)
             .where(bm.Product.business_id == business_id)
-            .where(bm.Product.is_active == True)
             .where(bm.Product.product_id == id)
         )).scalars().first()
     )
