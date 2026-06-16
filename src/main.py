@@ -9,7 +9,6 @@ from src.auth.router import router as auth_router
 from src.users.router import router as users_router
 from src.debts.router import router as debts_router
 from src.customers.router import router as customers_router
-from src.external_services.weather_api import router as weather_router
 from src.celery_tasks.scheduler import start_scheduler, scheduler
 from contextlib import asynccontextmanager
 
@@ -31,7 +30,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.include_router(weather_router)
 app.include_router(main_router)
 app.include_router(products_router)
 app.include_router(sales_router)
