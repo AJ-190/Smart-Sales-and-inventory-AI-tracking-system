@@ -364,7 +364,7 @@ deploy:
 ## Author
 
 **Addy Samuel**  
-Backend Engineer — building for African markets  
+Backend Engineer — The Unfathomable Builder 🫥  
 [GitHub](https://github.com/AJ-190) · [LinkedIn](https://linkedin.com/in/your-profile)
 
 ---
