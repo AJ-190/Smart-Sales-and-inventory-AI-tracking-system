@@ -5,7 +5,9 @@ from src.config import get_settings
 
 
 DATABASE_URL = get_settings().DATABASE_URL
-
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+    
 Base = declarative_base()
 
 engine = create_async_engine(url=DATABASE_URL, echo=False, connect_args={"ssl":"require","statement_cache_size": 0})

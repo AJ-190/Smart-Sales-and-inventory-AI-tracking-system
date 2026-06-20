@@ -2,7 +2,7 @@ from fastapi_mail import FastMail, ConnectionConfig
 from src.config import get_settings
 
 
-connection = ConnectionConfig(
+mail_config = ConnectionConfig(
     MAIL_USERNAME = get_settings().MAIL_USERNAME,
     MAIL_PASSWORD = get_settings().MAIL_PASSWORD,
     MAIL_FROM = get_settings().MAIL_FROM,
@@ -14,4 +14,5 @@ connection = ConnectionConfig(
     VALIDATE_CERTS = get_settings().VALIDATE_CERTS
 )
 
-mail = FastMail()
+mail = FastMail(config=mail_config)
+
