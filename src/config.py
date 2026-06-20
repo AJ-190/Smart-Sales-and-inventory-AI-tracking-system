@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     MAIL_PASSWORD: str = os.getenv("SUPER_ADMIN_APP_PASSWORD", "")
     MAIL_FROM:str = os.getenv("SUPER_ADMIN_EMAIL", "")
     MAIL_PORT:int = 465
-    MAIL_SERVER: str = os.getenv("MAIL_SERVER")
+    MAIL_SERVER: str = os.getenv("MAIL_SERVER", "")
     MAIL_STARTTLS:bool = False
     MAIL_SSL_TLS:bool = True
     USE_CREDENTIALS:bool = True
