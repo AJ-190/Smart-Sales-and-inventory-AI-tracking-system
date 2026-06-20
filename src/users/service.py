@@ -32,15 +32,17 @@ async def get_users(db: AsyncSession, current_user):
 
     result = await db.execute(
         select(
+            um.BusinessMember.business_id,
+            um.BusinessMember.member_id,
             um.Users.user_id,
             um.Users.name,
             um.Users.phone,
             um.Users.email,
+            um.Users.role,
             bm.Business.name.label("business_name")
         )
         .join(um.BusinessMember, um.Users.user_id == um.BusinessMember.user_id)
         .join(bm.Business, bm.Business.business_id == um.BusinessMember.business_id)
-        .group_by(um.Users.user_id, bm.Business.name)
     )
     users = result.all()
 

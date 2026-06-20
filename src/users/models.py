@@ -21,6 +21,7 @@ class Users(Base):
     name = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True)
     refresh_token = Column(String, nullable=True)
+    is_verified = Column(String, default=False, nullable=True)
     phone = Column(String, nullable=True)
     password = Column(String, nullable=False)
     role = Column(SAEnum(RoleEnum), default=RoleEnum.user, nullable=False)

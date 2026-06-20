@@ -15,6 +15,7 @@ class CustomerResponse(BaseModel):
     name: str
     phone: str
     email: str
+    address: str
     is_active: bool
 
     model_config = ConfigDict(from_attributes=True)

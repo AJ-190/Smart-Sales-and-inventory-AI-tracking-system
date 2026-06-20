@@ -15,7 +15,7 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db)
 ):
     payload = auth_utils.verify_token(token)
-    user_id = payload.get("sub")
+    user_id = int(payload.get("sub"))
 
     if not user_id:
         raise HTTPException(

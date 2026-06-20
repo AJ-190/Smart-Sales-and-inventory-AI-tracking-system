@@ -15,9 +15,17 @@ class Settings(BaseSettings):
     SUPER_ADMIN_APP_PASSWORD: str = os.getenv("SUPER_ADMIN_APP_PASSWORD", "")
     SUPER_ADMIN_NAME: str = os.getenv("SUPER_ADMIN_NAME", "")
     REFRESH_TOKEN_TIME: int = 7 * 24 * 60
-    API_AUTH_KEY: Optional[str] = os.getenv("API_auth_key")
+    API_AUTH_KEY: Optional[str] = os.getenv("API_auth_key", "")
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
-
+    MAIL_USERNAME: str = os.getenv("SUPER_ADMIN_NAME", "")
+    MAIL_PASSWORD: str = os.getenv("SUPER_ADMIN_APP_PASSWORD", "")
+    MAIL_FROM:str = os.getenv("SUPER_ADMIN_EMAIL", "")
+    MAIL_PORT:int = 465
+    MAIL_SERVER: str = os.getenv("MAIL_SERVER")
+    MAIL_STARTTLS:bool = False
+    MAIL_SSL_TLS:bool = True
+    USE_CREDENTIALS:bool = True
+    VALIDATE_CERTS:bool = True
 
 def get_settings():
     return Settings()

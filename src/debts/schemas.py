@@ -11,3 +11,10 @@ class DebtResponse(BaseModel):
     is_paid: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CustomerDebt(BaseModel):
+    customer_debt: float
+    customer: list[DebtResponse] = []
+    
+    model_config = ConfigDict(from_attributes=True)

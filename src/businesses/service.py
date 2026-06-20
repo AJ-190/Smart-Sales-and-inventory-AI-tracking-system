@@ -364,3 +364,20 @@ async def con_del_approval(post, business_id, db: AsyncSession, current_user):
 
     approval_user.requester = user
     return approval_user
+
+
+async def business_authorized_access(current_user, business_id, db: AsyncSession):
+    if current_user.role != bm.RoleEnum.super_admin:
+        
+        user_access = (
+            (await db.execute(
+                select(um.BusinessMember)
+                .where(um.BusinessMember.user_id == int(current_user.user_id))
+                .where(um.BusinessMember.business_id == business_id)
+                
+            )).scalars().first()
+        )
+        
+        if not user_access:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This action is forbidden")
+    

@@ -3,7 +3,7 @@ from src.database import get_db
 from src.businesses import schemas, service as biz_service
 from src.auth import dependencies as auth_deps
 
-router = APIRouter()
+router = APIRouter(tags=['Business'])
 
 
 @router.post("/businesses/create", status_code=201, response_model=schemas.BusinessResponse)
