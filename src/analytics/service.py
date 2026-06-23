@@ -19,9 +19,6 @@ def date_validator(date, end_date):
 
 
 async def view_profit(business_id, db: AsyncSession, current_user, date: date | None = None, end_date: date | None = None):
-    if current_user.role not in [um.RoleEnum.admin, um.RoleEnum.super_admin]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
-
     if date and end_date:
         date_validator(date, end_date)
 
@@ -51,9 +48,6 @@ async def view_profit(business_id, db: AsyncSession, current_user, date: date | 
 
 
 async def get_summery(business_id, db: AsyncSession, current_user, date, end_date):
-    if current_user.role not in [um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
-
     stmt = (
         select(
             func.sum(bm.SalesItem.quantity).label("sold_quantity"),
@@ -148,13 +142,6 @@ async def get_summery(business_id, db: AsyncSession, current_user, date, end_dat
 
 
 async def check_stock(db: AsyncSession, current_user):
-    if current_user.role not in [
-        um.RoleEnum.admin,
-        um.RoleEnum.super_admin,
-        um.RoleEnum.manager
-    ]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
-
     member = await get_member(db, current_user)
 
     stock = (

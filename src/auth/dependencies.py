@@ -51,3 +51,14 @@ async def get_current_user(
         business_id=row.business_id,
         role=row.role
     )
+
+
+def role_checker(allowed_roles: list[um.RoleEnum]):
+    async def check(current_user: schemas.UsersOutUsers = Depends(get_current_user)):
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Unauthorized to perform this action"
+            )
+        return current_user
+    return check

@@ -2,26 +2,13 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 from src.users import models as um
-from src.users import models as um
 from src.customers import models as cm
 from src.debts import models as dm
 from src.businesses import models as bm
 from src.businesses import service
 
 
-async def role_permission(current_user):
-    if current_user.role not in [
-        um.RoleEnum.admin,
-        um.RoleEnum.super_admin,
-        um.RoleEnum.manager
-    ]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Unauthorized to perform this action")
-
-
-    
 async def get_debts(business_id, db: AsyncSession, current_user):
-    await role_permission(current_user)
     await service.business_authorized_access(current_user, business_id, db)
     
     result = await db.execute(
@@ -42,7 +29,6 @@ async def get_customers_with_deb(business_id,
                                  db: AsyncSession, 
                                  current_user, limit:int, 
                                  skip: int, search: str):
-    await role_permission(current_user)
     await service.business_authorized_access(current_user, business_id, db)
     
     query = (

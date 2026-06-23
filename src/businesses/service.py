@@ -78,8 +78,6 @@ async def my_businesses(db: AsyncSession, current_user):
 
 
 async def get_businesses(db, current_user):
-    if current_user.role != um.RoleEnum.super_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to perform this action")
     businesses = (
         (
             await db.execute(
@@ -103,9 +101,6 @@ async def get_businesses(db, current_user):
 
 
 async def get_business(id, db: AsyncSession, current_user):
-    if current_user.role not in [um.RoleEnum.super_admin, um.RoleEnum.admin]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to perform this action")
-
     stmt = (
         select(
             bm.Business,
@@ -135,9 +130,6 @@ async def get_business(id, db: AsyncSession, current_user):
 
 
 async def update_business(id, post, db: AsyncSession, current_user):
-    if current_user.role not in [um.RoleEnum.super_admin, um.RoleEnum.admin]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to perform this action")
-
     business = (
         (
             await db.execute(
@@ -176,9 +168,6 @@ async def update_business(id, post, db: AsyncSession, current_user):
 
 
 async def delete_business(id, db: AsyncSession, current_user):
-    if current_user.role not in [um.RoleEnum.admin, um.RoleEnum.super_admin]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to perform this transaction")
-
     stmt = (
         select(bm.Business)
         .join(um.BusinessMember, um.BusinessMember.business_id == bm.Business.business_id)
@@ -199,13 +188,6 @@ async def delete_business(id, db: AsyncSession, current_user):
 
 
 async def get_business_key(business_id, db: AsyncSession, current_user):
-    if current_user.role not in [
-        um.RoleEnum.super_admin,
-        um.RoleEnum.admin,
-        um.RoleEnum.manager
-    ]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
-
     key = (
         (
             await db.execute(
@@ -273,13 +255,6 @@ async def send_approval(post, db: AsyncSession, current_user):
 
 
 async def get_approvals(business_id, status_, db: AsyncSession, current_user):
-    if current_user.role not in [
-        um.RoleEnum.super_admin,
-        um.RoleEnum.admin,
-        um.RoleEnum.manager
-    ]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
-
     stmt = (
         select(bm.Approvals)
         .join(um.BusinessMember, um.BusinessMember.business_id == bm.Approvals.business_id)
@@ -315,13 +290,6 @@ async def get_approvals(business_id, status_, db: AsyncSession, current_user):
 
 
 async def con_del_approval(post, business_id, db: AsyncSession, current_user):
-    if current_user.role not in [
-        um.RoleEnum.admin,
-        um.RoleEnum.super_admin,
-        um.RoleEnum.manager
-    ]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
-
     stmt = (
         select(bm.Approvals)
         .join(um.BusinessMember, um.BusinessMember.business_id == bm.Approvals.business_id)

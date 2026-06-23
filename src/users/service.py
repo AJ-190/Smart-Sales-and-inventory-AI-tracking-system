@@ -27,9 +27,6 @@ async def add_user(post: schemas.UserSignUp, db: AsyncSession):
 
 
 async def get_users(db: AsyncSession, current_user):
-    if current_user.role != um.RoleEnum.super_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to perform this action")
-
     result = await db.execute(
         select(
             um.BusinessMember.business_id,
@@ -53,9 +50,6 @@ async def get_users(db: AsyncSession, current_user):
 
 
 async def get_all_users(db: AsyncSession, current_user):
-    if current_user.role != um.RoleEnum.super_admin:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
-
     result = await db.execute(
         select(um.Users.user_id,
                um.Users.name,
@@ -74,11 +68,6 @@ async def get_all_users(db: AsyncSession, current_user):
 
 
 async def get_members(db: AsyncSession, current_user):
-    if current_user.role not in [um.RoleEnum.super_admin, um.RoleEnum.admin]:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized to perform this action")
-
     if current_user.role == um.RoleEnum.admin:
         check_result = await db.execute(
             select(um.BusinessMember).where(um.BusinessMember.business_id == current_user.business_id)
@@ -106,8 +95,6 @@ async def get_members(db: AsyncSession, current_user):
 
 
 async def get_user(id, db: AsyncSession, current_user):
-    if current_user.role not in [um.RoleEnum.admin, um.RoleEnum.super_admin]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to perform this action")
     result = await db.execute(
         select(um.Users.role,
                um.Users.email,
@@ -150,9 +137,6 @@ async def update_user(id: int, post: schemas.UserUpdate, db: AsyncSession, curre
 
 
 async def delete_user(id, db: AsyncSession, current_user):
-    if current_user.role not in [um.RoleEnum.super_admin, um.RoleEnum.admin]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to perform this action")
-
     result = await db.execute(select(um.Users).where(um.Users.user_id == id))
     user_ = result.scalar_one_or_none()
 
@@ -168,9 +152,6 @@ async def delete_user(id, db: AsyncSession, current_user):
 
 
 async def activate_user(id: int, db: AsyncSession, current_user):
-    if current_user.role not in [um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to perform this action")
-
     result = await db.execute(
         select(um.Users, um.BusinessMember.business_id)
         .join(um.BusinessMember, um.BusinessMember.user_id == um.Users.user_id)

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from src.database import get_db
 from src.customers import schemas, service as customer_service
 from src.auth import dependencies as auth_deps
+from src.users import models as um
 
 router = APIRouter(prefix="/business", tags=['Customer'])
 
@@ -11,7 +12,7 @@ async def create_customer(
     business_id: int,
     post: schemas.CustomerCreate,
     db = Depends(get_db),
-    current_user=Depends(auth_deps.get_current_user),
+    current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager, um.RoleEnum.cashier])),
 ):
     return await customer_service.create_customer(db, current_user, post, business_id)
 
@@ -20,7 +21,7 @@ async def create_customer(
 async def get_customers(
     business_id: int,
     db = Depends(get_db),
-    current_user=Depends(auth_deps.get_current_user),
+    current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager, um.RoleEnum.cashier])),
     search: str | None = None,
     skip: int = 0,
     limit: int = 10
@@ -31,22 +32,22 @@ async def get_customers(
 @router.get("/customers/{business_id}/{customer_id}", response_model=schemas.CustomerResponse)
 async def get_customer(business_id: int, customer_id: int,
                  db = Depends(get_db),
-                 current_user=Depends(auth_deps.get_current_user)):
+                 current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager, um.RoleEnum.cashier]))):
     return await customer_service.get_customer(business_id, customer_id, db, current_user)
 
 
 @router.put("/customers/{business_id}/{customer_id}", response_model=schemas.CustomerResponse)
 async def update_customer(post: schemas.CustomerUpdate, business_id: int, customer_id: int,
                     db = Depends(get_db),
-                    current_user=Depends(auth_deps.get_current_user)):
+                    current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager, um.RoleEnum.cashier]))):
     return await customer_service.update_customer(post, business_id, customer_id, db, current_user)
 
 @router.put("/customers/{business_id}/deactivate/{customer_id}", response_model=schemas.CustomerResponse)
-async def deactivate_customer(business_id: int, customer_id: int, current_user=Depends(auth_deps.get_current_user), db=Depends(get_db)):
+async def deactivate_customer(business_id: int, customer_id: int, current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager])), db=Depends(get_db)):
     return await customer_service.deactivate_customer(current_user, business_id , customer_id, db)
 
 @router.delete("/customers/{business_id}/{customer_id}", status_code=204)
 async def delete_user(business_id: int, customer_id: int,
                 db = Depends(get_db),
-                current_user=Depends(auth_deps.get_current_user)):
+                current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]))):
     return await customer_service.delete_customer(business_id, customer_id, db, current_user)

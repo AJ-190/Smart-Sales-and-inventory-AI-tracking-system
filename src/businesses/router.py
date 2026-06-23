@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from src.database import get_db
 from src.businesses import schemas, service as biz_service
 from src.auth import dependencies as auth_deps
+from src.users import models as um
 
 router = APIRouter(tags=['Business'])
 
@@ -17,27 +18,27 @@ async def get_my_bussiness(db=Depends(get_db), current_user=Depends(auth_deps.ge
 
 
 @router.get("/businesses/", response_model=list[schemas.BusinessWithMemberCount])
-async def get_businesses(db=Depends(get_db), current_user=Depends(auth_deps.get_current_user)):
+async def get_businesses(db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin]))):
     return await biz_service.get_businesses(db, current_user)
 
 
 @router.get("/businesses/{id}", response_model=schemas.BusinessWithMemberCount)
-async def get_business(id: int, db=Depends(get_db), current_user=Depends(auth_deps.get_current_user)):
+async def get_business(id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin]))):
     return await biz_service.get_business(id, db, current_user)
 
 
 @router.put("/businesses/{id}", response_model=schemas.BusinessResponse)
-async def update_response(id: int, post: schemas.BusinessUpdate, db=Depends(get_db), current_user=Depends(auth_deps.get_current_user)):
+async def update_response(id: int, post: schemas.BusinessUpdate, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin]))):
     return await biz_service.update_business(id, post, db, current_user)
 
 
 @router.delete("/businesses/{id}", status_code=204)
-async def delete_business(id: int, db=Depends(get_db), current_user=Depends(auth_deps.get_current_user)):
+async def delete_business(id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin]))):
     return await biz_service.delete_business(id, db, current_user)
 
 
 @router.get("/businesses/business_key/{business_id}", response_model=schemas.Business_key)
-async def get_business_key(business_id: int, db=Depends(get_db), current_user=Depends(auth_deps.get_current_user)):
+async def get_business_key(business_id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]))):
     return await biz_service.get_business_key(business_id, db, current_user)
 
 
@@ -53,7 +54,7 @@ async def get_approvals(
     business_id: int,
     status: str | None = None,
     db=Depends(get_db),
-    current_user=Depends(auth_deps.get_current_user)):
+    current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]))):
     return await biz_service.get_approvals(business_id, status, db, current_user)
 
 
@@ -61,5 +62,5 @@ async def get_approvals(
 async def confirm_approval(post: schemas.Direction,
                      business_id: int,
                      db=Depends(get_db),
-                     current_user=Depends(auth_deps.get_current_user)):
+                     current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]))):
     return await biz_service.con_del_approval(post, business_id, db, current_user)

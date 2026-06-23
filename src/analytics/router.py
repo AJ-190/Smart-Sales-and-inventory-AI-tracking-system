@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from datetime import date
 from src.database import get_db
 from src.analytics import schemas, service as analytics_service
@@ -16,7 +16,7 @@ router = APIRouter()
 async def get_profit(
     business_id: int,
     db=Depends(get_db),
-    current_user=Depends(auth_deps.get_current_user),
+    current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin])),
     date: date | None = None,
     end_date: date | None = None,
 ):
@@ -27,7 +27,7 @@ async def get_profit(
 async def get_summery(
     business_id: int,
     db=Depends(get_db),
-    current_user=Depends(auth_deps.get_current_user),
+    current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager])),
     date: date | None = None,
     end_date: date | None = None
 ):
@@ -37,7 +37,7 @@ async def get_summery(
 @router.get("/reports/analytics/low_stock", response_model=list[LowStockResponse])
 async def get_low_stock(
     db=Depends(get_db),
-    current_user=Depends(auth_deps.get_current_user)
+    current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]))
 ):
     return await analytics_service.check_stock(db, current_user)
 
@@ -46,42 +46,31 @@ async def get_low_stock(
 async def get_debts(
     business_id: int,
     db=Depends(get_db),
-    current_user=Depends(auth_deps.get_current_user)
+    current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]))
 ):
     return await analytics_service.get_debts(business_id, db, current_user)
 
 
-def permision(current_user):
-    if current_user.role not in [um.RoleEnum.admin,
-                                 um.RoleEnum.super_admin,
-                                 um.RoleEnum.manager]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
-
-
 @router.post("/admin/crons/daily_summery")
-async def run_daily(db=Depends(get_db), current_user=Depends(auth_deps.get_current_user)):
-    permision(current_user)
+async def run_daily(db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]))):
     await cron_tasks.summery("daily", db=db)
     return {"status": "Daily sales cron triggered"}
 
 
 @router.post("/admin/crons/weekly_summery")
-async def run_weekly(db=Depends(get_db), current_user=Depends(auth_deps.get_current_user)):
-    permision(current_user)
+async def run_weekly(db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]))):
     await cron_tasks.summery("weekly", db=db)
     return {"status": "Weekly sales cron triggered"}
 
 
 @router.post("/admin/crons/monthly_summery")
-async def run_monthly(db=Depends(get_db), current_user=Depends(auth_deps.get_current_user)):
-    permision(current_user)
+async def run_monthly(db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]))):
     await cron_tasks.summery("monthly", db=db)
     return {"status": "Monthly sales cron triggered"}
 
 
 @router.get("/admin/crons/jobs")
-async def list_jobs(current_user=Depends(auth_deps.get_current_user)):
-    permision(current_user)
+async def list_jobs(current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]))):
     return [
         {
             "id": job.id,

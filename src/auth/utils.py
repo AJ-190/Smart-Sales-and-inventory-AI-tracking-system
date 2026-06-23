@@ -30,7 +30,7 @@ def refresh_token(data: dict):
 
 def verify_token(token: str) -> dict:
     if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No token provided")
 
     try:
         return jwt.decode(token, get_settings().SECRET_KEY, algorithms=[get_settings().ALGORITHM])

@@ -7,22 +7,8 @@ from src.users import models as um
 from src.businesses import service
 from src.businesses import models as bm
 
-async def role_permission_check(current_user):
-    if current_user.role not in [
-        um.RoleEnum.super_admin,
-        um.RoleEnum.admin,
-        um.RoleEnum.manager,
-        um.RoleEnum.cashier
-    ]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Unauthorized to perform this action")
-
-
-
 
 async def create_customer(db: AsyncSession, current_user, customer: schemas.CustomerCreate, business_id: int):
-    await role_permission_check(current_user)
-
     await service.business_authorized_access(current_user, business_id, db)
     
     existing_email = (
@@ -64,7 +50,6 @@ async def get_customers(business_id: int,
                         skip: int,
                         limit: int):
     
-    await role_permission_check(current_user)
     await service.business_authorized_access(current_user, business_id, db)
     
     base_query = (
@@ -94,7 +79,6 @@ async def get_customer(business_id: int,
                        current_user: str
                        ):
     
-        await role_permission_check(current_user)
         await service.business_authorized_access(current_user, business_id, db)
         
         customer = (
@@ -118,7 +102,6 @@ async def update_customer(customer: schemas.CustomerUpdate,
                           customer_id, db:AsyncSession, 
                           current_user):
     
-    await role_permission_check(current_user)
     await service.business_authorized_access(current_user, business_id, db)
     
     base_query = (
@@ -169,12 +152,6 @@ async def deactivate_customer(
                               db: AsyncSession
                               ):
     
-    if current_user.role not in [
-        bm.RoleEnum.super_admin,
-        bm.RoleEnum.admin,
-        bm.RoleEnum.manager
-    ]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
     await service.business_authorized_access(current_user, business_id, db)
     
     customer = (
@@ -212,12 +189,6 @@ async def delete_customer(business_id: int,
                           db: AsyncSession, 
                           current_user: str
                           ):
-    if current_user.role not in [
-        bm.RoleEnum.super_admin,
-        bm.RoleEnum.admin,
-        bm.RoleEnum.manager
-    ]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
     await service.business_authorized_access(current_user, business_id, db)
     
     

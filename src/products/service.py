@@ -8,9 +8,6 @@ from src.businesses.service import get_member
 
 
 async def add_product(business_id, post: schemas.Productcreate, db: AsyncSession, current_user):
-    if current_user.role not in [um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to perform this action")
-
     if post.price <= 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Price must be greater than 0")
 
@@ -46,9 +43,6 @@ async def add_product(business_id, post: schemas.Productcreate, db: AsyncSession
 
 
 async def get_Products(business_id, db: AsyncSession, current_user, limit, skip, search):
-    if current_user.role not in [um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager, um.RoleEnum.cashier]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to perform this action")
-
     products = (
         (await db.execute(
             select(bm.Product)
@@ -65,9 +59,6 @@ async def get_Products(business_id, db: AsyncSession, current_user, limit, skip,
 
 
 async def get_product(business_id, id, db: AsyncSession, current_user, limit, skip, search):
-    if current_user.role not in [um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager, um.RoleEnum.cashier]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to perform this action")
-
     await get_member(db, current_user)
 
     product = (
@@ -85,9 +76,6 @@ async def get_product(business_id, id, db: AsyncSession, current_user, limit, sk
 
 
 async def update_product(business_id, id, post: schemas.ProductUpdate, db: AsyncSession, current_user):
-    if current_user.role not in [um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
-
     await get_member(db, current_user)
     product = (
         (await db.execute(
@@ -112,8 +100,6 @@ async def update_product(business_id, id, post: schemas.ProductUpdate, db: Async
 
 
 async def delete_product(business_id, id, db: AsyncSession, current_user):
-    if current_user.role not in [um.RoleEnum.admin, um.RoleEnum.super_admin]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
     await get_member(db, current_user)
     product = (
         (await db.execute(
@@ -132,9 +118,6 @@ async def delete_product(business_id, id, db: AsyncSession, current_user):
 
 
 async def restock(business_id, id, post, db: AsyncSession, current_user):
-    if current_user.role not in [um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unauthorized to perform this action")
-
     await get_member(db, current_user)
     if post.quantity < 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quantity cannot be negative")
@@ -157,9 +140,6 @@ async def restock(business_id, id, post, db: AsyncSession, current_user):
 
 
 async def low_stock(business_id, db: AsyncSession, current_user):
-    if current_user.role not in [um.RoleEnum.admin, um.RoleEnum.super_admin]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
-
     await get_member(db, current_user)
 
     products = (
@@ -176,9 +156,6 @@ async def low_stock(business_id, db: AsyncSession, current_user):
 
 
 async def deactivate(business_id, id, db: AsyncSession, current_user):
-    if current_user.role not in [um.RoleEnum.admin, um.RoleEnum.super_admin]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
-
     await get_member(db, current_user)
     product = (
         (await db.execute(

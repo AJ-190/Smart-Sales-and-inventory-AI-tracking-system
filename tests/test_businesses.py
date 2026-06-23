@@ -56,7 +56,7 @@ def test_update_business_unauthorized(authorized_user_client, test_get_businesse
         json={"name": "Great Addy"}
     )
     
-    assert res.status_code == 403
+    assert res.status_code == 401
     
 def test_delete_business(authorized_sup_client,test_get_businesses):
     res = authorized_sup_client.delete(
@@ -76,7 +76,7 @@ def test_get_business_unauthorized(authorized_user_client, test_get_businesses):
         "/businesses/"
     )
     
-    assert res.status_code == 403
+    assert res.status_code == 401
     
 def test_get_business_key(authorized_sup_client, test_get_businesses):
     res = authorized_sup_client.get(

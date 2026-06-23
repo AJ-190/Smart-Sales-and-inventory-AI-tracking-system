@@ -10,10 +10,6 @@ from src.sales import schemas
 
 
 async def add_sale(business_id, post: schemas.SaleCreate, db: AsyncSession, current_user):
-    if current_user.role not in [um.RoleEnum.admin, um.RoleEnum.super_admin,
-                                  um.RoleEnum.cashier, um.RoleEnum.manager]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to perform this action")
-
     if not post.list_items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sale must have at least one item")
 
@@ -117,17 +113,6 @@ async def add_sale(business_id, post: schemas.SaleCreate, db: AsyncSession, curr
 
 
 async def get_sales(business_id: int, db: AsyncSession, current_user, limit: int, skip: int, date: date | None = None):
-    if current_user.role not in [
-        um.RoleEnum.admin,
-        um.RoleEnum.super_admin,
-        um.RoleEnum.manager,
-        um.RoleEnum.cashier
-    ]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Unauthorized to perform this action"
-        )
-
     today = datetime.utcnow().date()
 
     stmt = select(bm.Sale).where(bm.Sale.business_id == business_id)
@@ -168,17 +153,6 @@ async def get_sales(business_id: int, db: AsyncSession, current_user, limit: int
 
 
 async def get_sale(id, db: AsyncSession, current_user):
-    if current_user.role not in [
-        um.RoleEnum.admin,
-        um.RoleEnum.super_admin,
-        um.RoleEnum.manager,
-        um.RoleEnum.cashier
-    ]:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized to perform this action"
-        )
-
     stmt = select(bm.Sale).where(bm.Sale.business_id == current_user.business_id)
 
     if current_user.role == um.RoleEnum.cashier:
@@ -200,12 +174,6 @@ async def get_sale(id, db: AsyncSession, current_user):
 
 
 async def delete_sale(business_id, id, db: AsyncSession, current_user):
-    if current_user.role not in [
-        um.RoleEnum.admin,
-        um.RoleEnum.super_admin
-    ]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action")
-
     result = await db.execute(
         select(bm.Sale)
         .where(bm.Sale.business_id == business_id)
