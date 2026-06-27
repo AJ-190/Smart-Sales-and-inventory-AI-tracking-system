@@ -34,6 +34,17 @@ async def get_summery(
     return await analytics_service.get_summery(business_id, db, current_user, date, end_date)
 
 
+@router.get("/reports/analytics/dashboard/{business_id}", response_model=schemas.DashboardResponse)
+async def get_dashboard(
+    business_id: int,
+    db=Depends(get_db),
+    current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager])),
+    date: date | None = None,
+    end_date: date | None = None,
+):
+    return await analytics_service.get_dashboard(business_id, db, current_user, date, end_date)
+
+
 @router.get("/reports/analytics/low_stock", response_model=list[LowStockResponse])
 async def get_low_stock(
     db=Depends(get_db),
