@@ -6,13 +6,15 @@ from src.config import get_settings
 DATABASE_URL = get_settings().DATABASE_URL
 if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+    separator = "&" if "?" in DATABASE_URL else "?"
+    DATABASE_URL += f"{separator}statement_cache_size=0"
 
 Base = declarative_base()
 
 engine = create_async_engine(
     url=DATABASE_URL,
     echo=False,
-    connect_args={"ssl": "require", "statement_cache_size": 0},
+    connect_args={"ssl": "require"},
     pool_pre_ping=True,
     pool_size=5,
     max_overflow=10,
