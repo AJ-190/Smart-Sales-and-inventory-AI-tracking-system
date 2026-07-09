@@ -11,7 +11,7 @@ from src.users.service import update_user
 async def get_member(db, current_user):
     member = (
         await db.execute(
-            select(um.BusinessMember).where(um.BusinessMember.business_id == current_user.business_id)
+            select(um.BusinessMember).where(um.BusinessMember.user_id == current_user.user_id)
         )
     ).scalars().first()
     if not member:
@@ -115,7 +115,7 @@ async def get_business(id, db: AsyncSession, current_user):
     )
 
     if current_user.role != um.RoleEnum.super_admin:
-        stmt = stmt.where(um.BusinessMember.member_id == current_user.member_id)
+        stmt = stmt.where(um.BusinessMember.user_id == current_user.user_id)
 
     result = (await db.execute(stmt)).first()
 
@@ -150,7 +150,7 @@ async def update_business(id, post, db: AsyncSession, current_user):
                 .join(um.BusinessMember, um.BusinessMember.business_id == bm.Business.business_id)
                 .where(
                     bm.Business.business_id == id,
-                    um.BusinessMember.member_id == current_user.member_id,
+                    um.BusinessMember.user_id == current_user.user_id,
                 )
             )
         ).scalars().first()
@@ -177,12 +177,12 @@ async def delete_business(id, db: AsyncSession, current_user):
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Business with the ID: {id} not found")
 
-    user_own_business = (await db.execute(stmt.where(um.BusinessMember.business_id == current_user.member_id))).scalars().first()
+    user_own_business = (await db.execute(stmt.where(um.BusinessMember.user_id == current_user.user_id))).scalars().first()
 
     if not user_own_business and current_user.role != um.RoleEnum.super_admin:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to delete this business")
 
-    await db.delete(user_own_business)
+    await db.delete(business)
     await db.commit()
     return {f"Business with the ID:{id} deleted successfully"}
 

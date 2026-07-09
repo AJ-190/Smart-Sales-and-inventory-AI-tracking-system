@@ -1,12 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from src.errors.handlers import custom_http_exception_handler
 from src.database import engine, Base
+from src.middleware.auth_middleware import auth_middleware
 from src.businesses.router import router as main_router
 from src.products.router import router as products_router
 from src.sales.router import router as sales_router
 from src.analytics.router import router as analytics_router
 from src.auth.router import router as auth_router
 from src.users.router import router as users_router
+from src.db.redis import get_redis_client
 from src.debts.router import router as debts_router
 from src.customers.router import router as customers_router
 from src.celery_tasks.scheduler import start_scheduler, scheduler
@@ -15,9 +19,8 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        start_scheduler()
+    app.state.redis = await get_redis_client()
+    start_scheduler()
     yield
     scheduler.shutdown()
 
@@ -31,6 +34,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.middleware("http")(auth_middleware)
+app.add_exception_handler(StarletteHTTPException, custom_http_exception_handler)
 app.include_router(main_router)
 app.include_router(products_router)
 app.include_router(sales_router)

@@ -17,7 +17,7 @@ def date_validator(date, end_date):
     if date > today or end_date > today:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot retrieve future data")
     if end_date < date:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="End date cannot be before start date")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="End date cannot be before start date")
 
 
 async def view_profit(business_id, db: AsyncSession, current_user, date: date | None = None, end_date: date | None = None):
@@ -159,7 +159,11 @@ async def check_stock(db: AsyncSession, current_user):
     return stock
 
 
-async def get_dashboard(business_id, db: AsyncSession, current_user, start_date: date | None = None, end_date: date | None = None):
+async def get_dashboard(business_id,
+                        db: AsyncSession,
+                        current_user, 
+                        start_date: date | None = None, 
+                        end_date: date | None = None):
     await business_authorized_access(current_user, business_id, db)
 
     if start_date and end_date:

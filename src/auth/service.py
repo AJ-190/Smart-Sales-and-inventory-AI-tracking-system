@@ -5,14 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from src.users import models as um
 from src.auth import schemas, utils as auth_utils
-
+from src.config import get_settings
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
-
-
-def create_refresh_token() -> str:
-    return secrets.token_hex(64)
 
 
 async def login(user_credentials, db: AsyncSession):
@@ -26,9 +22,9 @@ async def login(user_credentials, db: AsyncSession):
 
     if not auth_utils.verify(user_credentials.password, user.password):
         raise HTTPException(401, "Incorrect password or email")
-
-    access_token = auth_utils.access_token({"sub": str(user.user_id), "role": user.role})
-    refresh_token = create_refresh_token()
+    
+    access_token = auth_utils.AccessToken({"sub": str(user.user_id), "role": user.role})
+    refresh_token = auth_utils.AccessToken( {"sub": str(user.user_id), "role": user.role}, expire=get_settings().REFRESH_TOKEN_TIME, refresh=True)
 
     user.refresh_token = hash_token(refresh_token)
     await db.commit()
@@ -36,7 +32,7 @@ async def login(user_credentials, db: AsyncSession):
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "token_type": "bearer"
+        "token_type": "Bearer"
     }
 
 
@@ -50,9 +46,10 @@ async def refresh(payload: schemas.Token, db: AsyncSession):
 
     if not user:
         raise HTTPException(403, "Invalid or expired refresh token")
+    
+    new_access_token = auth_utils.AccessToken({"sub": str(user.user_id), "role": user.role})
+    new_refresh_token = auth_utils.AccessToken( {"sub": str(user.user_id), "role": user.role}, expire=get_settings().REFRESH_TOKEN_TIME, refresh=True)
 
-    new_access_token = auth_utils.access_token({"sub": str(user.user_id), "role": user.role})
-    new_refresh_token = create_refresh_token()
 
     user.refresh_token = hash_token(new_refresh_token)
     await db.commit()
@@ -60,7 +57,7 @@ async def refresh(payload: schemas.Token, db: AsyncSession):
     return {
         "access_token": new_access_token,
         "refresh_token": new_refresh_token,
-        "token_type": "bearer"
+        "token_type": "Bearer"
     }
 
 

@@ -33,6 +33,7 @@ class Business(Base):
     business_id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, nullable=False)
     business_key = Column(String, unique=True, default=lambda: str(uuid.uuid4()))
+    bio = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

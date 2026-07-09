@@ -26,7 +26,7 @@ async def create_customer(db: AsyncSession, current_user, customer: schemas.Cust
         db.execute(
             select(cm.Customer)
             .where(cm.Customer.business_id == business_id)
-            .where(cm.Customer.email == customer.phone)
+            .where(cm.Customer.phone == customer.phone)
             
         ))
     )

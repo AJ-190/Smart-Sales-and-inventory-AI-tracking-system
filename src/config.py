@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     MAIL_USERNAME: str = os.getenv("SUPER_ADMIN_NAME", "")
     MAIL_PASSWORD: str = os.getenv("SUPER_ADMIN_APP_PASSWORD", "")
     MAIL_FROM:str = os.getenv("SUPER_ADMIN_EMAIL", "")
+    REDIS_URL: str = os.getenv("REDIS_URL", "")
     MAIL_PORT:int = 465
     MAIL_SERVER: str = os.getenv("MAIL_SERVER", "")
     MAIL_STARTTLS:bool = False

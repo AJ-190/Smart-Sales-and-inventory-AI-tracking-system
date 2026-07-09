@@ -69,12 +69,17 @@ async def get_all_users(db: AsyncSession, current_user):
 
 async def get_members(db: AsyncSession, current_user):
     if current_user.role == um.RoleEnum.admin:
+        if not current_user.business_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="You are not member of any business")
         check_result = await db.execute(
             select(um.BusinessMember).where(um.BusinessMember.business_id == current_user.business_id)
         )
         check = check_result.first()
         if not check:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="You are not member of any business")
+
+    if not current_user.business_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No business associated with your account")
 
     result = await db.execute(
         select(um.BusinessMember.role,
@@ -95,7 +100,7 @@ async def get_members(db: AsyncSession, current_user):
 
 
 async def get_user(id, db: AsyncSession, current_user):
-    result = await db.execute(
+    stmt = (
         select(um.Users.role,
                um.Users.email,
                um.Users.name,
@@ -105,10 +110,12 @@ async def get_user(id, db: AsyncSession, current_user):
                um.BusinessMember.business_id)
         .outerjoin(um.BusinessMember,
                    um.BusinessMember.user_id == um.Users.user_id)
-        .where(um.Users.user_id == id,
-               um.BusinessMember.business_id == current_user.business_id)
+        .where(um.Users.user_id == id)
     )
-    user_ = result.first()
+    if current_user.business_id:
+        stmt = stmt.where(um.BusinessMember.business_id == current_user.business_id)
+
+    user_ = (await db.execute(stmt)).first()
 
     if not user_:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -143,8 +150,14 @@ async def delete_user(id, db: AsyncSession, current_user):
     if not user_:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    if current_user.role == um.RoleEnum.admin and current_user.business_id != user_.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to delete users from other businesses")
+    if current_user.role == um.RoleEnum.admin:
+        membership = await db.execute(
+            select(um.BusinessMember)
+            .where(um.BusinessMember.user_id == id)
+            .where(um.BusinessMember.business_id == current_user.business_id)
+        )
+        if not membership.scalar_one_or_none():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to delete users from other businesses")
 
     await db.delete(user_)
     await db.commit()
@@ -154,7 +167,7 @@ async def delete_user(id, db: AsyncSession, current_user):
 async def activate_user(id: int, db: AsyncSession, current_user):
     result = await db.execute(
         select(um.Users, um.BusinessMember.business_id)
-        .join(um.BusinessMember, um.BusinessMember.user_id == um.Users.user_id)
+        .outerjoin(um.BusinessMember, um.BusinessMember.user_id == um.Users.user_id)
         .where(um.Users.user_id == id)
     )
     row = result.first()

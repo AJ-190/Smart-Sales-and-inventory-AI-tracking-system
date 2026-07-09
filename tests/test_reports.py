@@ -92,7 +92,7 @@ def test_dashboard_end_before_start(authorized_user_client, authorized_user_clie
     res = authorized_user_client.get(
         f"/reports/analytics/dashboard/{business_id}?date=2026-06-10&end_date=2026-06-05"
     )
-    assert res.status_code == 403
+    assert res.status_code == 400
 
 
 def test_dashboard_forbidden_business(authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli):

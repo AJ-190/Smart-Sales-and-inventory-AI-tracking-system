@@ -5,6 +5,7 @@ from sqlalchemy import select, func, cast, Date
 from datetime import timedelta, datetime, date
 from src.users import models as um
 from src.businesses import models as bm
+from src.debts import models as dm
 from src.customers.models import Customer
 from src.sales import schemas
 
@@ -91,7 +92,7 @@ async def add_sale(business_id, post: schemas.SaleCreate, db: AsyncSession, curr
         if not check_customer_reg:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Customer with the ID: {post.customer_id} not found")
 
-        new_debt = bm.Debt(
+        new_debt = dm.Debt(
             business_id=business_id,
             customer_id=post.customer_id,
             sale_id=sale.sale_id,
@@ -152,8 +153,8 @@ async def get_sales(business_id: int, db: AsyncSession, current_user, limit: int
     return sales
 
 
-async def get_sale(id, db: AsyncSession, current_user):
-    stmt = select(bm.Sale).where(bm.Sale.business_id == current_user.business_id)
+async def get_sale(business_id, id, db: AsyncSession, current_user):
+    stmt = select(bm.Sale).where(bm.Sale.business_id == business_id)
 
     if current_user.role == um.RoleEnum.cashier:
         stmt = stmt.where(bm.Sale.user_id == current_user.user_id)

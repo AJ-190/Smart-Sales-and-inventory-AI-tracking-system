@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+from unittest.mock import AsyncMock
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import StaticPool
 from src.database import get_db, Base
@@ -42,6 +43,12 @@ def session(async_engine):
     db = async_sessionmaker(bind=async_engine, expire_on_commit=False)()
     yield db
 
+
+@pytest.fixture(autouse=True)
+def setup_redis():
+    app.state.redis = AsyncMock()
+    app.state.redis.get.return_value = None
+    yield
 
 @pytest.fixture
 def client(session):
@@ -86,7 +93,7 @@ def test_user_1(client):
 
 @pytest.fixture
 def token(test_user):
-    token = auth_utils.access_token({"sub": str(test_user.user_id)})
+    token = auth_utils.AccessToken({"sub": str(test_user.user_id), "role": test_user.role})
     return token
 
 
@@ -103,7 +110,7 @@ def authorized_sup_client(session, token):
 
 @pytest.fixture
 def token_1(test_user_1):
-    token = auth_utils.access_token({"sub": str(test_user_1.user_id)})
+    token = auth_utils.AccessToken({"sub": str(test_user_1.user_id), "role": test_user_1.role})
     return token
 
 
@@ -177,7 +184,7 @@ def authorized_sup_products_create(authorized_sup_client, test_get_businesses):
     created = []
     for product in products:
         res = authorized_sup_client.post(
-            f"/products/{test_get_businesses[0].business_id}",
+            f"/products/{test_get_businesses[0].business.business_id}",
             json=product
         )
         created.append(product_schemas.ProductResponse(**res.json()))

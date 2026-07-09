@@ -29,7 +29,7 @@ async def get_sales(
 
 @router.get("/sales/{business_id}/{id}", response_model=schemas.SaleResponse)
 async def get_sale(business_id: int, id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager, um.RoleEnum.cashier]))):
-    return await sale_service.get_sale(id, db, current_user)
+    return await sale_service.get_sale(business_id, id, db, current_user)
 
 
 @router.delete("/sales/{business_id}/{id}", status_code=status.HTTP_204_NO_CONTENT)

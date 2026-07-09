@@ -47,7 +47,7 @@ def test_login(client, test_user):
     assert res.status_code == status.HTTP_200_OK
     token_data = res.json()
     assert "access_token" in token_data
-    assert token_data["token_type"] == "bearer"
+    assert token_data["token_type"] == "Bearer"
 
 
 def test_login_wrong_email(client, test_user):

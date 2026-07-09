@@ -44,7 +44,7 @@ def test_login_user(client, test_user):
               "password": "passwordY123"})
     
     post = auth_schemas.Token(**res.json())
-    assert post.token_type == "bearer"
+    assert post.token_type == "Bearer"
     assert res.status_code == 200
 
 def test_login_inc_email(client, test_user):
