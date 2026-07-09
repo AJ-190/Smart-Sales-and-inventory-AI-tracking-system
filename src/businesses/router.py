@@ -4,6 +4,7 @@ from src.businesses import schemas, service as biz_service
 from src.auth import dependencies as auth_deps
 from src.users import models as um
 
+
 router = APIRouter(tags=['Business'])
 
 
