@@ -48,6 +48,10 @@ def session(async_engine):
 def setup_redis():
     app.state.redis = AsyncMock()
     app.state.redis.get.return_value = None
+    app.state.redis.hgetall = AsyncMock(return_value={})
+    app.state.redis.hset = AsyncMock()
+    app.state.redis.hincrby = AsyncMock()
+    app.state.redis.expire = AsyncMock()
     yield
 
 @pytest.fixture
@@ -297,7 +301,7 @@ def test_send_approval(authorized_user_client, test_get_business_key):
                      }
 
     res = authorized_user_client.post(
-        f"/approvals/send_approval/",
+        f"/businesses/approvals/send_approval/",
         json=approval_data
     )
 
@@ -308,7 +312,7 @@ def test_send_approval(authorized_user_client, test_get_business_key):
 @pytest.fixture
 def test_approve_approval_(authorized_sup_client, test_get_businesses, test_send_approval, authorized_user_client_test_businesses):
     res = authorized_sup_client.post(
-        f"/approvals/confirm_approvals/{test_get_businesses[0].business.business_id}",
+        f"/businesses/approvals/confirm_approvals/{test_get_businesses[0].business.business_id}",
         json={"approval_id": test_send_approval.approval_id, "dir": 1}
     )
 
