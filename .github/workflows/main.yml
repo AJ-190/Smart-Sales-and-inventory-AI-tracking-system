@@ -24,7 +24,7 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}?statement_cache_size=0
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       SUPER_ADMIN_EMAIL: ${{secrets.SUPER_ADMIN_EMAIL}}
       SUPER_ADMIN_APP_PASSWORD: ${{secrets.SUPER_ADMIN_PASSWORD}}
