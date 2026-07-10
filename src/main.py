@@ -17,6 +17,8 @@ from src.celery_tasks.scheduler import start_scheduler, scheduler
 from contextlib import asynccontextmanager
 
 
+    
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.redis = await get_redis_client()
@@ -49,3 +51,4 @@ app.include_router(customers_router)
 @app.get("/")
 async def root():
     return "API is running"
+

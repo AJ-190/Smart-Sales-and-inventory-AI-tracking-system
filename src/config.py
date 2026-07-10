@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     MAIL_SSL_TLS:bool = True
     USE_CREDENTIALS:bool = True
     VALIDATE_CERTS:bool = True
+    REQUEST_LIMIT_EXPIRY: int = 60
+    REQUEST_LIMIT: int = 5
 
 def get_settings():
     return Settings()

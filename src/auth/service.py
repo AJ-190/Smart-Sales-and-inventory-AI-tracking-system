@@ -10,6 +10,8 @@ from src.config import get_settings
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
+def verify_token_hash(token: str, hashed_token: str) -> bool:
+    return hash_token(token) == hashed_token
 
 async def login(user_credentials, db: AsyncSession):
     result = await db.execute(
