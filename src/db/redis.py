@@ -4,7 +4,7 @@ from src.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-def get_redis_client() -> airedis.Redis | None:
+async def get_redis_client() -> airedis.Redis | None:
     try:
         return  airedis.from_url(get_settings().REDIS_URL, decode_responses=True)
     except Exception as e:
