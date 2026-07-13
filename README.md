@@ -1,7 +1,7 @@
 # Smart Sales & Inventory AI Tracking System
 
-![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-brightgreen)
-![Python](https://img.shields.io/badge/Python-3.14-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.136+-brightgreen)
+![Python](https://img.shields.io/badge/Python-3.13+-blue)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-336791)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Deploy](https://img.shields.io/badge/deployed-Render-46E3B7)
@@ -19,15 +19,14 @@ A production-ready REST API for small businesses to manage inventory, track sale
 
 ## Features
 
-- **Authentication** — User registration and login secured with JWT
+- **Authentication** — User registration and login secured with JWT + OTP email verification
 - **Multi-Business Support** — One user can own and manage multiple businesses
 - **Product Management** — Full CRUD operations on products per business
 - **Sales Tracking** — Record, retrieve, update, and delete sales transactions with automatic calculations
 - **Business Approvals** — Request and manage business join approvals with role-based access control
 - **Customer Management** — Create, update, and manage customers per business
 - **Debt Tracking** — Track outstanding customer debts with auto-reminders
-- **Dashboard & Analytics** — Aggregated KPIs, revenue breakdowns, profit margins, payment method splits, and best-selling product insights
-- **Weather Integration** — Live weather data via Open-Meteo API
+- **Dashboard & Analytics** — Aggregated KPIs, revenue breakdowns, profit margins, payment method splits, best-selling product insights, and a combined dashboard endpoint
 - **Automated Reports** — Daily, weekly, and monthly sales summaries sent via email to admins and managers using background cron jobs
 
 ---
@@ -40,11 +39,9 @@ A production-ready REST API for small businesses to manage inventory, track sale
 | Database | PostgreSQL (SQLAlchemy ORM) |
 | Auth | JWT (OAuth2 + Argon2 hashing) |
 | Background Jobs | APScheduler |
-| Email | SMTP (Gmail) |
+| Email | SMTP (Gmail) via aiosmtplib |
 | Caching | Redis *(optional — connector available)* |
-| External APIs | Open-Meteo (weather) |
 | Deployment | Render / Railway |
-| Mobile Client | React Native (Expo) |
 
 ---
 
@@ -56,9 +53,10 @@ src/
 ├── config.py              # Pydantic settings (env vars)
 ├── database.py            # SQLAlchemy engine, session factory, Base
 ├── httpx_client.py        # Shared HTTPX async client dependency
-├── redis_cllient.py       # Redis async connection helper *(optional)*
+├── mail.py                # Email utility (fastapi-mail)
+├── redis_cllient.py       # Redis async connection helper *(unused — legacy)*
 ├── auth/                  # Authentication module
-│   ├── router.py          #   /auth/login, /auth/refresh, /auth/logout
+│   ├── router.py          #   /auth/login, /auth/refresh, /auth/logout, /auth/otp/*
 │   ├── schemas.py         #   Request/response models
 │   ├── service.py         #   Login, refresh, logout logic
 │   ├── dependencies.py    #   OAuth2 scheme, get_current_user
@@ -67,36 +65,55 @@ src/
 │   ├── router.py          #   /users/sign_up, /users/* CRUD
 │   ├── models.py          #   Users, BusinessMember, RoleEnum
 │   ├── schemas.py         #   Request/response models
-│   └── service.py         #   User CRUD logic
-├── businesses/            # Business, product, sales, approvals, reports
-│   ├── router.py          #   All business/product/sale/approval/report endpoints
+│   ├── service.py         #   User CRUD logic
+│   └── dependencies.py    #   User-specific dependencies
+├── businesses/            # Business management + approvals
+│   ├── router.py          #   /businesses/* CRUD, /businesses/approvals/*
 │   ├── models.py          #   Business, Product, Sale, SalesItem, Debt, Approvals
 │   ├── schemas.py         #   Request/response models
 │   └── service.py         #   All business logic
+├── products/              # Product management module
+│   ├── router.py          #   /products/{business_id}/* CRUD
+│   ├── schemas.py         #   Request/response models
+│   └── service.py         #   Product CRUD + restock logic
+├── sales/                 # Sales tracking module
+│   ├── router.py          #   /sales/{business_id}/* CRUD
+│   ├── schemas.py         #   Request/response models
+│   └── service.py         #   Sales logic with auto-calculations
 ├── customers/             # Customer management module
 │   ├── router.py          #   /business/customers/* CRUD
 │   ├── models.py          #   Customer model
 │   ├── schemas.py         #   Request/response models
 │   └── service.py         #   Customer CRUD logic
 ├── debts/                 # Debt tracking module
-│   ├── router.py          #   /debts endpoint
+│   ├── router.py          #   /debts/{business_id}, /debts/customers/{business_id}
 │   ├── models.py          #   Re-exports Debt from businesses
 │   ├── schemas.py         #   Request/response models
 │   └── service.py         #   Debt query logic
-├── external_services/     # Third-party API integrations
-│   ├── weather_api.py     #   /weather/{city_name} endpoint
-│   └── weather.py         #   Open-Meteo API client
-├── celery_tasks/          # Background job module
-│   ├── tasks.py           #   Daily/weekly/monthly summary generators
+├── analytics/             # Dashboard & analytics module
+│   ├── router.py          #   /reports/*, /admin/crons/*
+│   ├── schemas.py         #   Request/response models
+│   └── service.py         #   Analytics aggregation logic
+├── celery_tasks/          # Background job module (APScheduler)
+│   ├── celery_app.py      #   Celery config *(unused — future migration)*
 │   ├── scheduler.py       #   APScheduler cron job definitions
-│   └── email_report.py    #   HTML email builder (Gmail SMTP)
+│   ├── sales_task.py      #   Daily/weekly/monthly summary generators
+│   ├── email_report.py    #   HTML email builder (Gmail SMTP)
+│   ├── otp_task.py        #   OTP email verification task
+│   ├── schemas.py         #   Report-related schemas
+│   └── worker.py          #   Worker stub *(placeholder)*
 ├── middleware/
-│   └── logging.py         # Request logging middleware
-└── errors/
-    └── handlers.py        # Global exception handlers
+│   ├── __init__.py
+│   ├── logging.py         #   Request logging middleware
+│   └── auth_middleware.py #   Auth enforcement middleware
+├── errors/
+│   ├── __init__.py
+│   └── handlers.py        #   Global exception handlers
+└── db/
+    └── redis.py           #   Redis async client (used by main.py)
 
 alembic/                   # Database migrations
-tests/                     # Pytest test suite (70+ tests)
+tests/                     # Pytest test suite
 ├── conftest.py            # Shared fixtures, factories
 ├── auth/
 │   └── test_auth.py
@@ -110,10 +127,13 @@ tests/                     # Pytest test suite (70+ tests)
 ├── test_customers.py
 ├── test_approvals.py
 ├── test_reports.py
-└── test_users.py
+├── test_users.py
+└── test_rate_limiter.py
 
 railway.yaml               # Railway deployment config
 render.yaml                # Render deployment config
+Dockerfile                 # Docker build config (Python 3.13-slim)
+Procfile                   # Heroku/Render process file
 requirements.txt
 ```
 
@@ -133,6 +153,8 @@ Authorization: Bearer <your_token>
 | `/auth/login` | POST | Login and receive JWT + refresh token |
 | `/auth/refresh` | POST | Refresh an expired access token |
 | `/auth/logout` | POST | Invalidate refresh token |
+| `/auth/otp/get_code` | POST | Request OTP verification code via email |
+| `/auth/otp/verification` | POST | Verify OTP code |
 
 ---
 
@@ -199,6 +221,7 @@ Authorization: Bearer <your_token>
 | `/business/customers/{business_id}` | GET | Get all customers |
 | `/business/customers/{business_id}/{customer_id}` | GET | Get a single customer |
 | `/business/customers/{business_id}/{customer_id}` | PUT | Update a customer |
+| `/business/customers/{business_id}/deactivate/{customer_id}` | PUT | Deactivate a customer |
 | `/business/customers/{business_id}/{customer_id}` | DELETE | Soft-delete a customer |
 
 ---
@@ -207,7 +230,8 @@ Authorization: Bearer <your_token>
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/debts/` | GET | Get outstanding debts for current business |
+| `/debts/{business_id}` | GET | Get outstanding debts for a business |
+| `/debts/customers/{business_id}` | GET | Get customers with outstanding debt |
 
 ---
 
@@ -215,17 +239,9 @@ Authorization: Bearer <your_token>
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/approvals/send_approval` | POST | Send a business join request |
-| `/approvals/get_approvals/{business_id}` | GET | Get approvals (filterable by status) |
-| `/approvals/confirm_approvals/{business_id}` | POST | Approve or reject an approval |
-
----
-
-## Weather
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/weather/{city_name}` | GET | Live weather data (Open-Meteo) |
+| `/businesses/approvals/send_approval` | POST | Send a business join request |
+| `/businesses/approvals/get_approvals/{business_id}` | GET | Get approvals (filterable by status) |
+| `/businesses/approvals/confirm_approvals/{business_id}` | POST | Approve or reject an approval |
 
 ---
 
@@ -253,6 +269,7 @@ The following data points are available via existing endpoints:
 | Endpoint | Method | Description |
 |---|---|---|
 | `/reports/profit/{business_id}` | GET | View profit, revenue, cost |
+| `/reports/analytics/dashboard/{business_id}` | GET | Full dashboard with all KPIs |
 | `/reports/analytics/summery/{business_id}` | GET | Full sales summary (also emailed) |
 | `/reports/analytics/low_stock` | GET | Low stock alert list |
 | `/reports/analytics/debts/{business_id}` | GET | Outstanding debt totals |
@@ -285,15 +302,26 @@ Background cron jobs run on schedule and email reports to business admins and ma
 Create a `.env` file in the project root:
 
 ```env
+# Database
 DATABASE_URL=postgresql://user:password@host:5432/dbname
+
+# JWT Auth
 SECRET_KEY=your_jwt_secret_key
 ALGORITHM=HS256
 ACCESS_TOKEN_TIME=60
 REFRESH_TOKEN_TIME=10080
+
+# Super Admin / Email (SMTP)
 SUPER_ADMIN_EMAIL=admin@example.com
 SUPER_ADMIN_APP_PASSWORD=your_gmail_app_password
 SUPER_ADMIN_NAME=Admin Name
+MAIL_SERVER=smtp.gmail.com
+
+# API Key
 API_AUTH_KEY=your_api_auth_key
+
+# Redis *(optional)*
+REDIS_URL=redis://localhost:6379
 ```
 
 ---
@@ -340,6 +368,15 @@ pytest -v tests/test_sales.py
 ---
 
 ## Deployment
+
+### Docker
+
+Build and run locally:
+
+```bash
+docker build -t smart-sales-inventory .
+docker run -p 8000:8000 --env-file .env smart-sales-inventory
+```
 
 ### Render
 
