@@ -1,4 +1,5 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
+
 
 
 class TokenData(BaseModel):
@@ -9,3 +10,13 @@ class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str
+
+class Otp_veriification_code(BaseModel):
+    otp: str
+    
+class Email(BaseModel):
+    email: EmailStr
+    
+class Otp_verification(BaseModel):
+    otp: str
+    email: EmailStr

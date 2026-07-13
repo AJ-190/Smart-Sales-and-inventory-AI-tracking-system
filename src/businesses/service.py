@@ -240,6 +240,9 @@ async def send_approval(post, db: AsyncSession, current_user):
     ]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Role not found in the business")
 
+    if not current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=" requester_id is required")
+
     user = bm.Approvals(
         business_id=check_business_.business_id,
         requester_id=current_user.user_id,
@@ -290,16 +293,14 @@ async def get_approvals(business_id, status_, db: AsyncSession, current_user):
 
 
 async def con_del_approval(post, business_id, db: AsyncSession, current_user):
+    from sqlalchemy.orm import selectinload
+
     stmt = (
         select(bm.Approvals)
         .join(um.BusinessMember, um.BusinessMember.business_id == bm.Approvals.business_id)
         .where(um.BusinessMember.business_id == business_id)
         .where(um.BusinessMember.user_id == current_user.user_id)
     )
-
-    business = (await db.execute(stmt)).scalars().first()
-    if not business:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No business found with the ID: {business_id}")
 
     approval_user = (await db.execute(stmt.where(bm.Approvals.approval_id == post.approval_id))).scalars().first()
     if not approval_user:
@@ -309,29 +310,23 @@ async def con_del_approval(post, business_id, db: AsyncSession, current_user):
         if approval_user.status == bm.ApprovalStatus.rejected:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval already rejected")
         approval_user.status = bm.ApprovalStatus.rejected
-        db.add(approval_user)
-        await db.commit()
 
     elif post.dir == 1:
         if approval_user.status == bm.ApprovalStatus.approved:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval already approved")
         approval_user.status = bm.ApprovalStatus.approved
-        db.add(approval_user)
-        await db.commit()
 
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid request")
 
-    user = (
-        (
-            await db.execute(
-                select(um.Users).where(um.Users.user_id == approval_user.requester_id)
-            )
-        ).scalars().first()
-    )
+    await db.commit()
 
-    approval_user.requester = user
-    return approval_user
+    result = await db.execute(
+        select(bm.Approvals)
+        .options(selectinload(bm.Approvals.requester))
+        .where(bm.Approvals.approval_id == post.approval_id)
+    )
+    return result.scalars().first()
 
 
 async def business_authorized_access(current_user, business_id, db: AsyncSession):

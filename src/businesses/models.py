@@ -108,9 +108,9 @@ class Approvals(Base):
     __tablename__ = "approvals"
 
     approval_id = Column(Integer, primary_key=True, autoincrement=True)
-    business_id = Column(Integer, ForeignKey("businesses.business_id"), nullable=False)
-    requester_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
-    reviewer_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    business_id = Column(Integer, ForeignKey("businesses.business_id", ondelete="CASCADE"), nullable=False)
+    requester_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
+    reviewer_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     role        = Column(SAEnum(RoleEnum), nullable=True)
     approval_type = Column(SAEnum(ApprovalType), nullable=False)
     status = Column(SAEnum(ApprovalStatus), default=ApprovalStatus.pending)

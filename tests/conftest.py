@@ -17,6 +17,7 @@ from src.users import schemas as user_schemas
 from src.businesses import schemas as biz_schemas
 from src.products import schemas as product_schemas
 from src.sales import schemas as sale_schemas
+from unittest.mock import patch
 
 
 @pytest.fixture(scope="session")
@@ -52,7 +53,8 @@ def setup_redis():
     app.state.redis.hset = AsyncMock()
     app.state.redis.hincrby = AsyncMock()
     app.state.redis.expire = AsyncMock()
-    yield
+    with patch("src.celery_tasks.otp_task.mail.send_message", new_callable=AsyncMock):
+        yield
 
 @pytest.fixture
 def client(session):

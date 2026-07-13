@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_TIME: int = 7 * 24 * 60
     API_AUTH_KEY: Optional[str] = os.getenv("API_auth_key", "")
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
-    MAIL_USERNAME: str = os.getenv("SUPER_ADMIN_NAME", "")
+    MAIL_USERNAME: str = os.getenv("SUPER_ADMIN_EMAIL", "")
     MAIL_PASSWORD: str = os.getenv("SUPER_ADMIN_APP_PASSWORD", "")
     MAIL_FROM:str = os.getenv("SUPER_ADMIN_EMAIL", "")
     REDIS_URL: str = os.getenv("REDIS_URL", "")
@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     MAIL_STARTTLS:bool = False
     MAIL_SSL_TLS:bool = True
     USE_CREDENTIALS:bool = True
-    VALIDATE_CERTS:bool = True
+    VALIDATE_CERTS:bool = False
     REQUEST_LIMIT_EXPIRY: int = 60
     REQUEST_LIMIT: int = 5
 

@@ -41,6 +41,8 @@ async def get_current_user(token_data = Depends(valiate_token), session: AsyncSe
             um.Users.email,
             um.Users.phone,
             um.Users.role,
+            um.Users.is_verified,
+            um.Users.is_active,
             um.BusinessMember.member_id,
             um.BusinessMember.business_id,
         )
@@ -58,6 +60,7 @@ async def get_current_user(token_data = Depends(valiate_token), session: AsyncSe
         email=row.email,
         phone=row.phone,
         role=row.role.value if isinstance(row.role, um.RoleEnum) else row.role,
+        is_verified=row.is_verified,
         member_id=row.member_id,
         business_id=row.business_id,
     )
@@ -65,7 +68,7 @@ async def get_current_user(token_data = Depends(valiate_token), session: AsyncSe
 def get_my_profile(current_user: users_schema.UsersOutUsers = Depends(get_current_user)):
     return current_user
 
-def role_checker(allowed_roles: list[um.RoleEnum]):
+def role_checker(allowed_roles: list[um.RoleEnum], require_verified: bool = False):
     async def check(
         current_user: users_schema.UsersOutUsers = Depends(get_current_user),
     ):
@@ -73,6 +76,11 @@ def role_checker(allowed_roles: list[um.RoleEnum]):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Unauthorized to perform this action",
+            )
+        if require_verified and not current_user.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account not verified",
             )
         return current_user
 

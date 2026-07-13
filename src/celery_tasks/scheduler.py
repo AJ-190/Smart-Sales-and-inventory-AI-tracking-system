@@ -1,6 +1,6 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from src.celery_tasks.tasks import (
+from src.celery_tasks.sales_task import (
     daily_sale_summery,
     weekly_sale_summery,
     monthly_sale_summery,

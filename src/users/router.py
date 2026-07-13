@@ -36,7 +36,7 @@ async def update_user(id: int, post: schemas.UserUpdate, db=Depends(get_db), cur
     return await users_service.update_user(id, post, db, current_user)
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin]))):
     return await users_service.delete_user(id, db, current_user)
 

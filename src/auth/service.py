@@ -37,6 +37,9 @@ async def login(user_credentials, db: AsyncSession):
         "token_type": "Bearer"
     }
 
+async def get_user_by_email(email: str, db: AsyncSession):
+    user = (await db.execute(select(um.Users).where(um.Users.email == email))).scalar_one_or_none()
+    return user
 
 async def refresh(payload: schemas.Token, db: AsyncSession):
     token_hash = hash_token(payload.refresh_token)
@@ -61,7 +64,6 @@ async def refresh(payload: schemas.Token, db: AsyncSession):
         "refresh_token": new_refresh_token,
         "token_type": "Bearer"
     }
-
 
 async def logout(payload: schemas.Token, db: AsyncSession):
     token_hash = hash_token(payload.refresh_token)

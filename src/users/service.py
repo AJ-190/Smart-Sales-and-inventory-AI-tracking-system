@@ -6,20 +6,26 @@ from src.businesses import models as bm
 from src.users import schemas
 from src.config import get_settings
 from src.auth import utils as auth_utils
+from src.celery_tasks.otp_task import send_otp
 
 
 async def add_user(post: schemas.UserSignUp, db: AsyncSession):
-    result = await db.execute(select(um.Users).where(um.Users.email == post.email))
-    existing = result.scalar_one_or_none()
-    phone_result = await db.execute(select(um.Users).where(um.Users.phone == post.phone))
-    phone_exisiting = phone_result.scalar_one_or_none()
+    existing = (
+        await db.execute(
+            select(um.Users)
+            .where((um.Users.email == post.email) | (um.Users.phone == post.phone))
+        )
+    ).scalar_one_or_none()
 
-    if existing or phone_exisiting:
+    if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already registered")
+
 
     role = um.RoleEnum.super_admin if post.email == get_settings().SUPER_ADMIN_EMAIL else um.RoleEnum.user
     user = um.Users(**post.model_dump(exclude={'password'}), password=auth_utils.hash(post.password), role=role)
-
+    otp = await send_otp(post.email)
+    if  not otp.status_code == status.HTTP_200_OK:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to send OTP-verification code, please try againa later")
     db.add(user)
     await db.commit()
     await db.refresh(user)
@@ -36,6 +42,7 @@ async def get_users(db: AsyncSession, current_user):
             um.Users.phone,
             um.Users.email,
             um.Users.role,
+            um.Users.is_verified,
             bm.Business.name.label("business_name")
         )
         .join(um.BusinessMember, um.Users.user_id == um.BusinessMember.user_id)
@@ -56,6 +63,7 @@ async def get_all_users(db: AsyncSession, current_user):
                um.Users.email,
                um.Users.role,
                um.Users.phone,
+               um.Users.is_verified,
                um.BusinessMember.business_id,
                um.BusinessMember.member_id)
         .outerjoin(um.BusinessMember, um.BusinessMember.user_id == um.Users.user_id)
@@ -86,6 +94,7 @@ async def get_members(db: AsyncSession, current_user):
                um.Users.email,
                um.Users.phone,
                um.Users.name,
+               um.Users.is_verified,
                um.BusinessMember.member_id,
                um.BusinessMember.business_id)
         .join(um.Users, um.BusinessMember.user_id == um.Users.user_id)
@@ -106,6 +115,7 @@ async def get_user(id, db: AsyncSession, current_user):
                um.Users.name,
                um.Users.phone,
                um.Users.user_id,
+               um.Users.is_verified,
                um.BusinessMember.member_id,
                um.BusinessMember.business_id)
         .outerjoin(um.BusinessMember,

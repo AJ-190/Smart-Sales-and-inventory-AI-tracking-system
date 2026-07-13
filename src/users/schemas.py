@@ -44,6 +44,12 @@ class UsersOutUsers(BaseModel):
     role: str
     name: str
     email: str
+    is_verified: bool = False
+
+    @field_validator("is_verified", mode="before")
+    @classmethod
+    def coerce_none_to_false(cls, v):
+        return v if v is not None else False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -55,7 +61,8 @@ class UserSignUpResponse(BaseModel):
     email: str
     role: str
     is_active: bool = True
-
+    is_verified: bool = False
+    
     model_config = ConfigDict(from_attributes=True)
 
 

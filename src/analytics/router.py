@@ -6,7 +6,7 @@ from src.products.schemas import LowStockResponse
 from src.sales.schemas import DebtResponse
 from src.auth import dependencies as auth_deps
 from src.users import models as um
-from src.celery_tasks import tasks as cron_tasks
+from src.celery_tasks import sales_task as cron_tasks
 from src.celery_tasks.scheduler import scheduler
 
 router = APIRouter()

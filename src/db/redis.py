@@ -2,6 +2,7 @@ import logging
 import redis
 import redis.asyncio as airedis
 from src.config import get_settings
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -25,24 +26,6 @@ async def check_jti_blocked(redis: airedis.Redis, jti: str):
     except Exception as e:
         logger.error("Failed to check jti in redis: %s", e)
 
-async def request_rate_limiter(redis: airedis.Redis, user: dict, expire: int):
-    try:
-        key = f"user:{user['user']['sub']}"
-        data = await redis.hgetall(key)
-        if data:
-            count = int(data.get("count", 0))
-            if count >= get_settings().REQUEST_LIMIT:
-                return True
-            await redis.hincrby(key, "count", 1)
-            await redis.expire(key, expire)
-        else:
-            await redis.hset(key, mapping={"count": 1})
-            await redis.expire(key, expire)
-        return False
-    except Exception as e:
-        logger.error("Failed to check rate limit in redis: %s", e)
-        return False
-
 
 async def ip_rate_limiter(redis: airedis.Redis, ip: str, expire: int):
     try:
@@ -62,3 +45,17 @@ async def ip_rate_limiter(redis: airedis.Redis, ip: str, expire: int):
     except Exception as e:
         logger.error("Failed to check ip rate limit in redis: %s", e)
         return False
+
+
+async def otp_verification(redis: airedis.Redis,  email: str, store: bool, otp: Optional[str] = None):
+    client = f"email:{email}"
+    if store:
+        if await redis.get(client):
+            await redis.delete(client)
+        await redis.setex(client, 300, otp)
+    else:
+        otp_ = await redis.get(client)
+        await redis.delete(client)
+        if otp_ is None:
+            return None
+        return otp_
