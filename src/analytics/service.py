@@ -1,3 +1,4 @@
+import logging
 from fastapi import status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, cast, Date, select
@@ -8,6 +9,8 @@ from src.debts import models as dm
 from src.customers import models as cm
 from src.businesses.service import get_member, business_authorized_access
 from src.celery_tasks.email_report import EmailReport
+
+logger = logging.getLogger(__name__)
 
 
 def date_validator(date, end_date):
@@ -138,7 +141,8 @@ async def get_summery(business_id, db: AsyncSession, current_user, date, end_dat
 
     subject = "Sales Summary Report"
     email = EmailReport(current_user.email, subject, body)
-    email.send()
+    if not email.send():
+        logger.warning("Failed to send summary email to %s", current_user.email)
 
     return body
 

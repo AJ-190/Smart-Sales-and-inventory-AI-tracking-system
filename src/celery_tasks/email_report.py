@@ -1,10 +1,13 @@
 import smtplib
 from email.mime.text import MIMEText
 import os
+import logging
 from dotenv import load_dotenv
 import time
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 class EmailReport:
@@ -89,15 +92,19 @@ class EmailReport:
         message['Subject'] = self.subject
         return message
 
-    def send(self):
+    def send(self) -> bool:
         message = self.prepare_message()
 
-        for attempts in range(5):
+        for attempt in range(5):
             try:
                 with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
                     server.login(self.Email, self.Password)
                     server.sendmail(from_addr=self.Email, to_addrs=self.to_email, msg=message.as_string())
-                    break
+                    return True
             except Exception as e:
-                print(f"Attempt {attempts + 1} failed: {e}")
-                time.sleep(10)
+                logger.warning("Email attempt %d/5 failed for %s: %s", attempt + 1, self.to_email, e)
+                if attempt < 4:
+                    time.sleep(10)
+
+        logger.error("All 5 email attempts failed for %s", self.to_email)
+        return False

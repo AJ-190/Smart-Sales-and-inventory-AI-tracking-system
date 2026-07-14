@@ -1,39 +1,66 @@
-from fastapi import status, HTTPException, Depends
+from fastapi import status, HTTPException, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from src.database import get_db
 from src.users import models as um
 from src.users import schemas as users_schema
 from src.db.redis import check_jti_blocked
-from fastapi import Request
+from src.auth.utils import verify_token
 
 
 async def valiate_token(request: Request):
-    from src.main import app
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
-    token_aata = request.state.user
+    token = auth_header.split(" ")[1]
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
-    redis = app.state.redis
-    check_blcoked_jti = await check_jti_blocked(redis, token_aata['jti'])
-    if check_blcoked_jti:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
-                            detail="Invalid token")
-        
-    return token_aata
+    token_data = verify_token(token)
 
-def AccessTokenRequired(token_aata):
-    if token_aata.refresh:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Access token is required")
+    redis = request.app.state.redis
+    if await check_jti_blocked(redis, token_data["jti"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+        )
 
-def RefreshTokenRequired(token_data):
-    if not token_data.refresh:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
-                        detail="Refresh token is required")
-        
-async def get_current_user(token_data = Depends(valiate_token), session: AsyncSession = Depends(get_db)):
-    user_id = int(token_data['user']['sub'])
-    
+    return token_data
+
+
+async def AccessTokenRequired(token_data=Depends(valiate_token)):
+    if token_data.get("refresh"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Access token is required",
+        )
+    return token_data
+
+
+async def RefreshTokenRequired(token_data=Depends(valiate_token)):
+    if not token_data.get("refresh"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token is required",
+        )
+    return token_data
+
+
+async def get_current_user(
+    token_data=Depends(valiate_token),
+    session: AsyncSession = Depends(get_db),
+):
+    user_id = int(token_data["user"]["sub"])
+
     result = await session.execute(
         select(
             um.Users.user_id,
@@ -52,7 +79,10 @@ async def get_current_user(token_data = Depends(valiate_token), session: AsyncSe
     row = result.first()
 
     if not row:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account not registered")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account not registered",
+        )
 
     return users_schema.UsersOutUsers(
         user_id=row.user_id,
@@ -65,8 +95,10 @@ async def get_current_user(token_data = Depends(valiate_token), session: AsyncSe
         business_id=row.business_id,
     )
 
+
 def get_my_profile(current_user: users_schema.UsersOutUsers = Depends(get_current_user)):
     return current_user
+
 
 def role_checker(allowed_roles: list[um.RoleEnum], require_verified: bool = False):
     async def check(
