@@ -2,11 +2,11 @@ from fastapi import APIRouter, Body, Depends, status, HTTPException
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from src.database import get_db
+from src.db.redis import get_redis
 from src.auth import schemas, service as auth_service
 from src.celery_tasks.otp_task import send_otp, verify_otp
 from src.users.schemas import UserSignUpResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.database import get_db
 from src.users import service
 
 
@@ -32,9 +32,10 @@ async def refresh(
 ):
     return await auth_service.refresh(payload, db)
 
-@router.post("/otp/get_code")
+@router.post("/otp/get_code", response_model=schemas.Otp_veriification_code)
 async def get_verification_code(body: EmailRequest):
-    return await send_otp(body.email)
+    await send_otp(body.email)
+    
     
 @router.post("/otp/verification", response_model=UserSignUpResponse)
 async def verify_otp_code(post: schemas.Otp_verification,  db: AsyncSession = Depends(get_db)):
@@ -54,6 +55,6 @@ async def verify_otp_code(post: schemas.Otp_verification,  db: AsyncSession = De
 @router.post("/logout")
 async def logout(
     payload: schemas.Token,
-    db = Depends(get_db)
+    redis_client = Depends(get_redis)
 ):
-    return await auth_service.logout(payload, db)
+    return await auth_service.logout(payload, redis_client)

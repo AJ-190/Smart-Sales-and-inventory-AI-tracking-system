@@ -6,6 +6,8 @@ from sqlalchemy import select
 from src.users import models as um
 from src.auth import schemas, utils as auth_utils
 from src.config import get_settings
+import time
+from src.middleware import logging
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
@@ -27,9 +29,6 @@ async def login(user_credentials, db: AsyncSession):
     
     access_token = auth_utils.AccessToken({"sub": str(user.user_id), "role": user.role})
     refresh_token = auth_utils.AccessToken( {"sub": str(user.user_id), "role": user.role}, expire=get_settings().REFRESH_TOKEN_TIME, refresh=True)
-
-    user.refresh_token = hash_token(refresh_token)
-    await db.commit()
 
     return {
         "access_token": access_token,
@@ -65,16 +64,19 @@ async def refresh(payload: schemas.Token, db: AsyncSession):
         "token_type": "Bearer"
     }
 
-async def logout(payload: schemas.Token, db: AsyncSession):
-    token_hash = hash_token(payload.refresh_token)
+async def logout(payload: schemas.Token, redis):
+    try:
+        
 
-    result = await db.execute(
-        select(um.Users).where(um.Users.refresh_token == token_hash)
-    )
-    user = result.scalar_one_or_none()
+        refresh_token = payload.refresh_token
+        
+        token = auth_utils.verify_token(refresh_token)
+        
+        jti = token.get("jti")
+        expire = token.get("exp")
+        exp_range = max(0, expire - int( time.time()))
 
-    if user:
-        user.refresh_token = None
-        await db.commit()
-
-    return {"message": "Logged out successfully"}
+        await redis.block_jti(redis, jti, exp=exp_range)
+        return {"msg": "Logout successfully"}
+    except Exception as e:
+        logging.logger.error(f"Failed to logout - {e}")

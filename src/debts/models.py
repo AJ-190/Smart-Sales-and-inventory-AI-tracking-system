@@ -22,3 +22,17 @@ class Debt(Base):
     business = relationship("Business", back_populates="debts")
     customer = relationship("Customer", back_populates="debts")
     sale = relationship("Sale", back_populates="debt")
+    transactions = relationship("Transactions", back_populates="debt")
+    
+    
+
+class DebtTransactions(Base):
+    __tablename__ = "debt_transactions"
+    transaction_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    debt_id = Column(Integer, ForeignKey("debts.debt_id"), nullable=False)
+    amount_paid = Column(Float, nullable=False)
+    remainder = Column(Float, nullable=False)
+    note = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
+    
+    debt = relationship("Debt", back_populates="transactions")

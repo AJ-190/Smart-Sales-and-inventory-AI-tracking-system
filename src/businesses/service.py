@@ -6,7 +6,7 @@ from src.businesses import models as bm
 from src.businesses import schemas
 from src.users import schemas as user_schemas
 from src.users.service import update_user
-
+import uuid
 
 async def get_member(db, current_user):
     member = (
@@ -188,22 +188,23 @@ async def delete_business(id, db: AsyncSession, current_user):
 
 
 async def get_business_key(business_id, db: AsyncSession, current_user):
-    key = (
-        (
-            await db.execute(
-                select(bm.Business.business_key)
-                .join(um.BusinessMember, um.BusinessMember.business_id == bm.Business.business_id)
-                .where(bm.Business.business_id == business_id)
-                .where(um.BusinessMember.user_id == current_user.user_id)
-            )
-        ).scalars().first()
-    )
+    business = (
+        await db.execute(
+            select(bm.Business)
+            .join(um.BusinessMember, um.BusinessMember.business_id == bm.Business.business_id)
+            .where(bm.Business.business_id == business_id)
+            .where(um.BusinessMember.user_id == current_user.user_id)
+        )
+    ).scalars().first()
 
-    if not key:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"No key for business with the ID: {business_id}")
-
-    return {"business_key": key}
+    if not business:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, 
+                            detail={"msg": "Businesses does not exist"})
+    
+    key = business.business_key
+    business.business_key = str(uuid.uuid4())
+    await db.commit()
+    return {"business_key": key }
 
 
 async def send_approval(post, db: AsyncSession, current_user):
