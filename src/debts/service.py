@@ -28,8 +28,7 @@ async def get_debts(business_id, db: AsyncSession, current_user):
 async def get_customers_with_debt(business_id,
                                   db: AsyncSession, 
                                   current_user, limit:int, 
-                                  skip: int, search: str,
-                                  amount_gre: float, amount_les: float):
+                                  skip: int, search: str):
     await service.business_authorized_access(current_user, business_id, db)
     
     base_query = (
@@ -54,21 +53,6 @@ async def get_customers_with_debt(business_id,
             )
         )
         
-    if amount_les > amount_gre:
-        raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, 
-                            detail={"msg": "Amount less, cannot be greater than amount greater"})
-        
-    if amount_gre != 0:
-        base_query.where(
-            dm.Debt.amount > amount_gre
-        )
-    
-    if amount_les != 0:
-        base_query.where(
-            dm.Debt.amount < amount_les
-        )
-        
-        
     result = await db.execute(
         base_query
         .order_by(dm.Debt.created_at.desc())
@@ -82,48 +66,3 @@ async def get_customers_with_debt(business_id,
                             detail="No customer with an outstanding debt.")
     
     return debts
-
-async def repay_debt(business_id, 
-                     customer_id,
-                     debt_id,
-                     db:AsyncSession, 
-                     current_user,
-                     paid,
-                     amount: float):
-    
-    customer = ( await db.execute(
-        select(dm.Debt)
-        .join(cm.Customer, cm.Customer.customer_id == dm.Debt.customer_id)
-        .where(dm.Debt.business_id == current_user.business_id)
-        .where(dm.Debt.business_id == business_id)
-        .where(dm.Debt.customer_id == customer_id)
-        .where(dm.Debt.debt_id == debt_id)
-
-    )
-    ).scalar_one_or_none()
-    
-    if not customer:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
-                            detail={"msg": "Customer not found"})
-        
-    if customer.amount <= 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, 
-                            detail="Customer is having no debt at the moment")
-        
-    if amount > customer.amount:
-       remaining =  amount - customer.amount
-       customer.amount = 0
-       
-    if customer.amount > amount:
-        remaining = customer.amount - amount
-
-        
-    if paid:
-        customer.amount = 0
-        
-    transaction = dm.DebtTransactions(debt_id=debt_id, amount_paid=amount, remainder=remaining or 0)
-    db.add(transaction)
-    await db.commit()
-    return customer
-    
-       
