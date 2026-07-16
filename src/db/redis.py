@@ -1,15 +1,10 @@
 import logging
 import redis
 import redis.asyncio as airedis
-from fastapi import Request
 from src.config import get_settings
 from typing import Optional
 
 logger = logging.getLogger(__name__)
-
-
-async def get_redis(request: Request):
-    return request.app.state.redis
 
 async def get_redis_client() -> airedis.Redis | None:
     try:
