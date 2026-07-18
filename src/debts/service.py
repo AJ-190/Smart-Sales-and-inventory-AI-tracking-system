@@ -145,7 +145,9 @@ async def get_customer_with_debt(business_id,customer_id, session: AsyncSession,
         .join(cm.Customer, cm.Customer.customer_id == dm.Debt.customer_id)
         .where(dm.Debt.business_id == business_id)
         .where(cm.Customer.customer_id == customer_id)
-        
+        .where(dm.Debt.is_paid == False)
+        .order_by(dm.Debt.created_at.desc())
+        .limit(1)
     )
     ).one_or_none()
     
