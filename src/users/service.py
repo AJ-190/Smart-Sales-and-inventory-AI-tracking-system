@@ -21,8 +21,7 @@ async def add_user(post: schemas.UserSignUp, db: AsyncSession):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already registered")
 
 
-    role = um.RoleEnum.super_admin if post.email == get_settings().SUPER_ADMIN_EMAIL else um.RoleEnum.user
-    user = um.Users(**post.model_dump(exclude={'password'}), password=auth_utils.hash(post.password), role=role)
+    user = um.Users(**post.model_dump(exclude={'password'}), password=auth_utils.hash(post.password))
     otp = await send_otp(post.email)
     if  not otp.status_code == status.HTTP_200_OK:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to send OTP-verification code, please try againa later")

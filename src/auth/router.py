@@ -7,8 +7,9 @@ from src.celery_tasks.otp_task import send_otp, verify_otp
 from src.users.schemas import UserSignUpResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_db
-from src.users import service, models as um
+from src.users import service, models as um, schemas as us_schema
 from src.auth.dependencies import role_checker
+from sqlalchemy import select
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -35,6 +36,16 @@ async def refresh(
 @router.post("/otp/get_code")
 async def get_verification_code(current_user = Depends(role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager, um.RoleEnum.cashier, um.RoleEnum.viewer, um.RoleEnum.user]))):
     return await send_otp(current_user.email)
+
+@router.post("/verify_user/{user_id}", response_model=us_schema.UserSignUpResponse)
+async def veirfy_user(user_id: int, session: AsyncSession = Depends(get_db), current_user:um.Users = Depends(role_checker([um.RoleEnum.super_admin]))):
+    user = (await session.execute(select(um.Users).where(um.Users.user_id == user_id))).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    user.is_verified = True
+    await session.commit()
+    await session.refresh(user)
+    return user
     
 @router.post("/otp/verification", response_model=UserSignUpResponse)
 async def verify_otp_code(otp: schemas.Otp_veriification_code, 
