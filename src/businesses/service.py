@@ -3,6 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 from src.users import models as um
 from src.businesses import models as bm
+from src.customers import models as cm
+from src.debts import models as dm
 from src.businesses import schemas
 from src.users import schemas as user_schemas
 from src.users.service import update_user
@@ -183,6 +185,28 @@ async def delete_business(id, db: AsyncSession, current_user):
         )).scalars().first()
         if not is_member:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to delete this business")
+
+    await db.execute(
+        dm.Transactions.__table__.delete().where(dm.Transactions.business_id == id)
+    )
+    await db.execute(
+        dm.Debt.__table__.delete().where(dm.Debt.business_id == id)
+    )
+    sales_items_stmt = bm.SalesItem.__table__.delete().where(
+        bm.SalesItem.sale_id.in_(
+            select(bm.Sale.sale_id).where(bm.Sale.business_id == id)
+        )
+    )
+    await db.execute(sales_items_stmt)
+    await db.execute(
+        bm.Sale.__table__.delete().where(bm.Sale.business_id == id)
+    )
+    await db.execute(
+        cm.Customer.__table__.delete().where(cm.Customer.business_id == id)
+    )
+    await db.execute(
+        um.BusinessMember.__table__.delete().where(um.BusinessMember.business_id == id)
+    )
 
     await db.delete(business)
     await db.commit()
