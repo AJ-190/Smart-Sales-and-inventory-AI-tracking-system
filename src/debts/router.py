@@ -4,15 +4,26 @@ from src.debts import service as debt_service
 from src.auth import dependencies as auth_deps
 from src.debts import schemas
 from src.users import models as um
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/debts", tags=["Debts"])
 
+roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin}
+
+@router.post("/add_debt/{business_id}/{customer_id}", response_model=schemas.DebtResponse)
+async def add_debt(post: schemas.AddDebt,
+                   business_id: int,
+                   customer_id: int,
+                   session: AsyncSession = Depends(get_db),
+                   current_user: um.Users = Depends(auth_deps.role_checker([*roles]))
+                   ):
+    return await debt_service.add_debt(post, business_id, customer_id, session, current_user)
 
 @router.get("/{business_id}")
 async def get_debts(
     business_id: int,
     db=Depends(get_db),
-    current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]))
+    current_user=Depends(auth_deps.role_checker([*roles]))
 ):
     return await debt_service.get_debts(business_id, db, current_user)
 
@@ -20,9 +31,30 @@ async def get_debts(
 async def get_customers_with_debt(
     business_id: int, 
     db=Depends(get_db),
-    current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager])),
-    limit:int = 0,
+    current_user=Depends(auth_deps.role_checker([*roles])),
+    limit:int = 100,
     skip: int = 0,
+    amount_gre: float | None = None,
+    amount_les: float | None =  None,
     search: str | None = None):
     
-    return await debt_service.get_customers_with_debt(business_id, db, current_user, limit, skip, search) 
+    return await debt_service.get_customers_with_debt(business_id, db, current_user, limit, skip, search, amount_gre, amount_les) 
+
+
+@router.get("/customers/{business_id}/{customer_id}", response_model=schemas.CustomerDebt)
+async def get_customer_with_debt(business_id: int,
+                                 customer_id: int, 
+                                 session: AsyncSession = Depends(get_db),
+                                 current_user=Depends(auth_deps.role_checker([*roles])),
+                                 ):
+                                 
+    return await debt_service.get_customer_with_debt(business_id, customer_id, session, current_user)
+
+@router.put("/update_customer_debt/{business_id}/{customer_id}", response_model=schemas.CustomerDebt)
+async def update_customer_debt(post: schemas.UpdateDebt,
+                     business_id: int, 
+                     customer_id: int,
+                     current_user: um.Users = Depends(auth_deps.role_checker([*roles])),
+                     session:AsyncSession = Depends(get_db)):
+    return await debt_service.update_customer_with_debt(post, business_id, customer_id, session, current_user)
+
