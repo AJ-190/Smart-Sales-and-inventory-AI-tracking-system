@@ -1,6 +1,14 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr
 from datetime import datetime
+from typing import Optional
 
+
+
+
+class AddDebt(BaseModel):
+    amount: float
+    note: str 
+    due_date: datetime 
 
 class DebtResponse(BaseModel):
     debt_id: int
@@ -13,8 +21,23 @@ class DebtResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+
 class CustomerDebt(BaseModel):
-    customer_debt: float
-    customer: list[DebtResponse] = []
+    debt: DebtResponse
+    customer_name: str
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+    
+
+    
+class UpdateDebt(BaseModel):
+    fully_paid: bool | None = None
+    amount: float | None = None
+    note: str | None = None
+    due_date: datetime | None = None
     
     model_config = ConfigDict(from_attributes=True)
+    
+    

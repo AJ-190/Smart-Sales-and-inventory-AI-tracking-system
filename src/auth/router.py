@@ -7,8 +7,8 @@ from src.celery_tasks.otp_task import send_otp, verify_otp
 from src.users.schemas import UserSignUpResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_db
-from src.users import service
-
+from src.users import service, models as um
+from src.auth.dependencies import role_checker
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -33,16 +33,18 @@ async def refresh(
     return await auth_service.refresh(payload, db)
 
 @router.post("/otp/get_code")
-async def get_verification_code(body: EmailRequest):
-    return await send_otp(body.email)
+async def get_verification_code(current_user = Depends(role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager, um.RoleEnum.cashier, um.RoleEnum.viewer, um.RoleEnum.user]))):
+    return await send_otp(current_user.email)
     
 @router.post("/otp/verification", response_model=UserSignUpResponse)
-async def verify_otp_code(post: schemas.Otp_verification,  db: AsyncSession = Depends(get_db)):
-    verify = await verify_otp(post.email, post.otp)
+async def verify_otp_code(otp: schemas.Otp_veriification_code, 
+                          db: AsyncSession = Depends(get_db),
+                          current_user = Depends(role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager, um.RoleEnum.cashier, um.RoleEnum.viewer, um.RoleEnum.user]))):
+    verify = await verify_otp(current_user.email, otp.otp)
     if not verify:
         raise HTTPException(status.HTTP_403_FORBIDDEN, 
                             detail="Incorrect OTP-verification code")
-    user = await auth_service.get_user_by_email(post.email, db)
+    user = await auth_service.get_user_by_email(current_user.email, db)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not registered")
     

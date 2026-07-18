@@ -26,10 +26,14 @@ class Debt(Base):
 
 
 class Transactions(Base):
+    __tablename__ = "transactions"
     transaction_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     debt_id = Column(Integer, ForeignKey("debts.debt_id"), nullable=False)
+    performer_id= Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    business_id=Column(Integer, ForeignKey("businesses.business_id"), nullable=False)
+    customer_id=Column(Integer, ForeignKey("customers.customer_id"), nullable=True)
     amount_paid = Column(Float, nullable=False)
-    note = Column(String, nullable=False)
+    note = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     
     debt = relationship("Debt", back_populates="transactions")

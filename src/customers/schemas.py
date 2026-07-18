@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict
 class CustomerCreate(BaseModel):
     name: str
     phone: str
-    email: str
+    email: Optional[str] = None
     address: Optional[str] = None
 
 
@@ -14,8 +14,8 @@ class CustomerResponse(BaseModel):
     business_id: int
     name: str
     phone: str
-    email: str
-    address: str
+    email: Optional[str] = None
+    address: Optional[str] = None
     is_active: bool
 
     model_config = ConfigDict(from_attributes=True)

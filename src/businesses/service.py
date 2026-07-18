@@ -292,7 +292,7 @@ async def get_approvals(business_id, status_, db: AsyncSession, current_user):
     return result
 
 
-async def con_del_approval(post, business_id, db: AsyncSession, current_user):
+async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSession, current_user):
     from sqlalchemy.orm import selectinload
 
     stmt = (
@@ -315,10 +315,14 @@ async def con_del_approval(post, business_id, db: AsyncSession, current_user):
         if approval_user.status == bm.ApprovalStatus.approved:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval already approved")
         approval_user.status = bm.ApprovalStatus.approved
+        
+        user = um.BusinessMember(**post.model_dump(exclude={"dir", "approval_id"}), business_id=approval_user.business_id)
+        db.add(user)
 
+        
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid request")
-
+    
     await db.commit()
 
     result = await db.execute(
