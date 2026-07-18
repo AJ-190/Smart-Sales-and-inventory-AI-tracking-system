@@ -181,6 +181,8 @@ async def update_customer_with_debt(post:schemas.UpdateDebt , business_id, custo
     if not debt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No outstanding debt found for this customer")
     
+    original_amount = debt.amount
+    
     if post.amount:
         if post.amount <= 0:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Amount cannot be less than or equal to zero(0)")
@@ -195,20 +197,58 @@ async def update_customer_with_debt(post:schemas.UpdateDebt , business_id, custo
         debt.amount = 0
         debt.is_paid = True
         
-    if post.due_date:
-        debt.due_date = post.due_date
-        
     if post.amount or post.fully_paid:
+        paid_amount = post.amount if post.amount else original_amount
         transaction = dm.Transactions(business_id=business_id, 
                                 customer_id=customer_id,
                                 debt_id=debt.debt_id,
                                 performer_id=current_user.user_id,
-                                amount_paid=post.amount if post.amount else debt.amount,
+                                amount_paid=paid_amount,
                                 note=post.note if post.note else None)
         session.add(transaction)
    
     await session.commit()
-    return await get_customer_with_debt(business_id, customer_id, session, current_user)
+
+    remaining = (
+        await session.execute(
+            select(dm.Debt)
+            .where(dm.Debt.customer_id == customer_id)
+            .where(dm.Debt.business_id == business_id)
+            .where(dm.Debt.is_paid == False)
+        )
+    ).scalars().all()
+
+    if remaining:
+        latest = remaining[0]
+        return {
+            "debt": latest,
+            "customer_name": (await session.execute(
+                select(cm.Customer.name).where(cm.Customer.customer_id == customer_id)
+            )).scalar_one(),
+            "customer_email": (await session.execute(
+                select(cm.Customer.email).where(cm.Customer.customer_id == customer_id)
+            )).scalar_one(),
+            "customer_phone": (await session.execute(
+                select(cm.Customer.phone).where(cm.Customer.customer_id == customer_id)
+            )).scalar_one(),
+        }
+
+    customer = (await session.execute(
+        select(cm.Customer).where(cm.Customer.customer_id == customer_id)
+    )).scalar_one()
+    return {
+        "debt": {
+            "debt_id": 0,
+            "business_id": business_id,
+            "customer_id": customer_id,
+            "amount": 0,
+            "due_date": debt.due_date,
+            "is_paid": True,
+        },
+        "customer_name": customer.name,
+        "customer_email": customer.email,
+        "customer_phone": customer.phone,
+    }
     
 
 
