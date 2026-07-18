@@ -168,19 +168,21 @@ async def update_business(id, post, db: AsyncSession, current_user):
 
 
 async def delete_business(id, db: AsyncSession, current_user):
-    stmt = (
-        select(bm.Business)
-        .join(um.BusinessMember, um.BusinessMember.business_id == bm.Business.business_id)
-        .where(bm.Business.business_id == id)
-    )
-    business = (await db.execute(stmt)).scalars().first()
+    business = (await db.execute(
+        select(bm.Business).where(bm.Business.business_id == id)
+    )).scalars().first()
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Business with the ID: {id} not found")
 
-    user_own_business = (await db.execute(stmt.where(um.BusinessMember.user_id == current_user.user_id))).scalars().first()
-
-    if not user_own_business and current_user.role != um.RoleEnum.super_admin:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to delete this business")
+    if current_user.role != um.RoleEnum.super_admin:
+        is_member = (await db.execute(
+            select(um.BusinessMember).where(
+                um.BusinessMember.business_id == id,
+                um.BusinessMember.user_id == current_user.user_id,
+            )
+        )).scalars().first()
+        if not is_member:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to delete this business")
 
     await db.delete(business)
     await db.commit()
