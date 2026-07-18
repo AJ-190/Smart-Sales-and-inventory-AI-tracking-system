@@ -170,7 +170,9 @@ async def update_customer_with_debt(post:schemas.UpdateDebt , business_id, custo
                 .join(cm.Customer, cm.Customer.customer_id == dm.Debt.customer_id)
                 .where(cm.Customer.business_id == business_id)
                 .where(dm.Debt.customer_id == customer_id)
-                .where(dm.Debt.is_paid == False))
+                .where(dm.Debt.is_paid == False)
+                .order_by(dm.Debt.created_at.asc())
+                .limit(1))
         )
     ).scalar_one_or_none()
     
