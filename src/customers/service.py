@@ -6,38 +6,36 @@ from src.customers import schemas
 from src.users import models as um
 from src.businesses import service
 from src.businesses import models as bm
-
+from sqlalchemy.exc import IntegrityError
 
 async def create_customer(db: AsyncSession, current_user, customer: schemas.CustomerCreate, business_id: int):
     await service.business_authorized_access(current_user, business_id, db)
     
-    existing_email = (
-        (await
-        db.execute(
-            select(cm.Customer)
-            .where(cm.Customer.business_id == business_id)
-            .where(cm.Customer.email == customer.email)
-            
-        ))
-    )
+    existing = (
+       await db.execute(
+           select(cm.Customer)
+           .where(cm.Customer.business_id == business_id)
+           .where(
+               (cm.Customer.email == customer.email) | (cm.Customer.phone == customer.phone)
+               )
+           )
+       ).scalar_one_or_none()
     
-    existing_phone  = (
-        (await
-        db.execute(
-            select(cm.Customer)
-            .where(cm.Customer.business_id == business_id)
-            .where(cm.Customer.phone == customer.phone)
-            
-        ))
-    )
-    
-    if existing_email.scalar_one_or_none() or existing_phone.scalar_one_or_none():
+    if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User with that email or phone number exists")
     
     customer_add = cm.Customer(**customer.model_dump(), business_id=business_id)
     
     db.add(customer_add)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Customer with that email or phone number already exists"
+        )
+
     await db.refresh(customer_add)
     return customer_add
 
@@ -69,6 +67,9 @@ async def get_customers(business_id: int,
     results  = await db.execute(base_query.order_by(
         cm.Customer.created_at
     ).limit(limit).offset(skip))
+    
+    if not results:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No customer found")
     
     return results.scalars().all()
     

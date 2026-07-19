@@ -58,3 +58,11 @@ async def update_customer_debt(post: schemas.UpdateDebt,
                      session:AsyncSession = Depends(get_db)):
     return await debt_service.update_customer_with_debt(post, business_id, customer_id, session, current_user)
 
+
+@router.get("/customer_transactions/{business_id}/{customer_id}", response_model=list[schemas.CustomerTransactions])
+async def get_customer_transactions(business_id: int,
+                                    customer_id:int,
+                                    current_user: um.Users = Depends(auth_deps.role_checker([*roles])),
+                                    session: AsyncSession = Depends(get_db)):
+    return await debt_service.get_transactions(business_id, customer_id, current_user, session)
+    

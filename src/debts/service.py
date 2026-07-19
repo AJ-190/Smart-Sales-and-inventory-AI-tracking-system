@@ -250,9 +250,36 @@ async def update_customer_with_debt(post:schemas.UpdateDebt , business_id, custo
         "customer_phone": customer.phone,
     }
     
+    
+async def get_transactions(business_id, customer_id, current_user: um.Users, session: AsyncSession):
+    await service.business_authorized_access(current_user, business_id, session)
+    
+    customer_transaction = (
+       await session.execute(
+           select(dm.Transactions,
+                  cm.Customer.email,
+                  cm.Customer.phone,
+                  cm.Customer.name,
+                  cm.Customer.address)
+           .join(cm.Customer, cm.Customer.customer_id == dm.Transactions.customer_id)
+           .where(dm.Transactions.business_id == business_id)
+           .where(dm.Transactions.customer_id == customer_id)
+           
+       )
+   ).all()
+    
 
-
-            
+    if not customer_transaction:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No transaction found for this customer")
+    return [
+        {
+            "transactions": t[0],
+            "customer_email": t[1],
+            "customer_phone": t[2],
+            "customer_name": t[3],
+            "customer_address": t[4]
+        }
+        for t in customer_transaction
+    ]
             
     
-        

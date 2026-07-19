@@ -8,6 +8,7 @@ from src.businesses import models as bm
 from src.debts import models as dm
 from src.customers.models import Customer
 from src.sales import schemas
+from src.businesses import models as bm_models
 
 
 async def add_sale(business_id, post: schemas.SaleCreate, db: AsyncSession, current_user):
@@ -184,6 +185,30 @@ async def delete_sale(business_id, id, db: AsyncSession, current_user):
 
     if not sale:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Sale with the ID: {id} not found")
+    
+    sale_itmes = (
+        await db.execute(
+            select(bm_models.SalesItem)
+            .where(bm_models.SalesItem.sale_id == sale.sale_id)
+            
+        )
+    ).scalars().all()
+    
+    for item in sale_itmes:
+        product = (
+            await db.execute(
+                select(bm_models.Product)
+                .where(bm_models.Product.product_id == item.product_id)
+                )
+        ).scalar_one_or_none()
+        
+        if not product:
+            continue
+        product.quantity = product.quantity + item.quantity
+        
+    
+    
+    
     await db.delete(sale)
     await db.commit()
     return {"status": "success", "msg": f"sale with the ID: {id} is deleted successfully"}

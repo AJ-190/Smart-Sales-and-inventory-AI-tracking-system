@@ -41,3 +41,23 @@ class UpdateDebt(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
     
+class Transactions(BaseModel):
+    transaction_id: int
+    debt_id: int
+    performer_id: int
+    business_id: int
+    customer_id: Optional[int] = None
+    amount_paid: int
+    note: Optional[str] = None
+    created_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class CustomerTransactions(BaseModel):
+    transactions: Transactions
+    customer_name: str
+    customer_phone: str
+    customer_email: Optional[str] = None
+    customer_address: Optional[str] = None
+    
+    model_config = ConfigDict(from_attributes=True)
