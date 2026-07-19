@@ -332,35 +332,40 @@ async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSessio
     if not approval_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval not found or already processed")
 
+    requester = (
+        await db.execute(
+            select(um.Users).where(um.Users.user_id == approval_user.requester_id)
+        )
+    ).scalar_one_or_none()
+
     if post.dir == 0:
         if approval_user.status == bm.ApprovalStatus.rejected:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval already rejected")
         approval_user.status = bm.ApprovalStatus.rejected
-        
-        db.delete(approval_user)
+        await db.delete(approval_user)
 
     elif post.dir == 1:
         if approval_user.status == bm.ApprovalStatus.approved:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval already approved")
         approval_user.status = bm.ApprovalStatus.approved
-        
-        user = um.BusinessMember(role=approval_user.role,user_id=approval_user.user_id,
-        business_id=approval_user.business_id)
+        user = um.BusinessMember(role=approval_user.role, user_id=approval_user.requester_id,
+            business_id=approval_user.business_id)
         db.add(user)
-        db.delete(approval_user)
+        await db.delete(approval_user)
 
-        
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid request")
     
     await db.commit()
 
-    result = await db.execute(
-        select(bm.Approvals)
-        .options(selectinload(bm.Approvals.requester))
-        .where(bm.Approvals.approval_id == post.approval_id)
-    )
-    return result.scalars().first()
+    return {
+        "approval_id": approval_user.approval_id,
+        "business_id": approval_user.business_id,
+        "reason": approval_user.reason,
+        "approval_type": str(approval_user.approval_type.value) if hasattr(approval_user.approval_type, 'value') else str(approval_user.approval_type),
+        "status": str(approval_user.status.value) if hasattr(approval_user.status, 'value') else str(approval_user.status),
+        "requester": requester,
+    }
 
 
 async def business_authorized_access(current_user, business_id, db: AsyncSession):

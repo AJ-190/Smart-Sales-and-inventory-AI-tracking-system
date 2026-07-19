@@ -7,10 +7,17 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 async def get_redis_client() -> airedis.Redis | None:
+    url = get_settings().REDIS_URL
+    if not url:
+        logger.error("REDIS_URL is not set")
+        return None
     try:
-        return airedis.from_url(get_settings().REDIS_URL, decode_responses=True)
+        client = airedis.from_url(url, decode_responses=True)
+        await client.ping()
+        logger.info("Redis connected successfully")
+        return client
     except Exception as e:
-        logger.warning("Failed to get redis client: %s", e)
+        logger.error("Failed to connect to Redis: %s", e)
         return None
         
         
