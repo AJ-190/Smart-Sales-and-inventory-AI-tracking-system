@@ -7,20 +7,22 @@ from src.users import models as um
 
 router = APIRouter()
 
+roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin, um.RoleEnum.user, um.RoleEnum.viewer}
+
 
 @router.post("/products/{business_id}", response_model=schemas.ProductResponse, status_code=201)
-async def add_product(business_id: int, post: schemas.Productcreate, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]))):
+async def add_product(business_id: int, post: schemas.Productcreate, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([*roles]))):
     return await product_service.add_product(business_id, post, db, current_user)
 
 
 @router.get("/products/{business_id}", response_model=list[schemas.ProductResponse])
-async def get_products(business_id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager, um.RoleEnum.cashier])),
+async def get_products(business_id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([*roles])),
                  limit: int = 10, skip: int = 0, search: Optional[str] = ""):
     return await product_service.get_Products(business_id, db, current_user, limit, skip, search)
 
 
 @router.get("/products/{business_id}/{id}", response_model=schemas.ProductResponse)
-async def get_product(business_id: int, id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager, um.RoleEnum.cashier])),
+async def get_product(business_id: int, id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([*roles])),
                 limit: int = 10, skip: int = 0, search: Optional[str] = ""):
     return await product_service.get_product(business_id, id, db, current_user, limit, skip, search)
 
@@ -41,7 +43,7 @@ async def restock(business_id: int, id: int, post: schemas.Restock, db=Depends(g
 
 
 @router.get("/products/{business_id}/low_stock", response_model=list[schemas.ProductResponse])
-async def low_stock(business_id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin]))):
+async def low_stock(business_id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([*roles]))):
     return await product_service.low_stock(business_id, db, current_user)
 
 
