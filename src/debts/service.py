@@ -264,13 +264,10 @@ async def get_transactions(business_id, customer_id, current_user: um.Users, ses
            .join(cm.Customer, cm.Customer.customer_id == dm.Transactions.customer_id)
            .where(dm.Transactions.business_id == business_id)
            .where(dm.Transactions.customer_id == customer_id)
-           
+           .order_by(dm.Transactions.created_at.desc())
        )
    ).all()
     
-
-    if not customer_transaction:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No transaction found for this customer")
     return [
         {
             "transactions": t[0],

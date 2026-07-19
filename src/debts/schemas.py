@@ -47,7 +47,7 @@ class Transactions(BaseModel):
     performer_id: int
     business_id: int
     customer_id: Optional[int] = None
-    amount_paid: int
+    amount_paid: float
     note: Optional[str] = None
     created_at: datetime
     

@@ -336,6 +336,8 @@ async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSessio
         if approval_user.status == bm.ApprovalStatus.rejected:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval already rejected")
         approval_user.status = bm.ApprovalStatus.rejected
+        
+        db.delete(approval_user)
 
     elif post.dir == 1:
         if approval_user.status == bm.ApprovalStatus.approved:
@@ -345,6 +347,7 @@ async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSessio
         user = um.BusinessMember(role=approval_user.role,user_id=approval_user.user_id,
         business_id=approval_user.business_id)
         db.add(user)
+        db.delete(approval_user)
 
         
     else:
