@@ -11,12 +11,13 @@ from src.celery_tasks.scheduler import scheduler
 
 router = APIRouter()
 
+roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin, um.RoleEnum.user, um.RoleEnum.viewer}
 
 @router.get("/reports/profit/{business_id}", response_model=schemas.ProfitResponse)
 async def get_profit(
     business_id: int,
     db=Depends(get_db),
-    current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin])),
+    current_user=Depends(auth_deps.role_checker([*roles])),
     date: date | None = None,
     end_date: date | None = None,
 ):
@@ -27,7 +28,7 @@ async def get_profit(
 async def get_summery(
     business_id: int,
     db=Depends(get_db),
-    current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager])),
+    current_user=Depends(auth_deps.role_checker([*roles])),
     date: date | None = None,
     end_date: date | None = None
 ):
@@ -38,7 +39,7 @@ async def get_summery(
 async def get_dashboard(
     business_id: int,
     db=Depends(get_db),
-    current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager])),
+    current_user=Depends(auth_deps.role_checker([*roles])),
     date: date | None = None,
     end_date: date | None = None,
 ):
@@ -48,7 +49,7 @@ async def get_dashboard(
 @router.get("/reports/analytics/low_stock", response_model=list[LowStockResponse])
 async def get_low_stock(
     db=Depends(get_db),
-    current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]))
+    current_user=Depends(auth_deps.role_checker([*roles]))
 ):
     return await analytics_service.check_stock(db, current_user)
 
@@ -57,7 +58,7 @@ async def get_low_stock(
 async def get_debts(
     business_id: int,
     db=Depends(get_db),
-    current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]))
+    current_user=Depends(auth_deps.role_checker([*roles]))
 ):
     return await analytics_service.get_debts(business_id, db, current_user)
 
