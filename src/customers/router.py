@@ -5,14 +5,14 @@ from src.auth import dependencies as auth_deps
 from src.users import models as um
 
 router = APIRouter(prefix="/business", tags=['Customer'])
-
+roles = [um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager, um.RoleEnum.cashier, um.RoleEnum.user]
 
 @router.post("/customers/{business_id}", response_model=schemas.CustomerResponse)
 async def create_customer(
     business_id: int,
     post: schemas.CustomerCreate,
     db = Depends(get_db),
-    current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager, um.RoleEnum.cashier])),
+    current_user=Depends(auth_deps.role_checker([*roles])),
 ):
     return await customer_service.create_customer(db, current_user, post, business_id)
 
@@ -21,7 +21,7 @@ async def create_customer(
 async def get_customers(
     business_id: int,
     db = Depends(get_db),
-    current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager, um.RoleEnum.cashier])),
+    current_user=Depends(auth_deps.role_checker([*roles])),
     search: str | None = None,
     skip: int = 0,
     limit: int = 10
@@ -32,14 +32,14 @@ async def get_customers(
 @router.get("/customers/{business_id}/{customer_id}", response_model=schemas.CustomerResponse)
 async def get_customer(business_id: int, customer_id: int,
                  db = Depends(get_db),
-                 current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager, um.RoleEnum.cashier]))):
+                 current_user=Depends(auth_deps.role_checker([*roles]))):
     return await customer_service.get_customer(business_id, customer_id, db, current_user)
 
 
 @router.put("/customers/{business_id}/{customer_id}", response_model=schemas.CustomerResponse)
 async def update_customer(post: schemas.CustomerUpdate, business_id: int, customer_id: int,
                     db = Depends(get_db),
-                    current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager, um.RoleEnum.cashier]))):
+                    current_user=Depends(auth_deps.role_checker([*roles]))):
     return await customer_service.update_customer(post, business_id, customer_id, db, current_user)
 
 @router.put("/customers/{business_id}/deactivate/{customer_id}", response_model=schemas.CustomerResponse)
