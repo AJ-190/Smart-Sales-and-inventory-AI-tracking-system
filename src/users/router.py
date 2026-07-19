@@ -17,7 +17,7 @@ async def get_users(db=Depends(get_db), current_user=Depends(auth_deps.role_chec
 
 
 @router.get("/members", response_model=list[schemas.UsersOutUsers])
-async def get_members(db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin]))):
+async def get_members(db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]))):
     return await users_service.get_members(db, current_user)
 
 
@@ -27,7 +27,7 @@ async def get_all_users(db=Depends(get_db), current_user=Depends(auth_deps.role_
 
 
 @router.get("/{id}", response_model=schemas.UsersOutUsers)
-async def get_user(id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin]))):
+async def get_user(id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]))):
     return await users_service.get_user(id, db, current_user)
 
 

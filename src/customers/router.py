@@ -5,7 +5,7 @@ from src.auth import dependencies as auth_deps
 from src.users import models as um
 
 router = APIRouter(prefix="/business", tags=['Customer'])
-roles = [um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager, um.RoleEnum.cashier, um.RoleEnum.user]
+roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin, um.RoleEnum.user, um.RoleEnum.viewer}
 
 @router.post("/customers/{business_id}", response_model=schemas.CustomerResponse)
 async def create_customer(

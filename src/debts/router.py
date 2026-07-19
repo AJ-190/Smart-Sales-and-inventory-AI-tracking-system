@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/debts", tags=["Debts"])
 
-roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin}
+roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin, um.RoleEnum.user, um.RoleEnum.viewer}
 
 @router.post("/add_debt/{business_id}/{customer_id}", response_model=schemas.DebtResponse)
 async def add_debt(post: schemas.AddDebt,
