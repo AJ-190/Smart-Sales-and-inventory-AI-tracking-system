@@ -22,12 +22,16 @@ async def add_user(post: schemas.UserSignUp, db: AsyncSession):
 
 
     user = um.Users(**post.model_dump(exclude={'password'}), password=auth_utils.hash(post.password))
-    otp = await send_otp(post.email)
-    if  not otp.status_code == status.HTTP_200_OK:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to send OTP-verification code, please try againa later")
     db.add(user)
     await db.commit()
     await db.refresh(user)
+
+    try:
+        otp = await send_otp(post.email)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("OTP send failed for %s: %s", post.email, e)
+
     return user
 
 
