@@ -342,7 +342,8 @@ async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSessio
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval already approved")
         approval_user.status = bm.ApprovalStatus.approved
         
-        user = um.BusinessMember(**post.model_dump(exclude={"dir", "approval_id"}), business_id=approval_user.business_id)
+        user = um.BusinessMember(role=approval_user.role,user_id=approval_user.user_id,
+        business_id=approval_user.business_id)
         db.add(user)
 
         
