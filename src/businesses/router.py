@@ -68,7 +68,7 @@ async def confirm_approval(post: schemas.Direction,
     return await biz_service.con_del_approval(post, business_id, db, current_user)
 
 
-@router.delete(".leave_business/{business_id}", status_code=204)
+@router.delete("/leave_business/{business_id}", status_code=204)
 async def leave_business(business_id: int,
                          current_user: um.Users = Depends(auth_deps.role_checker([*roles])),
                          session = Depends(get_db)):
