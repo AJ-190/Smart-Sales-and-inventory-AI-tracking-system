@@ -51,3 +51,17 @@ class SaleResponse(BaseModel):
     debt: DebtResponse | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+
+class SaleItemUpdate(BaseModel):
+    product_id: Optional[int] = None
+    quantity: Optional[int] = None
+
+
+class SaleUpdate(BaseModel):
+    payment_method: Optional[str] = None
+    amount_paid: Optional[float] = None
+    list_items: Optional[list[SaleItemCreate]] = None
+    customer_id: Optional[int] = None
+    due_date: Optional[datetime] = None

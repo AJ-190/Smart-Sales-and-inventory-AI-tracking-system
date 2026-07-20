@@ -6,6 +6,8 @@ from src.auth import dependencies as auth_deps
 router = APIRouter(prefix="/users", tags=['Users'])
 
 
+roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin, um.RoleEnum.user, um.RoleEnum.viewer}
+
 @router.post("/sign_up", response_model=schemas.UserSignUpResponse, status_code=201)
 async def add_user(post: schemas.UserSignUp, db=Depends(get_db)):
     return await users_service.add_user(post, db)
@@ -42,7 +44,7 @@ async def update_user(id: int, post: schemas.UserUpdate, db=Depends(get_db), cur
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin]))):
+async def delete_user(id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([*roles]))):
     return await users_service.delete_user(id, db, current_user)
 
 

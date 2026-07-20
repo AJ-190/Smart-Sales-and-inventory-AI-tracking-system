@@ -8,7 +8,8 @@ from src.businesses import models as bm
 from src.debts import models as dm
 from src.customers.models import Customer
 from src.sales import schemas
-from src.businesses import models as bm_models
+from src.businesses import models as bm_models, service as biz_service
+
 
 
 async def add_sale(business_id, post: schemas.SaleCreate, db: AsyncSession, current_user):
@@ -212,3 +213,29 @@ async def delete_sale(business_id, id, db: AsyncSession, current_user):
     await db.delete(sale)
     await db.commit()
     return {"status": "success", "msg": f"sale with the ID: {id} is deleted successfully"}
+
+
+
+async def update_sale(business_id, sale_id, sale_data: schemas.SaleUpdate, current_user:um.Users, session:AsyncSession):
+    await biz_service.business_authorized_access(current_user, business_id, session)
+    
+    sale = (
+  
+            select(bm.Sale)
+            .where(bm.Sale.business_id == business_id)
+            .where(bm.Sale.sale_id == sale_id)
+        )
+    
+    if not current_user.role in [um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]:
+        sale = (
+            sale.where(bm.Sale.user_id == current_user.user_id)
+        )
+        
+    sale_ex = await session.execute(sale)
+    sale_exist = sale_ex.scalar_one_or_none()
+    
+    if not sale_exist:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
+                            detail="No sale found to be updated")
+        
+    
