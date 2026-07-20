@@ -383,3 +383,23 @@ async def business_authorized_access(current_user, business_id, db: AsyncSession
         if not user_access:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This action is forbidden")
     
+    
+    
+    
+async def leave_business(business_id, current_user: um.Users, session: AsyncSession):
+    await business_authorized_access(current_user, business_id, session)
+    
+    member = (
+        await session.execute(
+            select(um.BusinessMember)
+            .where(um.BusinessMember.business_id == business_id)
+            .where(um.BusinessMember.user_id == current_user.user_id)
+        )
+    ).scalar_one_or_none()
+    
+    if not member:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
+                            detail="User not found in the business")
+        
+    await session.delete(member)
+    await session.commit()

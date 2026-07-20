@@ -7,6 +7,7 @@ from src.users import models as um
 
 router = APIRouter(prefix="/businesses", tags=['Business'])
 
+roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin, um.RoleEnum.user, um.RoleEnum.viewer}
 
 @router.post("/create", status_code=201, response_model=schemas.BusinessResponse)
 async def create_business(post: schemas.BusinessCreate, db=Depends(get_db), current_user=Depends(auth_deps.get_current_user)):
@@ -24,7 +25,7 @@ async def get_businesses(db=Depends(get_db), current_user=Depends(auth_deps.role
 
 
 @router.get("/{id}", response_model=schemas.BusinessWithMemberCount)
-async def get_business(id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin]))):
+async def get_business(id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([*roles]))):
     return await biz_service.get_business(id, db, current_user)
 
 
@@ -65,3 +66,10 @@ async def confirm_approval(post: schemas.Direction,
                      db=Depends(get_db),
                      current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]))):
     return await biz_service.con_del_approval(post, business_id, db, current_user)
+
+
+@router.delete(".leave_business/{business_id}/", status_code=204)
+async def leave_business(business_id: int,
+                         current_user: um.Users = Depends(auth_deps.role_checker([*roles])),
+                         session = Depends(get_db)):
+    return await biz_service.leave_business(business_id, current_user, session)
