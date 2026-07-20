@@ -45,6 +45,7 @@ class UsersOutUsers(BaseModel):
     name: str
     email: str
     is_verified: bool = False
+    created_at: Optional[str] = None
 
     @field_validator("is_verified", mode="before")
     @classmethod

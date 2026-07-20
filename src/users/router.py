@@ -26,6 +26,11 @@ async def get_all_users(db=Depends(get_db), current_user=Depends(auth_deps.role_
     return await users_service.get_all_users(db, current_user)
 
 
+@router.get("/me/profile", response_model=schemas.UsersOutUsers)
+async def get_my_profile(current_user=Depends(auth_deps.get_current_user)):
+    return current_user
+
+
 @router.get("/{id}", response_model=schemas.UsersOutUsers)
 async def get_user(id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]))):
     return await users_service.get_user(id, db, current_user)

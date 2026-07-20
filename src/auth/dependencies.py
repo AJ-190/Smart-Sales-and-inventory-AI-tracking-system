@@ -70,6 +70,7 @@ async def get_current_user(
             um.Users.role,
             um.Users.is_verified,
             um.Users.is_active,
+            um.Users.created_at,
             um.BusinessMember.member_id,
             um.BusinessMember.business_id,
         )
@@ -93,6 +94,7 @@ async def get_current_user(
         is_verified=row.is_verified,
         member_id=row.member_id,
         business_id=row.business_id,
+        created_at=row.created_at.isoformat() if row.created_at else None,
     )
 
 
