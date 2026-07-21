@@ -27,7 +27,6 @@ class Settings(BaseSettings):
     MAIL_SSL_TLS:bool = False
     USE_CREDENTIALS:bool = True
     VALIDATE_CERTS:bool = False
-    RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
     REQUEST_LIMIT_EXPIRY: int = 60
     REQUEST_LIMIT: int = 5
 

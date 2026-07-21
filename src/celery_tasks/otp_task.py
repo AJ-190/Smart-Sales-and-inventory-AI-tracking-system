@@ -1,14 +1,15 @@
+import smtplib
+from email.mime.text import MIMEText
 import random
 import logging
-import httpx
+import asyncio
+import time
 from fastapi import status, HTTPException
 from src.config import get_settings
 from src.db.redis import otp_verification
 from starlette.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
-
-RESEND_API_URL = "https://api.resend.com/emails"
 
 
 def _build_otp_html(otp: str) -> str:
@@ -67,37 +68,35 @@ def _build_otp_html(otp: str) -> str:
 </html>"""
 
 
-async def _send_otp_email(to_email: str, otp: str) -> bool:
-    settings = get_settings()
-    api_key = settings.RESEND_API_KEY
-    if not api_key:
-        logger.error("RESEND_API_KEY is not configured")
-        return False
+SMTP_TIMEOUT = 10
 
-    payload = {
-        "from": f"{settings.SUPER_ADMIN_NAME} <onboarding@resend.dev>",
-        "to": [to_email],
-        "subject": "Account Verification",
-        "html": _build_otp_html(otp),
-    }
+
+def _send_otp_email_sync(to_email: str, otp: str) -> bool:
+    settings = get_settings()
+    subject = "Account Verification"
+    html_body = _build_otp_html(otp)
+
+    message = MIMEText(html_body, "html")
+    message["From"] = f"{settings.SUPER_ADMIN_NAME} <{settings.SUPER_ADMIN_EMAIL}>"
+    message["To"] = to_email
+    message["Subject"] = subject
 
     for attempt in range(3):
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.post(
-                    RESEND_API_URL,
-                    json=payload,
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json",
-                    },
-                )
-            if resp.status_code == 200:
-                return True
-            logger.warning("OTP email attempt %d/3 failed for %s: %s %s", attempt + 1, to_email, resp.status_code, resp.text)
+            server = smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT, timeout=SMTP_TIMEOUT)
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(settings.SUPER_ADMIN_EMAIL, settings.SUPER_ADMIN_APP_PASSWORD)
+            server.sendmail(
+                from_addr=settings.SUPER_ADMIN_EMAIL,
+                to_addrs=to_email,
+                msg=message.as_string(),
+            )
+            server.quit()
+            return True
         except Exception as e:
             logger.warning("OTP email attempt %d/3 failed for %s: %s", attempt + 1, to_email, e)
-
     logger.error("All 3 OTP email attempts failed for %s", to_email)
     return False
 
@@ -115,9 +114,9 @@ async def send_otp(email: str):
     await otp_verification(app.state.redis, email, otp=otp, store=True)
 
     try:
-        sent = await _send_otp_email(email, otp)
+        sent = await asyncio.to_thread(_send_otp_email_sync, email, otp)
     except Exception as e:
-        logger.error("OTP email error for %s: %s", email, e)
+        logger.error("OTP email thread error for %s: %s", email, e)
         sent = False
 
     if not sent:
