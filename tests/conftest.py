@@ -66,19 +66,32 @@ def client(session):
 
 
 @pytest.fixture
-def test_user(client):
-    data = {
-        "name": "Addy",
-        "email": "adysamuel68@gmail.com",
-        "password": "passwordY123",
-        "phone": "0257524704"}
-
-    res = client.post(
-        "/users/sign_up",
-        json=data
+def test_user(session):
+    user = src.users.models.Users(
+        name="Addy",
+        email="adysamuel68@gmail.com",
+        password=auth_utils.hash("passwordY123"),
+        phone="0257524704",
+        role=src.users.models.RoleEnum.super_admin,
+        is_verified=True,
     )
-    post = user_schemas.UserSignUpResponse(**res.json())
-    return post
+
+    async def _create():
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+
+    asyncio.run(_create())
+
+    return user_schemas.UserSignUpResponse(
+        business_id=None,
+        user_id=user.user_id,
+        name=user.name,
+        email=user.email,
+        role=user.role.value,
+        is_active=user.is_active,
+        is_verified=user.is_verified,
+    )
 
 
 @pytest.fixture

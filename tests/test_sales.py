@@ -65,7 +65,7 @@ def test_get_all_sales_for_bus(authorized_user_client, authorized_user_client_cr
 
 def test_get_sales_by_date_more_(authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli):
     res = authorized_user_client.get(
-        f"/sales/{authorized_user_client_cre_bus[0].business_id}?date=2026-07-16"
+        f"/sales/{authorized_user_client_cre_bus[0].business_id}?date=2026-07-25"
     )
     assert res.status_code == 400
     

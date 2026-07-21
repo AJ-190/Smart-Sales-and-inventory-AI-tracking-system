@@ -20,7 +20,7 @@ def test_user_create(client):
     user = schemas.UserSignUpResponse(**res.json())
     assert user.name == data['name']
     assert user.email == data['email']
-    assert user.role == um.RoleEnum.super_admin
+    assert user.role == um.RoleEnum.user
     assert res.status_code == 201
     
 def test_create_user_duplicate_email(client, test_user):
