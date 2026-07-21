@@ -8,7 +8,7 @@ from starlette.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
-RESEND_API_URL = "https://api.resend.com/emails"
+SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send"
 
 
 def _build_otp_html(otp: str) -> str:
@@ -69,30 +69,30 @@ def _build_otp_html(otp: str) -> str:
 
 async def _send_otp_email(to_email: str, otp: str) -> bool:
     settings = get_settings()
-    api_key = settings.RESEND_API_KEY
+    api_key = settings.SENDGRID_API_KEY
     if not api_key:
-        logger.error("RESEND_API_KEY is not configured")
+        logger.error("SENDGRID_API_KEY is not configured")
         return False
 
     payload = {
-        "from": f"{settings.SUPER_ADMIN_NAME} <onboarding@resend.dev>",
-        "to": [to_email],
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": settings.SUPER_ADMIN_EMAIL, "name": settings.SUPER_ADMIN_NAME},
         "subject": "Account Verification",
-        "html": _build_otp_html(otp),
+        "content": [{"type": "text/html", "value": _build_otp_html(otp)}],
     }
 
     for attempt in range(3):
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(
-                    RESEND_API_URL,
+                    SENDGRID_API_URL,
                     json=payload,
                     headers={
                         "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json",
                     },
                 )
-            if resp.status_code == 200:
+            if resp.status_code in (200, 202):
                 return True
             logger.warning("OTP email attempt %d/3 failed for %s: %s %s", attempt + 1, to_email, resp.status_code, resp.text)
         except Exception as e:

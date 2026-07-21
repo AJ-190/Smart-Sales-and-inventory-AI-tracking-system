@@ -343,6 +343,9 @@ MAIL_SERVER=smtp.gmail.com
 # API Key
 API_AUTH_KEY=your_api_auth_key
 
+# SendGrid (OTP emails)
+SENDGRID_API_KEY=your_sendgrid_api_key
+
 # Redis *(optional)*
 REDIS_URL=redis://localhost:6379
 ```
