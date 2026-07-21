@@ -68,7 +68,7 @@ def _build_otp_html(otp: str) -> str:
 </html>"""
 
 
-SMTP_TIMEOUT = 10
+SMTP_TIMEOUT = 30
 
 
 def _send_otp_email_sync(to_email: str, otp: str) -> bool:
