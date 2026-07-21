@@ -9,15 +9,15 @@ logger = logging.getLogger(__name__)
 async def get_redis_client() -> airedis.Redis | None:
     url = get_settings().REDIS_URL
     if not url:
-        logger.error("REDIS_URL is not set")
+        print("[REDIS] REDIS_URL is not set")
         return None
     try:
         client = airedis.from_url(url, decode_responses=True)
         await client.ping()
-        logger.info("Redis connected successfully")
+        print("[REDIS] Connected successfully")
         return client
     except Exception as e:
-        logger.error("Failed to connect to Redis: %s", e)
+        print(f"[REDIS] Failed to connect: {e}")
         return None
         
         

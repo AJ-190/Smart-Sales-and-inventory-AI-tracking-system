@@ -15,6 +15,7 @@ async def send_otp(email: str):
     from src.main import app
 
     if not app.state.redis:
+        print(f"[OTP] Redis is unavailable. app.state type: {type(app.state)}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="OTP service is unavailable. Please try again later."
