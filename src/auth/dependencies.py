@@ -6,6 +6,7 @@ from src.users import models as um
 from src.users import schemas as users_schema
 from src.db.redis import check_jti_blocked
 from src.auth.utils import verify_token
+from src.config import get_settings
 
 
 async def valiate_token(request: Request):
@@ -67,6 +68,7 @@ async def get_current_user(
             um.Users.name,
             um.Users.email,
             um.Users.phone,
+            um.Users.role.label("user_role"),
             um.BusinessMember.role,
             um.Users.is_verified,
             um.Users.is_active,
@@ -84,6 +86,9 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Account not registered",
         )
+        
+    if row.email == get_settings().SUPER_ADMIN_EMAIL:
+        row.role = um.RoleEnum.super_admin
 
     return users_schema.UsersOutUsers(
         user_id=row.user_id,
