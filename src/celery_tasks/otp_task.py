@@ -40,7 +40,7 @@ async def send_otp(email: str):
     try:
         await mail.send_message(message)
     except Exception as e:
-        logger.error("Failed to send OTP email to %s: %s", email, e)
+        print(f"[OTP] Failed to send email to {email}: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Failed to send verification email. Please try again later."
