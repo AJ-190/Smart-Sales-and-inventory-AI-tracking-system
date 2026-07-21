@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.analytics import service as analytics_service
+from src.celery_tasks.celery_app import celery
 
 logger = logging.getLogger(__name__)
 
@@ -62,13 +63,16 @@ async def summery(period: str, db: AsyncSession | None = None):
             await _run(session)
 
 
+@celery.task
 def daily_sale_summery():
     asyncio.run(summery("daily"))
 
 
+@celery.task
 def weekly_sale_summery():
     asyncio.run(summery("weekly"))
 
 
+@celery.task
 def monthly_sale_summery():
     asyncio.run(summery("monthly"))

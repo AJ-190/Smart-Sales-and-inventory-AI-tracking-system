@@ -13,18 +13,13 @@ from src.users.router import router as users_router
 from src.db.redis import get_redis_client
 from src.debts.router import router as debts_router
 from src.customers.router import router as customers_router
-from src.celery_tasks.scheduler import start_scheduler, scheduler
 from contextlib import asynccontextmanager
 
-
-    
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.redis = await get_redis_client()
-    start_scheduler()
     yield
-    scheduler.shutdown()
 
 
 app = FastAPI(lifespan=lifespan)

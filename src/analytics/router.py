@@ -7,7 +7,7 @@ from src.sales.schemas import DebtResponse
 from src.auth import dependencies as auth_deps
 from src.users import models as um
 from src.celery_tasks import sales_task as cron_tasks
-from src.celery_tasks.scheduler import scheduler
+from src.celery_tasks.celery_app import celery
 
 router = APIRouter()
 
@@ -85,10 +85,9 @@ async def run_monthly(db=Depends(get_db), current_user=Depends(auth_deps.role_ch
 async def list_jobs(current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]))):
     return [
         {
-            "id": job.id,
-            "name": job.name,
-            "next_run_time": job.next_run_time,
-            "trigger": str(job.trigger),
+            "id": name,
+            "name": config.get("task", ""),
+            "schedule": str(config.get("schedule", "")),
         }
-        for job in scheduler.get_jobs()
+        for name, config in celery.conf.beat_schedule.items()
     ]
