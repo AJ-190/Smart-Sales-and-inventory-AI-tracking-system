@@ -34,12 +34,16 @@ async def refresh(
     return await auth_service.refresh(payload, db)
 
 @router.post("/otp/get_code")
-async def get_verification_code(current_user = Depends(role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager, um.RoleEnum.cashier, um.RoleEnum.viewer, um.RoleEnum.user]))):
-    return await send_otp(current_user.email)
+async def get_verification_code(email: schemas.Email):
+    return await send_otp(email.email)
 
-@router.post("/verify_user/{user_id}", response_model=us_schema.UserSignUpResponse)
-async def veirfy_user(user_id: int, session: AsyncSession = Depends(get_db), current_user:um.Users = Depends(role_checker([um.RoleEnum.super_admin]))):
-    user = (await session.execute(select(um.Users).where(um.Users.user_id == user_id))).scalar_one_or_none()
+@router.post("/verify_user", response_model=us_schema.UserSignUpResponse)
+async def veirfy_user(email: schemas.Email, session: AsyncSession = Depends(get_db)):
+    user = (
+        await session.execute(
+            select(um.Users).where(um.Users.email == email.email)
+        )
+    ).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     user.is_verified = True
@@ -49,13 +53,12 @@ async def veirfy_user(user_id: int, session: AsyncSession = Depends(get_db), cur
     
 @router.post("/otp/verification", response_model=UserSignUpResponse)
 async def verify_otp_code(otp: schemas.Otp_veriification_code, 
-                          db: AsyncSession = Depends(get_db),
-                          current_user = Depends(role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager, um.RoleEnum.cashier, um.RoleEnum.viewer, um.RoleEnum.user]))):
-    verify = await verify_otp(current_user.email, otp.otp)
+                          db: AsyncSession = Depends(get_db),):
+    verify = await verify_otp(otp.email, otp.otp)
     if not verify:
         raise HTTPException(status.HTTP_403_FORBIDDEN, 
                             detail="Incorrect OTP-verification code")
-    user = await auth_service.get_user_by_email(current_user.email, db)
+    user = await auth_service.get_user_by_email(otp.email, db)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not registered")
     

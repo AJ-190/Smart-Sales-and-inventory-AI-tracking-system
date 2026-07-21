@@ -37,10 +37,10 @@ class Business_key(BaseModel):
 
 
 class Direction(BaseModel):
-    role: str
-    user_id: int
     approval_id: int
     dir: Annotated[int, Field(le=1, ge=0)]
+    role: Optional[str] = None
+    user_id: Optional[int] = None
 
 
 class ApprovalSend(BaseModel):

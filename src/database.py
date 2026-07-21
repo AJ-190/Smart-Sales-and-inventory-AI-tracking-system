@@ -4,6 +4,7 @@ from src.config import get_settings
 
 
 DATABASE_URL = get_settings().DATABASE_URL
+
 Base = declarative_base()
 
 engine = create_async_engine(

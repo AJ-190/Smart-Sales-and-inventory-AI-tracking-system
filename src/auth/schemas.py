@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-
+from typing import Optional
 
 
 class TokenData(BaseModel):
@@ -13,10 +13,8 @@ class Token(BaseModel):
 
 class Otp_veriification_code(BaseModel):
     otp: str
+    email: Optional[EmailStr] = None
     
 class Email(BaseModel):
     email: EmailStr
     
-class Otp_verification(BaseModel):
-    otp: str
-    email: EmailStr
