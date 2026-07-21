@@ -39,8 +39,8 @@ A production-ready REST API for small businesses to manage inventory, track sale
 | Database | PostgreSQL (SQLAlchemy ORM) |
 | Auth | JWT (OAuth2 + Argon2 hashing) |
 | Background Jobs | APScheduler |
-| Email | SMTP (Gmail) via aiosmtplib |
-| Caching | Redis *(optional — connector available)* |
+| Email | Resend API (OTP) + SMTP/Gmail (reports) |
+| Caching | Redis (OTP storage, rate limiting, JWT revocation) |
 | Deployment | Render / Railway |
 
 ---
@@ -116,12 +116,14 @@ alembic/                   # Database migrations
 tests/                     # Pytest test suite
 ├── conftest.py            # Shared fixtures, factories
 ├── auth/
-│   └── test_auth.py
+│   ├── test_auth.py
+│   └── test_otp.py
 ├── users/
 │   └── test_users.py
 ├── debts/
 │   └── test_debts.py
 ├── test_businesses.py
+├── test_business_members.py
 ├── test_products.py
 ├── test_sales.py
 ├── test_customers.py
@@ -184,6 +186,27 @@ Authorization: Bearer <your_token>
 | `/businesses/{id}` | PUT | Update a business |
 | `/businesses/{id}` | DELETE | Delete a business |
 | `/businesses/business_key/{business_id}` | GET | Get business join key |
+| `/businesses/{business_id}/members/{member_id}` | PUT | Update a business member's role or active status |
+
+---
+
+## Business Members
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/businesses/{business_id}/members/{member_id}` | PUT | Update member role and/or active status |
+
+**Request body:**
+```json
+{
+  "role": "manager",
+  "is_active": false
+}
+```
+
+Both fields are optional. Valid roles: `super_admin`, `admin`, `user`, `manager`, `cashier`, `viewer`.
+
+Only `super_admin`, `admin`, and `manager` roles can update members. Non-super-admins can only update members within their own business.
 
 ---
 

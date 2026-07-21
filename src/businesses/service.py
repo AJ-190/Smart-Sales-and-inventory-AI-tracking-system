@@ -284,20 +284,39 @@ async def send_approval(post, db: AsyncSession, current_user):
 
 
 async def get_approvals(business_id, status_, db: AsyncSession, current_user):
-    stmt = (
-        select(bm.Approvals)
-        .join(um.BusinessMember, um.BusinessMember.business_id == bm.Approvals.business_id)
-        .where(bm.Approvals.business_id == business_id)
-        .where(um.BusinessMember.user_id == current_user.user_id)
-    )
-    business_exist = (await db.execute(stmt)).scalars().all()
-    if not business_exist:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No approvals found")
+    business = (
+        await db.execute(
+            select(bm.Business).where(bm.Business.business_id == business_id)
+        )
+    ).scalars().first()
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
 
-    approval_status = (await db.execute(stmt.where(bm.Approvals.status == status_))).scalars().all()
+    if current_user.role != um.RoleEnum.super_admin:
+        is_member = (
+            await db.execute(
+                select(um.BusinessMember)
+                .where(um.BusinessMember.business_id == business_id)
+                .where(um.BusinessMember.user_id == current_user.user_id)
+            )
+        ).scalars().first()
+        if not is_member:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not a member of this business")
+
+    stmt = select(bm.Approvals).where(bm.Approvals.business_id == business_id)
+
+    if status_:
+        try:
+            status_enum = bm.ApprovalStatus(status_)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid status: {status_}. Must be one of: {[s.value for s in bm.ApprovalStatus]}")
+        stmt = stmt.where(bm.Approvals.status == status_enum)
+
+    approval_status = (await db.execute(stmt)).scalars().all()
 
     if not approval_status:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No approvals found '{status_}'")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No approvals found '{status_}'" if status_ else "No approvals found")
+
     requester_ids = [approval.requester_id for approval in approval_status]
 
     users = (
@@ -321,14 +340,32 @@ async def get_approvals(business_id, status_, db: AsyncSession, current_user):
 async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSession, current_user):
     from sqlalchemy.orm import selectinload
 
-    stmt = (
-        select(bm.Approvals)
-        .join(um.BusinessMember, um.BusinessMember.business_id == bm.Approvals.business_id)
-        .where(um.BusinessMember.business_id == business_id)
-        .where(um.BusinessMember.user_id == current_user.user_id)
-    )
+    business = (
+        await db.execute(
+            select(bm.Business).where(bm.Business.business_id == business_id)
+        )
+    ).scalars().first()
+    if not business:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
 
-    approval_user = (await db.execute(stmt.where(bm.Approvals.approval_id == post.approval_id))).scalars().first()
+    if current_user.role != um.RoleEnum.super_admin:
+        is_member = (
+            await db.execute(
+                select(um.BusinessMember)
+                .where(um.BusinessMember.business_id == business_id)
+                .where(um.BusinessMember.user_id == current_user.user_id)
+            )
+        ).scalars().first()
+        if not is_member:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not a member of this business")
+
+    approval_user = (
+        await db.execute(
+            select(bm.Approvals)
+            .where(bm.Approvals.business_id == business_id)
+            .where(bm.Approvals.approval_id == post.approval_id)
+        )
+    ).scalars().first()
     if not approval_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval not found or already processed")
 
