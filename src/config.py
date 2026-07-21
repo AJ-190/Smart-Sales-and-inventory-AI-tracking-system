@@ -21,10 +21,10 @@ class Settings(BaseSettings):
     MAIL_PASSWORD: str = os.getenv("SUPER_ADMIN_APP_PASSWORD", "")
     MAIL_FROM:str = os.getenv("SUPER_ADMIN_EMAIL", "")
     REDIS_URL: str = os.getenv("REDIS_URL", "")
-    MAIL_PORT:int = 465
+    MAIL_PORT:int = 587
     MAIL_SERVER: str = os.getenv("MAIL_SERVER", "")
-    MAIL_STARTTLS:bool = False
-    MAIL_SSL_TLS:bool = True
+    MAIL_STARTTLS:bool = True
+    MAIL_SSL_TLS:bool = False
     USE_CREDENTIALS:bool = True
     VALIDATE_CERTS:bool = False
     REQUEST_LIMIT_EXPIRY: int = 60

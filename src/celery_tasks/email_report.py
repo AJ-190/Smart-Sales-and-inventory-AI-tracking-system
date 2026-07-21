@@ -97,7 +97,8 @@ class EmailReport:
 
         for attempt in range(5):
             try:
-                with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+                with smtplib.SMTP("smtp.gmail.com", 587) as server:
+                    server.starttls()
                     server.login(self.Email, self.Password)
                     server.sendmail(from_addr=self.Email, to_addrs=self.to_email, msg=message.as_string())
                     return True
