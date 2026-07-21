@@ -24,6 +24,7 @@ class Users(Base):
     phone = Column(String, nullable=True)
     password = Column(String, nullable=False)
     role = Column(SAEnum(RoleEnum), default=RoleEnum.user, nullable=False)
+    refresh_token = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
