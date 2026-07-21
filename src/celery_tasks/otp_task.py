@@ -68,6 +68,9 @@ def _build_otp_html(otp: str) -> str:
 </html>"""
 
 
+SMTP_TIMEOUT = 10
+
+
 def _send_otp_email_sync(to_email: str, otp: str) -> bool:
     settings = get_settings()
     subject = "Account Verification"
@@ -78,22 +81,23 @@ def _send_otp_email_sync(to_email: str, otp: str) -> bool:
     message["To"] = to_email
     message["Subject"] = subject
 
-    for attempt in range(5):
+    for attempt in range(3):
         try:
-            with smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT) as server:
-                server.starttls()
-                server.login(settings.SUPER_ADMIN_EMAIL, settings.SUPER_ADMIN_APP_PASSWORD)
-                server.sendmail(
-                    from_addr=settings.SUPER_ADMIN_EMAIL,
-                    to_addrs=to_email,
-                    msg=message.as_string(),
-                )
+            server = smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT, timeout=SMTP_TIMEOUT)
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(settings.SUPER_ADMIN_EMAIL, settings.SUPER_ADMIN_APP_PASSWORD)
+            server.sendmail(
+                from_addr=settings.SUPER_ADMIN_EMAIL,
+                to_addrs=to_email,
+                msg=message.as_string(),
+            )
+            server.quit()
             return True
         except Exception as e:
-            logger.warning("OTP email attempt %d/5 failed for %s: %s", attempt + 1, to_email, e)
-            if attempt < 4:
-                time.sleep(2)
-    logger.error("All 5 OTP email attempts failed for %s", to_email)
+            logger.warning("OTP email attempt %d/3 failed for %s: %s", attempt + 1, to_email, e)
+    logger.error("All 3 OTP email attempts failed for %s", to_email)
     return False
 
 
