@@ -70,7 +70,17 @@ class UserSignUpResponse(BaseModel):
 class MemberOut(BaseModel):
     member_id: int
     business_id: int
+    user_id: int
     name: str
     email: str
+    phone: Optional[str] = None
+    role: str
+    is_verified: bool = False
+    is_active: bool = True
+
+    @field_validator("is_verified", mode="before")
+    @classmethod
+    def coerce_none_to_false(cls, v):
+        return v if v is not None else False
 
     model_config = ConfigDict(from_attributes=True)

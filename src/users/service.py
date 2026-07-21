@@ -93,13 +93,14 @@ async def get_members(db: AsyncSession, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No business associated with your account")
 
     result = await db.execute(
-        select(um.BusinessMember.role,
+        select(um.Users.user_id,
+               um.Users.name,
                um.Users.email,
                um.Users.phone,
-               um.Users.name,
                um.Users.is_verified,
                um.BusinessMember.member_id,
-               um.BusinessMember.business_id)
+               um.BusinessMember.business_id,
+               um.BusinessMember.role.label("role"))
         .join(um.Users, um.BusinessMember.user_id == um.Users.user_id)
         .where(um.BusinessMember.business_id == current_user.business_id)
     )
@@ -109,6 +110,32 @@ async def get_members(db: AsyncSession, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No members found in the business")
 
     return members
+
+
+async def get_member(member_id: int, db: AsyncSession, current_user):
+    if not current_user.business_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No business associated with your account")
+
+    result = await db.execute(
+        select(um.Users.user_id,
+               um.Users.name,
+               um.Users.email,
+               um.Users.phone,
+               um.Users.is_verified,
+               um.BusinessMember.member_id,
+               um.BusinessMember.business_id,
+               um.BusinessMember.role.label("role"),
+               um.BusinessMember.is_active)
+        .join(um.Users, um.BusinessMember.user_id == um.Users.user_id)
+        .where(um.BusinessMember.member_id == member_id)
+        .where(um.BusinessMember.business_id == current_user.business_id)
+    )
+    member = result.first()
+
+    if not member:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+
+    return member
 
 
 async def get_user(id, db: AsyncSession, current_user):
