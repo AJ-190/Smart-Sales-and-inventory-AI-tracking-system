@@ -68,3 +68,21 @@ class ApprovalsResponse(BaseModel):
     requester: "UsersOut"
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class BusinessMemberUpdate(BaseModel):
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class BusinessMemberResponse(BaseModel):
+    member_id: int
+    user_id: int
+    business_id: int
+    role: str
+    is_active: bool = True
+    joined_at: Optional[str] = None
+    name: Optional[str] = None
+    email: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)

@@ -13,7 +13,7 @@ class Token(BaseModel):
 
 class Otp_veriification_code(BaseModel):
     otp: str
-    email: Optional[EmailStr] = None
+    email: EmailStr
     
 class Email(BaseModel):
     email: EmailStr

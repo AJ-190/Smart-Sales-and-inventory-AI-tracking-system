@@ -49,6 +49,7 @@ def session(async_engine):
 def setup_redis():
     app.state.redis = AsyncMock()
     app.state.redis.get.return_value = None
+    app.state.redis.incr.return_value = 1
     app.state.redis.hgetall = AsyncMock(return_value={})
     app.state.redis.hset = AsyncMock()
     app.state.redis.hincrby = AsyncMock()

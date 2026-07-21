@@ -403,3 +403,62 @@ async def leave_business(business_id, current_user: um.Users, session: AsyncSess
         
     await session.delete(member)
     await session.commit()
+
+
+async def update_business_member(business_id: int, member_id: int, post: schemas.BusinessMemberUpdate, db: AsyncSession, current_user):
+    if current_user.role not in [um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to update members")
+
+    if current_user.role != um.RoleEnum.super_admin:
+        is_member = (
+            await db.execute(
+                select(um.BusinessMember)
+                .where(um.BusinessMember.business_id == business_id)
+                .where(um.BusinessMember.user_id == current_user.user_id)
+            )
+        ).scalars().first()
+        if not is_member:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not a member of this business")
+
+    member = (
+        await db.execute(
+            select(um.BusinessMember)
+            .where(um.BusinessMember.member_id == member_id)
+            .where(um.BusinessMember.business_id == business_id)
+        )
+    ).scalars().first()
+
+    if not member:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found in this business")
+
+    update_data = post.model_dump(exclude_unset=True)
+
+    if "role" in update_data:
+        try:
+            role_value = um.RoleEnum(update_data["role"])
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid role: {update_data['role']}. Must be one of: {[r.value for r in um.RoleEnum]}")
+        update_data["role"] = role_value
+
+    for key, value in update_data.items():
+        setattr(member, key, value)
+
+    await db.commit()
+    await db.refresh(member)
+
+    user = (
+        await db.execute(
+            select(um.Users).where(um.Users.user_id == member.user_id)
+        )
+    ).scalar_one_or_none()
+
+    return {
+        "member_id": member.member_id,
+        "user_id": member.user_id,
+        "business_id": member.business_id,
+        "role": member.role.value if isinstance(member.role, um.RoleEnum) else member.role,
+        "is_active": member.is_active,
+        "joined_at": member.joined_at.isoformat() if member.joined_at else None,
+        "name": user.name if user else None,
+        "email": user.email if user else None,
+    }

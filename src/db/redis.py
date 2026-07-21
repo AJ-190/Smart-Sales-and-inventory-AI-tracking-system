@@ -61,8 +61,12 @@ async def otp_verification(redis: airedis.Redis,  email: str, store: bool, otp: 
             await redis.delete(client)
         await redis.setex(client, 300, otp)
     else:
-        otp_ = await redis.get(client)
-        await redis.delete(client)
-        if otp_ is None:
-            return None
-        return otp_
+        return await redis.get(client)
+
+
+async def otp_increment_attempts(redis: airedis.Redis, email: str) -> int:
+    key = f"otp_attempts:{email}"
+    count = await redis.incr(key)
+    if count == 1:
+        await redis.expire(key, 300)
+    return count

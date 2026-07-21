@@ -1,9 +1,9 @@
-import random
+import secrets
 import logging
 import httpx
 from fastapi import status, HTTPException
 from src.config import get_settings
-from src.db.redis import otp_verification
+from src.db.redis import otp_verification, otp_increment_attempts
 from starlette.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
@@ -111,7 +111,7 @@ async def send_otp(email: str):
             detail="OTP service is unavailable. Please try again later.",
         )
 
-    otp = str(random.randint(1000000, 9999999))
+    otp = str(secrets.randbelow(9000000) + 1000000)
     await otp_verification(app.state.redis, email, otp=otp, store=True)
 
     try:
@@ -142,7 +142,16 @@ async def verify_otp(email: str, otp: str):
 
     if not red_otp:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="OTP code has expired or user not registered")
+
+    attempts = await otp_increment_attempts(app.state.redis, email)
+    if attempts > 3:
+        await app.state.redis.delete(f"email:{email}")
+        await app.state.redis.delete(f"otp_attempts:{email}")
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many failed attempts. Please request a new code.")
+
     if str(red_otp) != otp:
         return False
+
     await app.state.redis.delete(f"email:{email}")
+    await app.state.redis.delete(f"otp_attempts:{email}")
     return True

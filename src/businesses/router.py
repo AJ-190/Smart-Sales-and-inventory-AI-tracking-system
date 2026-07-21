@@ -73,3 +73,10 @@ async def leave_business(business_id: int,
                          current_user: um.Users = Depends(auth_deps.role_checker([*roles])),
                          session = Depends(get_db)):
     return await biz_service.leave_business(business_id, current_user, session)
+
+
+@router.put("/{business_id}/members/{member_id}", response_model=schemas.BusinessMemberResponse)
+async def update_business_member(business_id: int, member_id: int, post: schemas.BusinessMemberUpdate,
+                                 db=Depends(get_db),
+                                 current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]))):
+    return await biz_service.update_business_member(business_id, member_id, post, db, current_user)
