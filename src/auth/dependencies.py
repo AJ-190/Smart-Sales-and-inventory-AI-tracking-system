@@ -67,7 +67,7 @@ async def get_current_user(
             um.Users.name,
             um.Users.email,
             um.Users.phone,
-            um.Users.role,
+            um.BusinessMember.role,
             um.Users.is_verified,
             um.Users.is_active,
             um.Users.created_at,
