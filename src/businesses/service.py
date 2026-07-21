@@ -423,16 +423,22 @@ async def business_authorized_access(current_user, business_id, db: AsyncSession
     
     
     
-async def leave_business(business_id, current_user: um.Users, session: AsyncSession):
+async def leave_business(business_id, member_id, current_user: um.Users, session: AsyncSession):
+    
     await business_authorized_access(current_user, business_id, session)
     
     member = (
         await session.execute(
             select(um.BusinessMember)
             .where(um.BusinessMember.business_id == business_id)
-            .where(um.BusinessMember.user_id == current_user.user_id)
+            .where(um.BusinessMember.user_id == member_id)
         )
     ).scalar_one_or_none()
+    
+    if not (current_user.user_id == member.user_id or current_user.role in [um.RoleEnum.super_admin, um.RoleEnum.admin ]):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
+                            detail="Unauthorized to perform this action")
+        
     
     if not member:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
@@ -499,3 +505,5 @@ async def update_business_member(business_id: int, member_id: int, post: schemas
         "name": user.name if user else None,
         "email": user.email if user else None,
     }
+    
+    
