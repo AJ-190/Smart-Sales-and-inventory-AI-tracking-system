@@ -88,14 +88,20 @@ async def get_current_user(
         )
         
     if row.email == get_settings().SUPER_ADMIN_EMAIL:
-        row.role = um.RoleEnum.super_admin
+        effective_role = um.RoleEnum.super_admin.value
+    elif row.user_role == um.RoleEnum.super_admin:
+        effective_role = um.RoleEnum.super_admin.value
+    elif row.role is not None:
+        effective_role = row.role.value if isinstance(row.role, um.RoleEnum) else row.role
+    else:
+        effective_role = row.user_role.value if isinstance(row.user_role, um.RoleEnum) else str(row.user_role)
 
     return users_schema.UsersOutUsers(
         user_id=row.user_id,
         name=row.name,
         email=row.email,
         phone=row.phone,
-        role=row.role.value if isinstance(row.role, um.RoleEnum) else row.role,
+        role=effective_role,
         is_verified=row.is_verified,
         member_id=row.member_id,
         business_id=row.business_id,

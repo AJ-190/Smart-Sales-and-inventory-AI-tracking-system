@@ -470,6 +470,7 @@ def test_update_member_wrong_business(session):
     member = asyncio.run(_get_member())
     member_id = member.member_id
 
+    client.headers["Authorization"] = f"Bearer {admin_token}"
     res = client.put(
         f"/businesses/9999/members/{member_id}",
         json={"role": "manager"}
