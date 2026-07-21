@@ -14,6 +14,12 @@ logger = logging.getLogger(__name__)
 async def send_otp(email: str):
     from src.main import app
 
+    if not app.state.redis:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="OTP service is unavailable. Please try again later."
+        )
+
     otp = str(random.randint(1000000, 9999999))
     name_email = NameEmail(name="", email=email)
 
@@ -44,6 +50,12 @@ async def send_otp(email: str):
 
 async def verify_otp(email: str, otp: str):
     from src.main import app
+
+    if not app.state.redis:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="OTP service is unavailable. Please try again later."
+        )
 
     red_otp = await otp_verification(app.state.redis, email=email, store=False)
 
