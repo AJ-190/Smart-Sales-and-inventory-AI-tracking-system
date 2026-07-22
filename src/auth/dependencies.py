@@ -119,7 +119,7 @@ def role_checker(allowed_roles: list[um.RoleEnum], require_verified: bool = Fals
     ):
         if current_user.role not in allowed_roles:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
+                status_code=status.HTTP_403_FORBIDDEN,
                 detail="Unauthorized to perform this action",
             )
         if require_verified and not current_user.is_verified:
