@@ -54,7 +54,7 @@ async def get_customer_with_debt(business_id: int,
 async def update_customer_debt(post: schemas.UpdateDebt,
                      business_id: int, 
                      customer_id: int,
-                     current_user: um.Users = Depends(auth_deps.role_checker([*roles])),
+                     current_user: um.Users = Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin])),
                      session:AsyncSession = Depends(get_db)):
     return await debt_service.update_customer_with_debt(post, business_id, customer_id, session, current_user)
 
