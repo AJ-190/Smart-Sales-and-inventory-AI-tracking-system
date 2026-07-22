@@ -73,7 +73,7 @@ async def leave_business(business_id: int,
                          member_id: int,
                          current_user: um.Users = Depends(auth_deps.role_checker([*roles])),
                          session = Depends(get_db)):
-    return await biz_service.leave_business(business_id,member_id, current_user, session)
+    return await biz_service.leave_business(business_id, member_id, current_user, session)
 
 
 @router.put("/{business_id}/members/{member_id}", response_model=schemas.BusinessMemberResponse)

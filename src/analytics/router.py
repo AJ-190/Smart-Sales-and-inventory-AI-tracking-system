@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from datetime import date
 from src.database import get_db
 from src.analytics import schemas, service as analytics_service
@@ -63,22 +63,18 @@ async def get_debts(
     return await analytics_service.get_debts(business_id, db, current_user)
 
 
-@router.post("/admin/crons/daily_summery")
-async def run_daily(db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]))):
-    await cron_tasks.summery("daily", db=db)
-    return {"status": "Daily sales cron triggered"}
-
-
-@router.post("/admin/crons/weekly_summery")
-async def run_weekly(db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]))):
-    await cron_tasks.summery("weekly", db=db)
-    return {"status": "Weekly sales cron triggered"}
-
-
-@router.post("/admin/crons/monthly_summery")
-async def run_monthly(db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]))):
-    await cron_tasks.summery("monthly", db=db)
-    return {"status": "Monthly sales cron triggered"}
+@router.post("/admin/crons/{job_name}")
+async def run_cron_job(job_name: str, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]))):
+    valid_jobs = {
+        "daily_summery": "daily",
+        "weekly_summery": "weekly",
+        "monthly_summery": "monthly",
+    }
+    if job_name not in valid_jobs:
+        raise HTTPException(status_code=404, detail=f"Cron job '{job_name}' not found")
+    period = valid_jobs[job_name]
+    await cron_tasks.summery(period, db=db)
+    return {"status": f"{job_name} cron triggered"}
 
 
 @router.get("/admin/crons/jobs")
