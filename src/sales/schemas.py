@@ -38,17 +38,27 @@ class DebtResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CustomerBrief(BaseModel):
+    customer_id: int
+    name: str
+    phone: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class SaleResponse(BaseModel):
     sale_id: int
     total_amount: float
     business_id: int
     user_id: int
+    customer_id: Optional[int] = None
     amount_paid: float
     payment_method: str
     notes: Optional[str] = None
     created_at: datetime
     sales_items: list[SaleItemResponse] = []
     debt: DebtResponse | None = None
+    customer: Optional[CustomerBrief] = None
 
     model_config = ConfigDict(from_attributes=True)
 

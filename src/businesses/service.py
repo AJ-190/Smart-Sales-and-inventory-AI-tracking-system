@@ -435,14 +435,13 @@ async def leave_business(business_id, member_id, current_user: um.Users, session
         )
     ).scalar_one_or_none()
     
-    if not (current_user.user_id == member.user_id or current_user.role in [um.RoleEnum.super_admin, um.RoleEnum.admin ]):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
-                            detail="Unauthorized to perform this action")
-        
-    
     if not member:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
                             detail="User not found in the business")
+    
+    if not (current_user.user_id == member.user_id or current_user.role in [um.RoleEnum.super_admin, um.RoleEnum.admin ]):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, 
+                            detail="Unauthorized to perform this action")
         
     await session.delete(member)
     await session.commit()
