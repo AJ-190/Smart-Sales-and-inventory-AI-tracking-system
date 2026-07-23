@@ -442,7 +442,14 @@ async def leave_business(business_id, member_id, current_user: um.Users, session
     if not (current_user.user_id == member.user_id or current_user.role in [um.RoleEnum.super_admin, um.RoleEnum.admin ]):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, 
                             detail="Unauthorized to perform this action")
+    approval = (
+        await session.execute(select(bm.Approvals).where(bm.Approvals.business_id == business_id).where(bm.Approvals.requester_id == member_id))
+    ).scalar_one_or_none()
+    
+    if not approval:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User data not in approvals data")
         
+    await session.delete(approval)
     await session.delete(member)
     await session.commit()
 
