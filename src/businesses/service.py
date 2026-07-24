@@ -379,9 +379,20 @@ async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSessio
         if approval_user.status == bm.ApprovalStatus.approved:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval already approved")
         approval_user.status = bm.ApprovalStatus.approved
-        user = um.BusinessMember(role=approval_user.role, user_id=approval_user.requester_id,
-            business_id=approval_user.business_id)
-        db.add(user)
+        existing_member = (
+            await db.execute(
+                select(um.BusinessMember)
+                .where(um.BusinessMember.user_id == approval_user.requester_id)
+                .where(um.BusinessMember.business_id == approval_user.business_id)
+            )
+        ).scalar_one_or_none()
+        if existing_member:
+            existing_member.role = approval_user.role
+            existing_member.is_active = True
+        else:
+            user = um.BusinessMember(role=approval_user.role, user_id=approval_user.requester_id,
+                business_id=approval_user.business_id)
+            db.add(user)
 
 
     else:
