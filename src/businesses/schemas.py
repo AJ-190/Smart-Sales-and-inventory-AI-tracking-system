@@ -65,7 +65,7 @@ class ApprovalsResponse(BaseModel):
     reason: str
     approval_type: str
     status: str
-    requester: "UsersOut"
+    requester: Optional["UsersOut"] = None
 
     model_config = ConfigDict(from_attributes=True)
 
