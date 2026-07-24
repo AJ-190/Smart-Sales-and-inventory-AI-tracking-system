@@ -303,16 +303,7 @@ async def get_approvals(business_id, status_, db: AsyncSession, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
 
     if current_user.role != um.RoleEnum.super_admin:
-        is_member = (
-            await db.execute(
-                select(um.BusinessMember)
-                .where(um.BusinessMember.business_id == business_id)
-                .where(um.BusinessMember.user_id == current_user.user_id)
-            )
-        ).scalars().first()
-        if not is_member:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not a member of this business")
-
+        await business_authorized_access(current_user, business_id, db)
     stmt = select(bm.Approvals).where(bm.Approvals.business_id == business_id)
 
     if status_:
