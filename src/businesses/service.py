@@ -332,6 +332,7 @@ async def get_approvals(business_id, status_, db: AsyncSession, current_user):
 
     result = []
     for approval in approval_status:
+        db.expunge(approval)
         approval.requester = user_map.get(approval.requester_id)
         result.append(approval)
 
