@@ -233,187 +233,188 @@ async def get_business_key(business_id, db: AsyncSession, current_user):
 
 
 async def send_approval(post, db: AsyncSession, current_user):
-    check_business_ = (
-        (
-            await db.execute(
-                select(bm.Business).where(bm.Business.business_key == post.business_key)
-            )
-        ).scalars().first()
-    )
-    if not check_business_:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"Business with the business key '{post.business_key}' not found")
+    async with db.no_autoflush:
+        check_business_ = (
+            (
+                await db.execute(
+                    select(bm.Business).where(bm.Business.business_key == post.business_key)
+                )
+            ).scalars().first()
+        )
+        if not check_business_:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail=f"Business with the business key '{post.business_key}' not found")
 
-    stmt = (
-        select(bm.Approvals)
-        .join(bm.Business, bm.Business.business_id == bm.Approvals.business_id)
-        .where(bm.Approvals.business_id == check_business_.business_id)
-        .where(bm.Approvals.requester_id == current_user.user_id)
-       
-    )
-    
-    
-    existing_user = (await db.execute(stmt)).scalars().first()
-    if existing_user:
-        if existing_user.status == bm.ApprovalStatus.rejected:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Approval sent and got rejected"
-            )
+        stmt = (
+            select(bm.Approvals)
+            .join(bm.Business, bm.Business.business_id == bm.Approvals.business_id)
+            .where(bm.Approvals.business_id == check_business_.business_id)
+            .where(bm.Approvals.requester_id == current_user.user_id)
+        
+        )
+        
+        
+        existing_user = (await db.execute(stmt)).scalars().first()
+        if existing_user:
+            if existing_user.status == bm.ApprovalStatus.rejected:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Approval sent and got rejected"
+                )
 
-        if existing_user.status == bm.ApprovalStatus.pending:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval sent and pending.")
+            if existing_user.status == bm.ApprovalStatus.pending:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval sent and pending.")
 
-        if existing_user.status == bm.ApprovalStatus.approved:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You are already a member of the business")
-    
-    if post.role not in [
-        um.RoleEnum.cashier,
-        um.RoleEnum.admin,
-        um.RoleEnum.manager,
-        um.RoleEnum.user,
-        um.RoleEnum.viewer
-    ]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Role not found in the business")
+            if existing_user.status == bm.ApprovalStatus.approved:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You are already a member of the business")
+        
+        if post.role not in [
+            um.RoleEnum.cashier,
+            um.RoleEnum.admin,
+            um.RoleEnum.manager,
+            um.RoleEnum.user,
+            um.RoleEnum.viewer
+        ]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Role not found in the business")
 
-    if not current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=" requester_id is required")
+        if not current_user.user_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=" requester_id is required")
 
-    user = bm.Approvals(
-        business_id=check_business_.business_id,
-        requester_id=current_user.user_id,
-        approval_type=bm.ApprovalType.user_join,
-        reason=post.reason,
-        role=post.role
-    )
+        user = bm.Approvals(
+            business_id=check_business_.business_id,
+            requester_id=current_user.user_id,
+            approval_type=bm.ApprovalType.user_join,
+            reason=post.reason,
+            role=post.role
+        )
 
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    return user
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        return user
 
 
 async def get_approvals(business_id, status_, db: AsyncSession, current_user):
-    business = (
-        await db.execute(
-            select(bm.Business).where(bm.Business.business_id == business_id)
-        )
-    ).scalars().first()
-    if not business:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
-
-    if current_user.role != um.RoleEnum.super_admin:
-        await business_authorized_access(current_user, business_id, db)
-    stmt = select(bm.Approvals).where(bm.Approvals.business_id == business_id)
-
-    if status_:
-        try:
-            status_enum = bm.ApprovalStatus(status_)
-        except ValueError:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid status: {status_}. Must be one of: {[s.value for s in bm.ApprovalStatus]}")
-        stmt = stmt.where(bm.Approvals.status == status_enum)
-
-    approval_status = (await db.execute(stmt)).scalars().all()
-
-    if not approval_status:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No approvals found '{status_}'" if status_ else "No approvals found")
-
-    requester_ids = [approval.requester_id for approval in approval_status]
-
-    users = (
-        (
+    async with db.no_autoflush:
+        business = (
             await db.execute(
-                select(um.Users).where(um.Users.user_id.in_(requester_ids))
+                select(bm.Business).where(bm.Business.business_id == business_id)
             )
-        ).scalars().all()
-    )
+        ).scalars().first()
+        if not business:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
 
-    user_map = {user.user_id: user for user in users}
+        if current_user.role != um.RoleEnum.super_admin:
+            await business_authorized_access(current_user, business_id, db)
+        stmt = select(bm.Approvals).where(bm.Approvals.business_id == business_id)
 
-    result = []
-    for approval in approval_status:
-        result.append({
-            "approval_id": approval.approval_id,
-            "business_id": approval.business_id,
-            "reason": approval.reason,
-            "approval_type": str(approval.approval_type.value) if hasattr(approval.approval_type, 'value') else str(approval.approval_type),
-            "status": str(approval.status.value) if hasattr(approval.status, 'value') else str(approval.status),
-            "requester": user_map.get(approval.requester_id),
-        })
+        if status_:
+            try:
+                status_enum = bm.ApprovalStatus(status_)
+            except ValueError:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid status: {status_}. Must be one of: {[s.value for s in bm.ApprovalStatus]}")
+            stmt = stmt.where(bm.Approvals.status == status_enum)
 
-    if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No requests found")
-    return result
+        approval_status = (await db.execute(stmt)).scalars().all()
+
+        if not approval_status:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No approvals found '{status_}'" if status_ else "No approvals found")
+
+        requester_ids = [approval.requester_id for approval in approval_status]
+
+        users = (
+            (
+                await db.execute(
+                    select(um.Users).where(um.Users.user_id.in_(requester_ids))
+                )
+            ).scalars().all()
+        )
+
+        user_map = {user.user_id: user for user in users}
+
+        result = []
+        for approval in approval_status:
+            result.append({
+                "approval_id": approval.approval_id,
+                "business_id": approval.business_id,
+                "reason": approval.reason,
+                "approval_type": str(approval.approval_type.value) if hasattr(approval.approval_type, 'value') else str(approval.approval_type),
+                "status": str(approval.status.value) if hasattr(approval.status, 'value') else str(approval.status),
+                "requester": user_map.get(approval.requester_id),
+            })
+
+        if not result:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No requests found")
+        return result
 
 
 async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSession, current_user):
-    from sqlalchemy.orm import selectinload
-
-    business = (
-        await db.execute(
-            select(bm.Business).where(bm.Business.business_id == business_id)
-        )
-    ).scalars().first()
-    if not business:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
-
-    if current_user.role != um.RoleEnum.super_admin:
-        await business_authorized_access(current_user, business_id, db)
-    approval_user = (
-        await db.execute(
-            select(bm.Approvals)
-            .where(bm.Approvals.business_id == business_id)
-            .where(bm.Approvals.approval_id == post.approval_id)
-        )
-    ).scalars().first()
-    if not approval_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval not found or already processed")
-
-    requester = (
-        await db.execute(
-            select(um.Users).where(um.Users.user_id == approval_user.requester_id)
-        )
-    ).scalar_one_or_none()
-
-    if post.dir == 0:
-        if approval_user.status == bm.ApprovalStatus.rejected:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval already rejected")
-        approval_user.status = bm.ApprovalStatus.rejected
-        
-
-    elif post.dir == 1:
-        if approval_user.status == bm.ApprovalStatus.approved:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval already approved")
-        approval_user.status = bm.ApprovalStatus.approved
-        existing_member = (
+    async with db.no_autoflush:
+        business = (
             await db.execute(
-                select(um.BusinessMember)
-                .where(um.BusinessMember.user_id == approval_user.requester_id)
-                .where(um.BusinessMember.business_id == approval_user.business_id)
+                select(bm.Business).where(bm.Business.business_id == business_id)
+            )
+        ).scalars().first()
+        if not business:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+
+        if current_user.role != um.RoleEnum.super_admin:
+            await business_authorized_access(current_user, business_id, db)
+        approval_user = (
+            await db.execute(
+                select(bm.Approvals)
+                .where(bm.Approvals.business_id == business_id)
+                .where(bm.Approvals.approval_id == post.approval_id)
+            )
+        ).scalars().first()
+        if not approval_user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval not found or already processed")
+
+        requester = (
+            await db.execute(
+                select(um.Users).where(um.Users.user_id == approval_user.requester_id)
             )
         ).scalar_one_or_none()
-        if existing_member:
-            existing_member.role = approval_user.role
-            existing_member.is_active = True
+
+        if post.dir == 0:
+            if approval_user.status == bm.ApprovalStatus.rejected:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval already rejected")
+            approval_user.status = bm.ApprovalStatus.rejected
+            
+
+        elif post.dir == 1:
+            if approval_user.status == bm.ApprovalStatus.approved:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval already approved")
+            approval_user.status = bm.ApprovalStatus.approved
+            existing_member = (
+                await db.execute(
+                    select(um.BusinessMember)
+                    .where(um.BusinessMember.user_id == approval_user.requester_id)
+                    .where(um.BusinessMember.business_id == approval_user.business_id)
+                )
+            ).scalar_one_or_none()
+            if existing_member:
+                existing_member.role = approval_user.role
+                existing_member.is_active = True
+            else:
+                user = um.BusinessMember(role=approval_user.role, user_id=approval_user.requester_id,
+                    business_id=approval_user.business_id)
+                db.add(user)
+
+
         else:
-            user = um.BusinessMember(role=approval_user.role, user_id=approval_user.requester_id,
-                business_id=approval_user.business_id)
-            db.add(user)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid request")
+        
+        await db.commit()
 
-
-    else:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid request")
-    
-    await db.commit()
-
-    return {
-        "approval_id": approval_user.approval_id,
-        "business_id": approval_user.business_id,
-        "reason": approval_user.reason,
-        "approval_type": str(approval_user.approval_type.value) if hasattr(approval_user.approval_type, 'value') else str(approval_user.approval_type),
-        "status": str(approval_user.status.value) if hasattr(approval_user.status, 'value') else str(approval_user.status),
-        "requester": requester,
-    }
+        return {
+            "approval_id": approval_user.approval_id,
+            "business_id": approval_user.business_id,
+            "reason": approval_user.reason,
+            "approval_type": str(approval_user.approval_type.value) if hasattr(approval_user.approval_type, 'value') else str(approval_user.approval_type),
+            "status": str(approval_user.status.value) if hasattr(approval_user.status, 'value') else str(approval_user.status),
+            "requester": requester,
+        }
 
 
 async def business_authorized_access(current_user, business_id, db: AsyncSession):
