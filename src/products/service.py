@@ -87,6 +87,8 @@ async def update_product(business_id, id, post: schemas.ProductUpdate, db: Async
 
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Product with the ID:{id} not found")
+    if product.business_id is None:
+        product.business_id = business_id
     for key, value in post.model_dump(exclude_unset=True).items():
         setattr(product, key, value)
 
