@@ -37,6 +37,7 @@ class UpdateDebt(BaseModel):
     amount: float | None = None
     note: str | None = None
     due_date: datetime | None = None
+    sale_id: Optional[int] = None
     
     model_config = ConfigDict(from_attributes=True)
     

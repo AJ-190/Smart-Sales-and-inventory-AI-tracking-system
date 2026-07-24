@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 from src.users import models as um
 from src.customers import models as cm
 from src.debts import models as dm
-from src.businesses import service
+from src.businesses import service, models as bm
 from src.debts import schemas
 
 
@@ -182,23 +182,37 @@ async def update_customer_with_debt(post:schemas.UpdateDebt , business_id, custo
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No outstanding debt found for this customer")
     
     original_amount = debt.amount
+    paid_amount = 0
+    
+    sale_to_update = None
+    sale_id = post.sale_id or debt.sale_id
+    if sale_id:
+        sale_result = await session.execute(
+            select(bm.Sale).where(bm.Sale.business_id == business_id).where(bm.Sale.sale_id == sale_id)
+        )
+        sale_to_update = sale_result.scalar_one_or_none()
     
     if post.amount:
         if post.amount <= 0:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Amount cannot be less than or equal to zero(0)")
         
         if post.amount >= debt.amount:
+            paid_amount = debt.amount
             debt.amount = 0
             debt.is_paid = True
         else:
+            paid_amount = post.amount
             debt.amount = debt.amount - post.amount
             
     if post.fully_paid:
+        paid_amount = debt.amount
         debt.amount = 0
         debt.is_paid = True
         
-    if post.amount or post.fully_paid:
-        paid_amount = post.amount if post.amount else original_amount
+    if paid_amount > 0:
+        if sale_to_update:
+            sale_to_update.amount_paid = sale_to_update.amount_paid + paid_amount
+        
         transaction = dm.Transactions(business_id=business_id, 
                                 customer_id=customer_id,
                                 debt_id=debt.debt_id,

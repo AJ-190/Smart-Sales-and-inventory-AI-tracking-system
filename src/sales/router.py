@@ -4,6 +4,7 @@ from src.database import get_db
 from src.sales import schemas, service as sale_service
 from src.auth import dependencies as auth_deps
 from src.users import models as um
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -36,3 +37,13 @@ async def get_sale(business_id: int, id: int, db=Depends(get_db), current_user=D
 @router.delete("/sales/{business_id}/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_sale(business_id: int, id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager, um.RoleEnum.cashier]))):
     return await sale_service.delete_sale(business_id, id, db, current_user)
+
+
+@router.put("/sale/{business_id}/{sale_id}", response_model=schemas.SaleResponse)
+async def update_sale(business_id: int, sale_id: int, 
+                      sale_data:schemas.SaleCreate,
+                      current_user = Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.amdin, um.RoleEnum.manager, um.RoleEnum.cashier])),
+                      session: AsyncSession = Depends(get_db)
+                      ):
+    return await sale_service.update_sale(business_id, sale_id, sale_data, current_user, session)
+

@@ -413,7 +413,7 @@ async def business_authorized_access(current_user, business_id, db: AsyncSession
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This action is forbidden")
     
     
-    
+    return user_access
     
 async def leave_business(business_id, member_id, current_user: um.Users, session: AsyncSession):
     

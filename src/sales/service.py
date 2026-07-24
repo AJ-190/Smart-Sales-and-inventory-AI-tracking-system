@@ -1,7 +1,7 @@
 from fastapi import status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
-from sqlalchemy import select, func, cast, Date
+from sqlalchemy import select, func, cast, Date, delete
 from datetime import timedelta, datetime, date
 from src.users import models as um
 from src.businesses import models as bm
@@ -108,8 +108,7 @@ async def add_sale(business_id, post: schemas.SaleCreate, db: AsyncSession, curr
         select(bm.Sale)
         .options(
             joinedload(bm.Sale.sales_items),
-            joinedload(bm.Sale.debt),
-            joinedload(bm.Sale.customer))
+            joinedload(bm.Sale.debt))
         .where(bm.Sale.sale_id == sale.sale_id)
     )
     sale_ = result.scalars().first()
@@ -139,8 +138,7 @@ async def get_sales(business_id: int, db: AsyncSession, current_user, limit: int
         stmt
         .options(
             joinedload(bm.Sale.sales_items),
-            joinedload(bm.Sale.debt),
-            joinedload(bm.Sale.customer)
+            joinedload(bm.Sale.debt)
         )
         .order_by(bm.Sale.created_at.desc())
         .limit(limit)
@@ -167,8 +165,7 @@ async def get_sale(business_id, id, db: AsyncSession, current_user):
         stmt
         .options(
             joinedload(bm.Sale.sales_items),
-            joinedload(bm.Sale.debt),
-            joinedload(bm.Sale.customer)
+            joinedload(bm.Sale.debt)
         )
         .where(bm.Sale.sale_id == id)
     )
@@ -209,9 +206,15 @@ async def delete_sale(business_id, id, db: AsyncSession, current_user):
         if not product:
             continue
         product.quantity = product.quantity + item.quantity
-        
-    
-    
+
+    debt_result = await db.execute(
+        select(dm.Debt).where(dm.Debt.sale_id == sale.sale_id)
+    )
+    linked_debt = debt_result.scalars().first()
+    if linked_debt:
+        await db.execute(
+            delete(dm.Transactions).where(dm.Transactions.debt_id == linked_debt.debt_id)
+        )
     
     await db.delete(sale)
     await db.commit()
@@ -220,7 +223,7 @@ async def delete_sale(business_id, id, db: AsyncSession, current_user):
 
 
 async def update_sale(business_id, sale_id, sale_data: schemas.SaleUpdate, current_user:um.Users, session:AsyncSession):
-    await biz_service.business_authorized_access(current_user, business_id, session)
+    user = await biz_service.business_authorized_access(current_user, business_id, session)
     
     sale = (
   
@@ -229,16 +232,9 @@ async def update_sale(business_id, sale_id, sale_data: schemas.SaleUpdate, curre
             .where(bm.Sale.sale_id == sale_id)
         )
     
-    if not current_user.role in [um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]:
+    if user.role == um.RoleEnum.cashier:
         sale = (
-            sale.where(bm.Sale.user_id == current_user.user_id)
+            sale.where(bm.Sale.user_id == user.user_id)
         )
         
-    sale_ex = await session.execute(sale)
-    sale_exist = sale_ex.scalar_one_or_none()
-    
-    if not sale_exist:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
-                            detail="No sale found to be updated")
         
-    
