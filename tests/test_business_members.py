@@ -46,7 +46,7 @@ def test_update_member_role(session):
     client.headers["Authorization"] = f"Bearer {user_token}"
 
     res = client.post(
-        "/businesses/approvals/send_approval/",
+        "/businesses/approvals/send_approval",
         json={"business_key": business_key, "reason": "Join as cashier", "role": "cashier"},
     )
     approval_id = res.json()["approval_id"]
@@ -121,7 +121,7 @@ def test_update_member_deactivate(session):
     client.headers["Authorization"] = f"Bearer {user_token}"
 
     res = client.post(
-        "/businesses/approvals/send_approval/",
+        "/businesses/approvals/send_approval",
         json={"business_key": business_key, "reason": "Join as cashier", "role": "cashier"},
     )
     approval_id = res.json()["approval_id"]
@@ -194,7 +194,7 @@ def test_update_member_role_and_active(session):
     client.headers["Authorization"] = f"Bearer {user_token}"
 
     res = client.post(
-        "/businesses/approvals/send_approval/",
+        "/businesses/approvals/send_approval",
         json={"business_key": business_key, "reason": "Join as cashier", "role": "cashier"},
     )
     approval_id = res.json()["approval_id"]
@@ -268,7 +268,7 @@ def test_update_member_unauthorized(session):
     client.headers["Authorization"] = f"Bearer {user_token}"
 
     res = client.post(
-        "/businesses/approvals/send_approval/",
+        "/businesses/approvals/send_approval",
         json={"business_key": business_key, "reason": "Join as cashier", "role": "cashier"},
     )
     approval_id = res.json()["approval_id"]
@@ -297,7 +297,7 @@ def test_update_member_unauthorized(session):
         f"/businesses/{business_id}/members/{member_id}",
         json={"role": "admin"}
     )
-    assert res.status_code == 401
+    assert res.status_code == 403
 
     app.dependency_overrides.clear()
 
@@ -374,7 +374,7 @@ def test_update_member_invalid_role(session):
     client.headers["Authorization"] = f"Bearer {user_token}"
 
     res = client.post(
-        "/businesses/approvals/send_approval/",
+        "/businesses/approvals/send_approval",
         json={"business_key": business_key, "reason": "Join as cashier", "role": "cashier"},
     )
     approval_id = res.json()["approval_id"]
@@ -446,7 +446,7 @@ def test_update_member_wrong_business(session):
     client.headers["Authorization"] = f"Bearer {user_token}"
 
     res = client.post(
-        "/businesses/approvals/send_approval/",
+        "/businesses/approvals/send_approval",
         json={"business_key": business_key, "reason": "Join as cashier", "role": "cashier"},
     )
     approval_id = res.json()["approval_id"]
@@ -518,7 +518,7 @@ def test_update_member_no_auth(session):
     client.headers["Authorization"] = f"Bearer {user_token}"
 
     res = client.post(
-        "/businesses/approvals/send_approval/",
+        "/businesses/approvals/send_approval",
         json={"business_key": business_key, "reason": "Join as cashier", "role": "cashier"},
     )
     approval_id = res.json()["approval_id"]

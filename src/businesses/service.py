@@ -254,19 +254,18 @@ async def send_approval(post, db: AsyncSession, current_user):
     
     
     existing_user = (await db.execute(stmt)).scalars().first()
-    if not existing_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval not found, another approval request is needed.")
-    if existing_user.status == bm.ApprovalStatus.rejected:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Approval sent and got rejected"
-        )
-        
-    if existing_user.status == bm.ApprovalStatus.pending:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval sent and pending.")
-    
-    if existing_user.status == bm.ApprovalStatus.approved:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You are already a member of the business")
+    if existing_user:
+        if existing_user.status == bm.ApprovalStatus.rejected:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Approval sent and got rejected"
+            )
+
+        if existing_user.status == bm.ApprovalStatus.pending:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval sent and pending.")
+
+        if existing_user.status == bm.ApprovalStatus.approved:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You are already a member of the business")
     
     if post.role not in [
         um.RoleEnum.cashier,

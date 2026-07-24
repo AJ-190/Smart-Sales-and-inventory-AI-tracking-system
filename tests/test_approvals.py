@@ -51,7 +51,7 @@ def test_approval_creates_business_member(session):
     client.headers["Authorization"] = f"Bearer {requester_token}"
 
     res = client.post(
-        "/businesses/approvals/send_approval/",
+        "/businesses/approvals/send_approval",
         json={"business_key": business_key, "reason": "Join as cashier", "role": "cashier"},
     )
     assert res.status_code == 201
@@ -121,7 +121,7 @@ def test_reject_does_not_create_business_member(session):
     client.headers["Authorization"] = f"Bearer {requester_token}"
 
     res = client.post(
-        "/businesses/approvals/send_approval/",
+        "/businesses/approvals/send_approval",
         json={"business_key": business_key, "reason": "Join as manager", "role": "manager"},
     )
     approval_id = res.json()["approval_id"]
@@ -187,7 +187,7 @@ def test_approve_sets_correct_role(session):
     client.headers["Authorization"] = f"Bearer {requester_token}"
 
     res = client.post(
-        "/businesses/approvals/send_approval/",
+        "/businesses/approvals/send_approval",
         json={"business_key": business_key, "reason": "Join as manager", "role": "manager"},
     )
     approval_id = res.json()["approval_id"]

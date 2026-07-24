@@ -317,7 +317,7 @@ def test_send_approval(authorized_user_client, test_get_business_key):
                      }
 
     res = authorized_user_client.post(
-        f"/businesses/approvals/send_approval/",
+        f"/businesses/approvals/send_approval",
         json=approval_data
     )
 
