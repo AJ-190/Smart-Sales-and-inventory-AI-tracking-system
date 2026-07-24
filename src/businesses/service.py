@@ -335,6 +335,8 @@ async def get_approvals(business_id, status_, db: AsyncSession, current_user):
         approval.requester = user_map.get(approval.requester_id)
         result.append(approval)
 
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No requests found")
     return result
 
 
