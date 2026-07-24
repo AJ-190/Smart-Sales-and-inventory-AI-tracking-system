@@ -332,9 +332,14 @@ async def get_approvals(business_id, status_, db: AsyncSession, current_user):
 
     result = []
     for approval in approval_status:
-        db.expunge(approval)
-        approval.requester = user_map.get(approval.requester_id)
-        result.append(approval)
+        result.append({
+            "approval_id": approval.approval_id,
+            "business_id": approval.business_id,
+            "reason": approval.reason,
+            "approval_type": str(approval.approval_type.value) if hasattr(approval.approval_type, 'value') else str(approval.approval_type),
+            "status": str(approval.status.value) if hasattr(approval.status, 'value') else str(approval.status),
+            "requester": user_map.get(approval.requester_id),
+        })
 
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No requests found")
