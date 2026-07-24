@@ -42,7 +42,7 @@ async def delete_sale(business_id: int, id: int, db=Depends(get_db), current_use
 @router.put("/sale/{business_id}/{sale_id}", response_model=schemas.SaleResponse)
 async def update_sale(business_id: int, sale_id: int, 
                       sale_data:schemas.SaleCreate,
-                      current_user = Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.amdin, um.RoleEnum.manager, um.RoleEnum.cashier])),
+                      current_user = Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager, um.RoleEnum.cashier])),
                       session: AsyncSession = Depends(get_db)
                       ):
     return await sale_service.update_sale(business_id, sale_id, sale_data, current_user, session)
