@@ -233,7 +233,7 @@ async def get_business_key(business_id, db: AsyncSession, current_user):
 
 
 async def send_approval(post, db: AsyncSession, current_user):
-    async with db.no_autoflush:
+    with db.no_autoflush:
         check_business_ = (
             (
                 await db.execute(
@@ -295,7 +295,7 @@ async def send_approval(post, db: AsyncSession, current_user):
 
 
 async def get_approvals(business_id, status_, db: AsyncSession, current_user):
-    async with db.no_autoflush:
+    with db.no_autoflush:
         business = (
             await db.execute(
                 select(bm.Business).where(bm.Business.business_id == business_id)
@@ -349,7 +349,7 @@ async def get_approvals(business_id, status_, db: AsyncSession, current_user):
 
 
 async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSession, current_user):
-    async with db.no_autoflush:
+    with db.no_autoflush:
         business = (
             await db.execute(
                 select(bm.Business).where(bm.Business.business_id == business_id)
