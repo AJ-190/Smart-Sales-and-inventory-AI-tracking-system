@@ -64,6 +64,8 @@ async def refresh(payload: schemas.Token, db: AsyncSession):
         "refresh_token": new_refresh_token,
         "token_type": "Bearer"
     }
+    
+    
 
 async def logout(payload: schemas.Token, db: AsyncSession):
     token_hash = hash_token(payload.refresh_token)
