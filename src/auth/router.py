@@ -2,7 +2,7 @@ from fastapi import APIRouter, Body, Depends, status, HTTPException
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from src.database import get_db
-from src.auth import schemas, service as auth_service
+from src.auth import schemas, service as auth_service, utils
 from src.celery_tasks.otp_task import send_otp, verify_otp
 from src.users.schemas import UserSignUpResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -73,7 +73,7 @@ async def verify_forgot_password(otp: schemas.Otp_veriification_code,
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Incorrect OTP-verification code")
     
     
-    user.password = otp.password
+    user.password = utils.hash(otp.password)
     return user
     
 @router.post("/otp/verification", response_model=UserSignUpResponse)
