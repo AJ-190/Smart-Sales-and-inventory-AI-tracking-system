@@ -74,6 +74,8 @@ async def verify_forgot_password(otp: schemas.Otp_veriification_code,
     
     
     user.password = utils.hash(otp.password.get_secret_value())
+    await session.commit()
+    await session.refresh(user)
     return user
     
 @router.post("/otp/verification", response_model=UserSignUpResponse)
