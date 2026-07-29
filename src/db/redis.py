@@ -54,14 +54,23 @@ async def ip_rate_limiter(redis: airedis.Redis, ip: str, expire: int):
         return False
 
 
-async def otp_verification(redis: airedis.Redis,  email: str, store: bool, otp: Optional[str] = None):
-    client = f"email:{email}"
-    if store:
-        if await redis.get(client):
-            await redis.delete(client)
-        await redis.setex(client, 300, otp)
-    else:
-        return await redis.get(client)
+async def otp_verification(redis: airedis.Redis,  email: str, store: bool, otp: Optional[str] = None, forgot_pass: Optional[bool] = False):
+
+    try:
+        client = f"email:{email}"
+        if store:
+            if await redis.exists(client):
+                await redis.delete(client)
+            mapping = {"otp": otp or "", "forgot_pass": "1" if forgot_pass else "0"}
+            await redis.hset(client, mapping=mapping)
+            await redis.expire(client, 300)
+            return True
+        
+        else:
+            return await redis.hgetall(client)
+
+    except Exception as e:
+        logger.error("Failed to process otp-verification: %s", e)
 
 
 async def otp_increment_attempts(redis: airedis.Redis, email: str) -> int:

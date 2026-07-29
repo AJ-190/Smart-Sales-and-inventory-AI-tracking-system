@@ -35,7 +35,7 @@ async def refresh(
 
 @router.post("/otp/get_code")
 async def get_verification_code(email: schemas.Email):
-    return await send_otp(email.email)
+    return await send_otp(email.email, forgot_pass=False)
 
 @router.post("/verify_user", response_model=us_schema.UserSignUpResponse)
 async def veirfy_user(email: schemas.Email, session: AsyncSession = Depends(get_db)):
@@ -50,11 +50,36 @@ async def veirfy_user(email: schemas.Email, session: AsyncSession = Depends(get_
     await session.commit()
     await session.refresh(user)
     return user
+
+
+@router.post("/forgot_password")
+async def forgot_password(useremail: schemas.Email, session: AsyncSession = Depends(get_db)):
+    if not await auth_service.get_user_by_email(useremail.email, session):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
+                            detail="User not registered")
+        
+    return await send_otp(useremail.email, forgot_pass=True)
+
+
+@router.post("/verify/forgot_password", response_model=us_schema.UserSignUpResponse)
+async def verify_forgot_password(otp: schemas.Otp_veriification_code,
+                                 
+                                 session: AsyncSession = Depends(get_db)):
+    if otp.password is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No password entered")
+    
+    user = await auth_service.get_user_by_email(otp.email, session)
+    if not await verify_otp(otp.email,otp=otp.otp, forgot_pass=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Incorrect OTP-verification code")
+    
+    
+    user.password = otp.password
+    return user
     
 @router.post("/otp/verification", response_model=UserSignUpResponse)
 async def verify_otp_code(otp: schemas.Otp_veriification_code, 
                           db: AsyncSession = Depends(get_db),):
-    verify = await verify_otp(otp.email, otp.otp)
+    verify = await verify_otp(otp.email, otp.otp, forgot_pass=True)
     if not verify:
         raise HTTPException(status.HTTP_403_FORBIDDEN, 
                             detail="Incorrect OTP-verification code")

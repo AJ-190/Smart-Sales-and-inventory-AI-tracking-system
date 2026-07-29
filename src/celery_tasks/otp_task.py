@@ -102,7 +102,7 @@ async def _send_otp_email(to_email: str, otp: str) -> bool:
     return False
 
 
-async def send_otp(email: str):
+async def send_otp(email: str, forgot_pass):
     from src.main import app
 
     if not app.state.redis:
@@ -112,7 +112,7 @@ async def send_otp(email: str):
         )
 
     otp = str(secrets.randbelow(9000000) + 1000000)
-    await otp_verification(app.state.redis, email, otp=otp, store=True)
+    await otp_verification(app.state.redis, email, forgot_pass=forgot_pass, otp=otp, store=True)
 
     try:
         sent = await _send_otp_email(email, otp)
@@ -129,7 +129,7 @@ async def send_otp(email: str):
     return JSONResponse(status_code=status.HTTP_200_OK, content={"msg": "OTP-verification code is sent"})
 
 
-async def verify_otp(email: str, otp: str):
+async def verify_otp(email: str, otp: str, forgot_pass):
     from src.main import app
 
     if not app.state.redis:
@@ -138,19 +138,22 @@ async def verify_otp(email: str, otp: str):
             detail="OTP service is unavailable. Please try again later.",
         )
 
-    red_otp = await otp_verification(app.state.redis, email=email, store=False)
+    data = await otp_verification(app.state.redis, forgot_pass=forgot_pass, email=email, store=False)
 
-    if not red_otp:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="OTP code has expired or user not registered")
+    if not data:
+        return False
+
+    if data.get("forgot_pass") == "1" and not forgot_pass:
+        return False
+
+    if data.get("otp") != otp:
+        return False
 
     attempts = await otp_increment_attempts(app.state.redis, email)
     if attempts > 3:
         await app.state.redis.delete(f"email:{email}")
         await app.state.redis.delete(f"otp_attempts:{email}")
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many failed attempts. Please request a new code.")
-
-    if str(red_otp) != otp:
-        return False
 
     await app.state.redis.delete(f"email:{email}")
     await app.state.redis.delete(f"otp_attempts:{email}")
