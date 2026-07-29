@@ -73,7 +73,7 @@ async def verify_forgot_password(otp: schemas.Otp_veriification_code,
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Incorrect OTP-verification code")
     
     
-    user.password = utils.hash(otp.password)
+    user.password = utils.hash(otp.password.get_secret_value())
     return user
     
 @router.post("/otp/verification", response_model=UserSignUpResponse)
