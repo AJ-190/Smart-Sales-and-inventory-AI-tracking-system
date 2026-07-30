@@ -29,3 +29,5 @@ celery.conf.update(
         },
     },
 )
+
+from src.celery_tasks import sales_task  # noqa: F401 — registers tasks with the celery app
