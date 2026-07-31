@@ -21,7 +21,7 @@ def test_get_otp_code_invalid_email(client):
 
 def test_verify_otp_correct_code(client, test_user):
     app = client.app
-    app.state.redis.get.return_value = "1234567"
+    app.state.redis.hgetall.return_value = {"otp": "1234567", "forgot_pass": "0"}
 
     res = client.post(
         "/auth/otp/verification",
@@ -33,7 +33,7 @@ def test_verify_otp_correct_code(client, test_user):
 
 def test_verify_otp_wrong_code(client, test_user):
     app = client.app
-    app.state.redis.get.return_value = "1234567"
+    app.state.redis.hgetall.return_value = {"otp": "1234567", "forgot_pass": "0"}
 
     res = client.post(
         "/auth/otp/verification",
@@ -45,7 +45,7 @@ def test_verify_otp_wrong_code(client, test_user):
 
 def test_verify_otp_expired(client, test_user):
     app = client.app
-    app.state.redis.get.return_value = None
+    app.state.redis.hgetall.return_value = {}
 
     res = client.post(
         "/auth/otp/verification",
@@ -57,7 +57,7 @@ def test_verify_otp_expired(client, test_user):
 
 def test_verify_otp_too_many_attempts(client, test_user):
     app = client.app
-    app.state.redis.get.return_value = "1234567"
+    app.state.redis.hgetall.return_value = {"otp": "1234567", "forgot_pass": "0"}
     app.state.redis.incr.return_value = 4
 
     res = client.post(
@@ -86,7 +86,7 @@ def test_verify_otp_missing_otp(client):
 
 def test_verify_otp_user_not_registered(client):
     app = client.app
-    app.state.redis.get.return_value = "1234567"
+    app.state.redis.hgetall.return_value = {"otp": "1234567", "forgot_pass": "0"}
 
     res = client.post(
         "/auth/otp/verification",

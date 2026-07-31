@@ -4,6 +4,9 @@ import os
 import logging
 from dotenv import load_dotenv
 import time
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.pdfgen import canvas
 
 load_dotenv()
 
@@ -109,3 +112,34 @@ class EmailReport:
 
         logger.error("All 5 email attempts failed for %s", self.to_email)
         return False
+
+
+
+
+    def render_receipt_reportlab(path, business, items, total):
+        c = canvas.Canvas(path, pagesize=A4)
+        width, height = A4
+
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(20 * mm, height - 25 * mm, business["name"])
+        c.setFont("Helvetica", 9)
+        c.drawString(20 * mm, height - 32 * mm, business["phone"])
+
+        y = height - 50 * mm
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(20 * mm, y, "ITEM")
+        c.drawRightString(width - 20 * mm, y, "SUBTOTAL")
+
+        c.setFont("Helvetica", 9.5)
+        for item in items:
+            y -= 7 * mm  # you track this cursor yourself — nothing flows automatically
+            c.drawString(20 * mm, y, item["name"])
+            c.drawRightString(width - 20 * mm, y, f"GHS {item['qty'] * item['unit_price']:.2f}")
+
+        y -= 12 * mm
+        c.setFont("Helvetica-Bold", 12)
+        c.drawRightString(width - 20 * mm, y, f"Total: GHS {total:.2f}")
+        
+        c.setFont("Helvetica", 7)
+        c.drawCentredString(width / 2, 15 * mm, f"{business['name']} · generated via Business Bot")
+        c.save()

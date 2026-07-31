@@ -1,4 +1,5 @@
 import pytest
+from datetime import date, timedelta
 from src.sales import schemas
 
 def test_create_sale(authorized_user_client, authorized_user_client_cre_bus, test_products_create):
@@ -64,8 +65,9 @@ def test_get_all_sales_for_bus(authorized_user_client, authorized_user_client_cr
     
 
 def test_get_sales_by_date_more_(authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli):
+    future_date = (date.today() + timedelta(days=1)).isoformat()
     res = authorized_user_client.get(
-        f"/sales/{authorized_user_client_cre_bus[0].business_id}?date=2026-07-25"
+        f"/sales/{authorized_user_client_cre_bus[0].business_id}?date={future_date}"
     )
     assert res.status_code == 400
     

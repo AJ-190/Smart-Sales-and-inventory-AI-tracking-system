@@ -19,3 +19,4 @@ class Customer(Base):
     business = relationship("Business", back_populates="customers")
     sales = relationship("Sale", back_populates="customer")
     debts = relationship("Debt", back_populates="customer", cascade="all, delete-orphan")
+    reminders = relationship("Reminders", back_populates="customer", cascade="all, delete-orphan")

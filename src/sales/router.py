@@ -47,3 +47,7 @@ async def update_sale(business_id: int, sale_id: int,
                       ):
     return await sale_service.update_sale(business_id, sale_id, sale_data, current_user, session)
 
+
+@router.get("{business_id}/{sale_id}/reciept")
+async def generate_reciept(business_id: int, sale_id: int):
+    return

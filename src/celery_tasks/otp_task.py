@@ -141,12 +141,12 @@ async def verify_otp(email: str, otp: str, forgot_pass):
     data = await otp_verification(app.state.redis, forgot_pass=forgot_pass, email=email, store=False)
 
     if not data:
-        return False
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="OTP code has expired or user not registered",
+        )
 
     if data.get("forgot_pass") == "1" and not forgot_pass:
-        return False
-
-    if data.get("otp") != otp:
         return False
 
     attempts = await otp_increment_attempts(app.state.redis, email)
@@ -154,6 +154,9 @@ async def verify_otp(email: str, otp: str, forgot_pass):
         await app.state.redis.delete(f"email:{email}")
         await app.state.redis.delete(f"otp_attempts:{email}")
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many failed attempts. Please request a new code.")
+
+    if data.get("otp") != otp:
+        return False
 
     await app.state.redis.delete(f"email:{email}")
     await app.state.redis.delete(f"otp_attempts:{email}")

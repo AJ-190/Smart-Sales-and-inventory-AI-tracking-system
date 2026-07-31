@@ -43,6 +43,7 @@ class Business(Base):
     customers = relationship("Customer", back_populates="business")
     approvals = relationship("Approvals", back_populates="business")
     debts = relationship("Debt", back_populates="business")
+    reminders = relationship("Reminders", back_populates="business")
 
 
 class Product(Base):

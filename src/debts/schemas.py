@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict, EmailStr
 from datetime import datetime
 from typing import Optional
-
+from datetime import date, time
 
 
 
@@ -62,3 +62,14 @@ class CustomerTransactions(BaseModel):
     customer_address: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
+    
+    
+    
+    
+class scheduleReminder(BaseModel):
+    debt_id: int
+    customer_id: int
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    time_of_day: Optional[time] = None
+    note: str

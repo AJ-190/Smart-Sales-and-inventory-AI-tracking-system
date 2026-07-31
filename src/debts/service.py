@@ -2,11 +2,11 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 from src.users import models as um
-from src.customers import models as cm
+from src.customers import models as cm, service as cv
 from src.debts import models as dm
 from src.businesses import service, models as bm
 from src.debts import schemas
-
+from datetime import datetime, date, timedelta
 
 
 
@@ -294,3 +294,39 @@ async def get_transactions(business_id, customer_id, current_user: um.Users, ses
     ]
             
     
+
+async def set_reminders(business_id, current_user: um.Users, session: AsyncSession, post: schemas.scheduleReminder):
+    await service.business_authorized_access(current_user, business_id, session)
+    
+    customer = await cv.get_customer(business_id, post.customer_id, session, current_user)
+    
+    
+    customer_with_debt = (
+        await session.execute(
+            select(dm.Debt)
+            .where(dm.Debt.business_id == business_id)
+            .where(dm.Debt.customer_id == post.customer_id)
+            .where(dm.Debt.debt_id == post.debt_id)
+        )
+    ).scalar_one_or_none()
+    
+    if not customer_with_debt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No debt found for this customer")
+    
+    data = post.model_dump()
+    data["business_id"] = business_id
+    data["debt_id"] = customer_with_debt.debt_id
+
+    if not data.get("start_date"):
+        data["start_date"] = customer_with_debt.due_date.date() - timedelta(days=3)
+
+    if not data.get("end_date"):
+        data["end_date"] = customer_with_debt.due_date.date()
+        
+    reminder = dm.Reminders(**data)
+    
+    session.add(reminder)
+    await session.commit()
+    await session.refresh(reminder)
+    return reminder
+

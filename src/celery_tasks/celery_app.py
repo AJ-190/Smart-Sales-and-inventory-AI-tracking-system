@@ -27,7 +27,13 @@ celery.conf.update(
             "task": "src.celery_tasks.sales_task.monthly_sale_summery",
             "schedule": crontab(hour=0, minute=0, day_of_month="1"),
         },
+        "daily-debt-reminders": {
+            "task": "src.celery_tasks.debt_reminders.dispatch_debt_reminders",
+            "schedule": crontab(hour=9, minute=0),
+        },
     },
 )
 
-from src.celery_tasks import sales_task  # noqa: F401 — registers tasks with the celery app
+from src.celery_tasks import debt_reminders, sales_task  # noqa: F401 — registers tasks with the celery app
+
+

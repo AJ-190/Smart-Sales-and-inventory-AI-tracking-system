@@ -38,7 +38,9 @@ async def summery(period: str, db: AsyncSession | None = None):
     async def _run(db: AsyncSession):
         start, end = _get_period_range(period)
         result = await db.execute(
-            select(um.BusinessMember).where(
+            select(um.BusinessMember, um.Users)
+            .join(um.Users, um.BusinessMember.user_id == um.Users.user_id)
+            .where(
                 um.BusinessMember.role.in_([
                     um.RoleEnum.admin,
                     um.RoleEnum.super_admin,
@@ -46,11 +48,11 @@ async def summery(period: str, db: AsyncSession | None = None):
                 ])
             )
         )
-        users = result.scalars().all()
+        rows = result.all()
 
-        for user in users:
+        for member, user in rows:
             try:
-                await analytics_service.get_summery(user.business_id, db, user, start, end)
+                await analytics_service.get_summery(member.business_id, db, user, start, end)
                 print(f"[CRON] summary done for {user.user_id}")
             except Exception as e:
                 logger.error(f"Error generating summary for user {user.user_id}: {e}")
