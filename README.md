@@ -25,7 +25,8 @@ A production-ready REST API for small businesses to manage inventory, track sale
 - **Sales Tracking** — Record, retrieve, update, and delete sales transactions with automatic calculations
 - **Business Approvals** — Request and manage business join approvals with role-based access control
 - **Customer Management** — Create, update, and manage customers per business
-- **Debt Tracking** — Track outstanding customer debts with auto-reminders
+- **Debt Tracking** — Track outstanding customer debts with automatic SMS reminders
+- **Scheduled SMS Reminders** — Schedule debt reminders and send them via Africa's Talking (sandbox/live)
 - **Dashboard & Analytics** — Aggregated KPIs, revenue breakdowns, profit margins, payment method splits, best-selling product insights, and a combined dashboard endpoint
 - **Automated Reports** — Daily, weekly, and monthly sales summaries sent via email to admins and managers using background cron jobs
 
@@ -38,9 +39,10 @@ A production-ready REST API for small businesses to manage inventory, track sale
 | Framework | FastAPI |
 | Database | PostgreSQL (SQLAlchemy ORM) |
 | Auth | JWT (OAuth2 + Argon2 hashing) |
-| Background Jobs | APScheduler |
-| Email | Resend API (OTP) + SMTP/Gmail (reports) |
-| Caching | Redis (OTP storage, rate limiting, JWT revocation) |
+| Background Jobs | Celery + Celery Beat |
+| Email | SendGrid (OTP) + SMTP/Gmail (reports) |
+| SMS | Africa's Talking (sandbox / live) |
+| Caching | Redis (OTP storage, rate limiting, JWT revocation, Celery broker) |
 | Deployment | Render / Railway |
 
 ---
@@ -85,23 +87,21 @@ src/
 │   ├── models.py          #   Customer model
 │   ├── schemas.py         #   Request/response models
 │   └── service.py         #   Customer CRUD logic
-├── debts/                 # Debt tracking module
-│   ├── router.py          #   /debts/{business_id}, /debts/customers/{business_id}
-│   ├── models.py          #   Re-exports Debt from businesses
+├── debts/                 # Debt tracking + reminders module
+│   ├── router.py          #   /debts/{business_id}, /debts/customers/{business_id}, /debts/reminders/{business_id}
+│   ├── models.py          #   Debt, Transactions, Reminders
 │   ├── schemas.py         #   Request/response models
-│   └── service.py         #   Debt query logic
+│   └── service.py         #   Debt query + reminder scheduling logic
 ├── analytics/             # Dashboard & analytics module
 │   ├── router.py          #   /reports/*, /admin/crons/*
 │   ├── schemas.py         #   Request/response models
 │   └── service.py         #   Analytics aggregation logic
-├── celery_tasks/          # Background job module (APScheduler)
-│   ├── celery_app.py      #   Celery config *(unused — future migration)*
-│   ├── scheduler.py       #   APScheduler cron job definitions
+├── celery_tasks/          # Background job module (Celery + Beat)
+│   ├── celery_app.py      #   Celery config + beat schedule
 │   ├── sales_task.py      #   Daily/weekly/monthly summary generators
-│   ├── email_report.py    #   HTML email builder (Gmail SMTP)
+│   ├── email_report.py    #   HTML email builder + PDF receipt renderer
 │   ├── otp_task.py        #   OTP email verification task
-│   ├── schemas.py         #   Report-related schemas
-│   └── worker.py          #   Worker stub *(placeholder)*
+│   └── debt_reminders.py  #   Daily SMS debt-reminder dispatcher
 ├── middleware/
 │   ├── __init__.py
 │   ├── logging.py         #   Request logging middleware
@@ -255,6 +255,52 @@ Only `super_admin`, `admin`, and `manager` roles can update members. Non-super-a
 |---|---|---|
 | `/debts/{business_id}` | GET | Get outstanding debts for a business |
 | `/debts/customers/{business_id}` | GET | Get customers with outstanding debt |
+| `/debts/customers/{business_id}/{customer_id}` | GET | Get a single customer with their outstanding debt |
+| `/debts/update_customer_debt/{business_id}/{customer_id}` | PUT | Record a payment / settle a debt |
+| `/debts/customer_transactions/{business_id}/{customer_id}` | GET | Get payment history for a customer |
+| `/debts/reminders/{business_id}` | POST | Schedule an SMS reminder for a debt |
+
+---
+
+## Scheduled Debt Reminders
+
+Business admins, managers, and cashiers can schedule an automatic SMS reminder for a customer's outstanding debt. A Celery Beat job runs daily at **09:00 UTC** and sends an SMS for every active reminder whose date window includes today, as long as the debt is still unpaid.
+
+**Schedule a reminder:**
+
+```
+POST /debts/reminders/{business_id}
+Authorization: Bearer <token>   (roles: admin, manager, cashier, super_admin)
+```
+
+```json
+{
+  "debt_id": 12,
+  "customer_id": 7,
+  "start_date": "2026-07-28",
+  "end_date": "2026-07-31",
+  "time_of_day": "09:00",
+  "note": "Friendly follow-up on your balance"
+}
+```
+
+`start_date` and `end_date` default to the debt's due date minus 3 days and the due date respectively. `time_of_day` defaults to `09:00`. The SMS is sent to the customer's phone via the Africa's Talking API.
+
+**Beat schedule** (`src/celery_tasks/celery_app.py`):
+
+| Job | Schedule |
+|---|---|
+| Daily sales summary | Every day at 00:00 UTC |
+| Weekly sales summary | Every Monday at 00:00 UTC |
+| Monthly sales summary | 1st of the month at 00:00 UTC |
+| Debt reminders | Every day at 09:00 UTC |
+
+Run the worker and beat scheduler locally:
+
+```bash
+celery -A src.celery_tasks.celery_app worker --loglevel=info
+celery -A src.celery_tasks.celery_app beat --loglevel=info
+```
 
 ---
 
@@ -317,6 +363,7 @@ Background cron jobs run on schedule and email reports to business admins and ma
 - **Daily** — End-of-day sales summary
 - **Weekly** — Weekly performance overview
 - **Monthly** — Monthly revenue and inventory report
+- **Debt Reminders** — Daily SMS reminders for scheduled outstanding debts (see [Scheduled Debt Reminders](#scheduled-debt-reminders))
 
 ---
 
@@ -346,9 +393,18 @@ API_AUTH_KEY=your_api_auth_key
 # SendGrid (OTP emails)
 SENDGRID_API_KEY=your_sendgrid_api_key
 
+# Africa's Talking (debt reminder SMS)
+# Sandbox: username is always "sandbox", URL below is the sandbox endpoint
+SMS_KEY=your_africastalking_api_key
+SMS_USERNAME=sandbox
+SMS_SENDER_ID=your_sender_id_or_blank
+SMS_API_URL=https://api.sandbox.africastalking.com/version1/messaging
+
 # Redis *(optional)*
 REDIS_URL=redis://localhost:6379
 ```
+
+> **Note:** `SMS_API_URL` defaults to the Africa's Talking **sandbox** endpoint. Switch to `https://api.africastalking.com/version1/messaging` (and set `SMS_USERNAME` to your live app username) to send real SMS. Sandbox sends are simulated — they appear in the Africa's Talking dashboard but are never delivered to real phones.
 
 ---
 
