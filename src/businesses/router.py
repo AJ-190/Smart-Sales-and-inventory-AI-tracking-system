@@ -67,6 +67,9 @@ async def confirm_approval(post: schemas.Direction,
                      current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]))):
     return await biz_service.con_del_approval(post, business_id, db, current_user)
 
+@router.delete("/approvals/delete_approval/{business_id}/{approval_id}")
+async def delete_approval(business_id: int, approval_id: int, session = Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]))):
+        return await biz_service.delete_approval(business_id, approval_id, session, current_user)
 
 @router.delete("/leave_business/{business_id}/{member_id}", status_code=204)
 async def leave_business(business_id: int,

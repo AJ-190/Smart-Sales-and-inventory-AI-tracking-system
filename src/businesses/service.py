@@ -255,19 +255,20 @@ async def send_approval(post, db: AsyncSession, current_user):
         
         
         existing_user = (await db.execute(stmt)).scalars().first()
+
         if existing_user:
             if existing_user.status == bm.ApprovalStatus.rejected:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Approval sent and got rejected"
-                )
+                existing_user.status = bm.ApprovalStatus.pending
+                await db.commit()
+                await db.refresh(existing_user)
+                return existing_user
 
             if existing_user.status == bm.ApprovalStatus.pending:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval sent and pending.")
 
             if existing_user.status == bm.ApprovalStatus.approved:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You are already a member of the business")
-        
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval already approved.")
+
         if post.role not in [
             um.RoleEnum.cashier,
             um.RoleEnum.admin,
@@ -415,7 +416,35 @@ async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSessio
             "status": str(approval_user.status.value) if hasattr(approval_user.status, 'value') else str(approval_user.status),
             "requester": requester,
         }
-
+        
+        
+async def delete_approval(approval_id, business_id, session: AsyncSession, current_user):
+    with session.no_autoflush:
+        business = (
+            await session.execute(
+                select(bm.Business).where(bm.Business.business_id == business_id)
+            )
+        ).scalars().first()
+        if not business:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
+        
+        if current_user.role != um.RoleEnum.super_admin:
+            await business_authorized_access(current_user, business_id, session)
+        
+        approval = (
+            await session.execute(
+                select(bm.Approvals)
+                .where(bm.Approvals.business_id == business_id)
+                .where(bm.Approvals.approval_id == approval_id)
+            )
+        ).scalars().first()
+        if not approval:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval not found")
+        
+        
+        await session.delete(approval)
+        await session.commit()
+        return {"detail": "Approval deleted successfully"}
 
 async def business_authorized_access(current_user, business_id, db: AsyncSession):
     if current_user.role != bm.RoleEnum.super_admin:
@@ -438,23 +467,29 @@ async def leave_business(business_id, member_id, current_user: um.Users, session
     
     await business_authorized_access(current_user, business_id, session)
     
-    member = (
+    result = (
         await session.execute(
-            select(um.BusinessMember)
+            select(um.BusinessMember, bm.Approvals)
             .where(um.BusinessMember.business_id == business_id)
             .where(um.BusinessMember.user_id == member_id)
+            .join(bm.Approvals, bm.Approvals.requester_id == um.BusinessMember.member_id)
         )
-    ).scalar_one_or_none()
+    ).one_or_none()
+
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                         detail="User not found in the business")
+
+    member_, approvals = result
+
     
-    if not member:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
-                            detail="User not found in the business")
-    
-    if not (current_user.user_id == member.user_id or current_user.role in [um.RoleEnum.super_admin, um.RoleEnum.admin ]):
+    if not (current_user.user_id == member_.user_id or current_user.role in [um.RoleEnum.super_admin, um.RoleEnum.admin ]):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, 
                             detail="Unauthorized to perform this action")
-
-    await session.delete(member)
+    
+    
+    approvals.status = bm.ApprovalStatus.rejected
+    await session.delete(member_)
     await session.commit()
 
 
