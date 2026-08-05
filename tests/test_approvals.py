@@ -214,3 +214,64 @@ def test_approve_sets_correct_role(session):
     assert member.role == um.RoleEnum.manager
 
     app.dependency_overrides.clear()
+
+
+def test_delete_approval_removes_record(session):
+    def override():
+        yield session
+    app.dependency_overrides[get_db] = override
+    client = TestClient(app)
+
+    res = client.post("/users/sign_up", json={
+        "name": "AdminDel", "email": "admin_del@test.com",
+        "password": "TestPass123", "phone": "6666666666"
+    })
+    assert res.status_code == 201
+    admin_id = res.json()["user_id"]
+
+    async def _promote():
+        await session.execute(
+            update(um.Users).where(um.Users.user_id == admin_id).values(role=um.RoleEnum.super_admin)
+        )
+        await session.commit()
+    asyncio.run(_promote())
+
+    admin_token = auth_utils.AccessToken({"sub": str(admin_id), "role": "super_admin"})
+    client.headers["Authorization"] = f"Bearer {admin_token}"
+
+    res = client.post("/businesses/create", json={"name": "Del Shop"})
+    assert res.status_code == 201
+    business_id = res.json()["business_id"]
+
+    res = client.get(f"/businesses/business_key/{business_id}")
+    business_key = res.json()["business_key"]
+
+    res = client.post("/users/sign_up", json={
+        "name": "RequesterDel", "email": "req_del@test.com",
+        "password": "TestPass123", "phone": "7777777777"
+    })
+    requester_id = res.json()["user_id"]
+
+    requester_token = auth_utils.AccessToken({"sub": str(requester_id), "role": "user"})
+    client.headers["Authorization"] = f"Bearer {requester_token}"
+
+    res = client.post(
+        "/businesses/approvals/send_approval",
+        json={"business_key": business_key, "reason": "Join", "role": "cashier"},
+    )
+    assert res.status_code == 201
+    approval_id = res.json()["approval_id"]
+
+    client.headers["Authorization"] = f"Bearer {admin_token}"
+    res = client.delete(f"/businesses/approvals/delete_approval/{business_id}/{approval_id}")
+    assert res.status_code == 200, res.text
+
+    async def _check():
+        result = await session.execute(
+            select(bm.Approvals).where(bm.Approvals.approval_id == approval_id)
+        )
+        return result.scalar_one_or_none()
+
+    assert asyncio.run(_check()) is None
+
+    app.dependency_overrides.clear()

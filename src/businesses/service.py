@@ -418,7 +418,7 @@ async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSessio
         }
         
         
-async def delete_approval(approval_id, business_id, session: AsyncSession, current_user):
+async def delete_approval(business_id, approval_id, session: AsyncSession, current_user):
     with session.no_autoflush:
         business = (
             await session.execute(

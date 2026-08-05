@@ -78,8 +78,8 @@ async def schedule_reminders(business_id: int,
 
 @router.get("/reminders/{business_id}", response_model=list[schemas.ReminderResponse])
 async def get_reminders(business_id: int,
-                        post: schemas.GetReminders,
-                        current_user: um.Users = Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin])),
+                        post: Optional[schemas.GetReminders] = None,
+                        current_user: um.Users = Depends(auth_deps.role_checker([*roles])),
                         session: AsyncSession = Depends(get_db)):
     return await debt_service.get_reminders(business_id, current_user, session, post)
 

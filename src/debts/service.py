@@ -332,8 +332,10 @@ async def set_reminders(business_id, current_user: um.Users, session: AsyncSessi
 
 
 
-async def get_reminders(business_id, current_user: um.Users, session: AsyncSession, post: schemas.scheduleReminder):
+async def get_reminders(business_id, current_user: um.Users, session: AsyncSession, post: schemas.GetReminders | None = None):
     await service.business_authorized_access(current_user, business_id, session)
+    
+    post = post or schemas.GetReminders()
     
     reminders = (
         select(dm.Reminders)
@@ -376,7 +378,7 @@ async def edit_reminder(business_id, reminder_id, current_user: um.Users, sessio
     return reminder
 
 
-async def delete_reminder(business_id, customer_id, reminder_id, current_user: um.Users, session: AsyncSession):
+async def delete_reminder(business_id, reminder_id, current_user: um.Users, session: AsyncSession):
     await service.business_authorized_access(current_user, business_id, session)
     
     reminder = (
@@ -384,7 +386,6 @@ async def delete_reminder(business_id, customer_id, reminder_id, current_user: u
             select(dm.Reminders)
             .where(dm.Reminders.business_id == business_id)
             .where(dm.Reminders.reminder_id == reminder_id)
-            .where(dm.Reminders.customer_id == customer_id)
         )
     ).scalar_one_or_none()
     
