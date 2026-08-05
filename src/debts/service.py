@@ -330,3 +330,68 @@ async def set_reminders(business_id, current_user: um.Users, session: AsyncSessi
     await session.refresh(reminder)
     return reminder
 
+
+
+async def get_reminders(business_id, current_user: um.Users, session: AsyncSession, post: schemas.scheduleReminder):
+    await service.business_authorized_access(current_user, business_id, session)
+    
+    reminders = (
+        select(dm.Reminders)
+        .where(dm.Reminders.business_id == business_id)
+    )
+    
+    if post.customer_id:
+        reminders = reminders.where(dm.Reminders.customer_id == post.customer_id)
+        
+    if post.start_date:
+        reminders = reminders.where(func.date(dm.Reminders.start_date) >= post.start_date)
+        
+    if post.end_date:
+        reminders = reminders.where(func.date(dm.Reminders.end_date) <= post.end_date)
+        
+    result = await session.execute(reminders.order_by(dm.Reminders.created_at.desc()))
+    reminders_list = result.scalars().all()
+    
+    return reminders_list
+
+async def edit_reminder(business_id, reminder_id, current_user: um.Users, session: AsyncSession, post: schemas.UpdateReminder):
+    await service.business_authorized_access(current_user, business_id, session)
+    
+    reminder = (
+        await session.execute(
+            select(dm.Reminders)
+            .where(dm.Reminders.business_id == business_id)
+            .where(dm.Reminders.reminder_id == reminder_id)
+        )
+    ).scalar_one_or_none()
+    
+    if not reminder:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No reminder found for this customer")
+    
+    for key, value in post.model_dump(exclude_unset=True).items():
+        setattr(reminder, key, value)
+        
+    await session.commit()
+    await session.refresh(reminder)
+    return reminder
+
+
+async def delete_reminder(business_id, customer_id, reminder_id, current_user: um.Users, session: AsyncSession):
+    await service.business_authorized_access(current_user, business_id, session)
+    
+    reminder = (
+        await session.execute(
+            select(dm.Reminders)
+            .where(dm.Reminders.business_id == business_id)
+            .where(dm.Reminders.reminder_id == reminder_id)
+            .where(dm.Reminders.customer_id == customer_id)
+        )
+    ).scalar_one_or_none()
+    
+    if not reminder:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No reminder found for this customer")
+    
+    await session.delete(reminder)
+    await session.commit()
+    return reminder
+

@@ -69,9 +69,31 @@ async def get_customer_transactions(business_id: int,
     return await debt_service.get_transactions(business_id, customer_id, current_user, session)
     
     
-@router.post("/reminders/{business_id}")
+@router.post("/reminders/{business_id}", response_model=schemas.ReminderResponse)
 async def schedule_reminders(business_id: int, 
                              post: schemas.scheduleReminder,
                              current_user: um.Users = Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin])),
                              session: AsyncSession = Depends(get_db)):
     return await debt_service.set_reminders(business_id,current_user, session, post)
+
+@router.get("/reminders/{business_id}", response_model=list[schemas.ReminderResponse])
+async def get_reminders(business_id: int,
+                        post: schemas.GetReminders,
+                        current_user: um.Users = Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin])),
+                        session: AsyncSession = Depends(get_db)):
+    return await debt_service.get_reminders(business_id, current_user, session, post)
+
+@router.put("/reminders/{business_id}/{reminder_id}", response_model=schemas.ReminderResponse)
+async def update_reminder(business_id: int,
+                          reminder_id: int,
+                          post: schemas.UpdateReminder,
+                          current_user: um.Users = Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin])),
+                          session: AsyncSession = Depends(get_db)):
+    return await debt_service.edit_reminder(business_id, reminder_id, current_user, session, post)
+
+@router.delete("/reminders/{business_id}/{reminder_id}")
+async def delete_reminder(business_id: int,
+                          reminder_id: int,
+                          current_user: um.Users = Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin])),
+                          session: AsyncSession = Depends(get_db)):
+    return await debt_service.delete_reminder(business_id, reminder_id, current_user, session)

@@ -73,3 +73,37 @@ class scheduleReminder(BaseModel):
     end_date: Optional[date] = None
     time_of_day: Optional[time] = None
     note: str
+    
+
+class ReminderResponse(BaseModel):
+    reminder_id: int
+    debt_id: int
+    business_id: int
+    customer_id: int
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    time_of_day: Optional[time] = None
+    note: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+    
+class UpdateReminder(BaseModel):
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    time_of_day: Optional[time] = None
+    note: Optional[str] = None
+    is_active: Optional[bool] = None
+
+    
+    
+class GetReminders(BaseModel):
+    debt_id: Optional[int] = None
+    customer_id: Optional[int] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    time_of_day: Optional[time] = None
+    note: Optional[str] = None
+    is_active: Optional[bool] = None
