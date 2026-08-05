@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from src.database import get_db
+from src.db.database import get_db
 from src.debts import service as debt_service
 from src.auth import dependencies as auth_deps
 from src.debts import schemas

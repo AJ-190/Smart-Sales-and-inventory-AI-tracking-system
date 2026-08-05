@@ -7,6 +7,12 @@ from src.users import models as um
 from src.businesses import service
 from src.businesses import models as bm
 from sqlalchemy.exc import IntegrityError
+from src.db.cache import CacheManager, CacheKey, build_keys
+
+
+def _cache_manager() -> CacheManager:
+    from src.main import app
+    return CacheManager(app.state.redis)
 
 async def create_customer(db: AsyncSession, current_user, customer: schemas.CustomerCreate, business_id: int):
     await service.business_authorized_access(current_user, business_id, db)
@@ -37,13 +43,16 @@ async def create_customer(db: AsyncSession, current_user, customer: schemas.Cust
         )
 
     await db.refresh(customer_add)
+    await _cache_manager().delete_by_pattern(
+        build_keys(CacheKey.GET_CUSTOMERS, user=current_user.user_id, business_id=business_id)
+    )
     return customer_add
 
 
 
 async def get_customers(business_id: int,
                         db: AsyncSession,
-                        current_user: str,
+                        current_user: um.Users,
                         search: str,
                         skip: int,
                         limit: int):
@@ -54,6 +63,18 @@ async def get_customers(business_id: int,
         select(cm.Customer)
         .where(cm.Customer.business_id == business_id)
     )
+    
+    cache_key = build_keys(
+        CacheKey.GET_CUSTOMERS,
+        user=current_user.user_id,
+        business_id=business_id,
+        search=search or "",
+        skip=skip,
+        limit=limit,
+    )
+    cache_data = await _cache_manager().get(cache_key)
+    if cache_data is not None:
+        return cache_data
     
     if search:
         search_ = f"%{search}%"
@@ -70,17 +91,35 @@ async def get_customers(business_id: int,
     
     if not results:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No customer found")
+    customers = []
     
-    return results.scalars().all()
+    for customer in results.scalars():
+        customers.append({
+            "customer_id": customer.customer_id,
+            "business_id": customer.business_id,
+            "name": customer.name,
+            "phone": customer.phone,
+            "email": customer.email,
+            "address": customer.address,
+            "is_active": customer.is_active,
+            "created_at": customer.created_at.isoformat() if customer.created_at else None,
+        })
+    await _cache_manager().set(cache_key, customers)
+
+    return customers
     
     
 async def get_customer(business_id: int,
                        customer_id: int,
                        db: AsyncSession,
-                       current_user: str
+                       current_user: um.Users
                        ):
     
         await service.business_authorized_access(current_user, business_id, db)
+        
+        cache_data =  await _cache_manager().get(build_keys(CacheKey.GET_CUSTOMER_BY_ID, user = current_user.user_id, business_id=business_id, customer_id=customer_id))
+        if cache_data:
+            return cache_data
         
         customer = (
             await(db.execute(
@@ -94,6 +133,17 @@ async def get_customer(business_id: int,
         
         if not customer:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No customer found.")
+        
+        await _cache_manager().set(build_keys(CacheKey.GET_CUSTOMER_BY_ID, user = current_user.user_id, business_id=business_id, customer_id=customer_id), {
+            "customer_id": customer.customer_id,
+            "business_id": customer.business_id,
+            "name": customer.name,
+            "phone": customer.phone,
+            "email": customer.email,
+            "address": customer.address,
+            "is_active": customer.is_active,
+            "created_at": customer.created_at.isoformat() if customer.created_at else None,
+        })
         
         return customer
         
@@ -143,6 +193,12 @@ async def update_customer(customer: schemas.CustomerUpdate,
         
     await db.commit()
     await db.refresh(customer_id_exist)
+    await _cache_manager().delete_by_pattern(
+        build_keys(CacheKey.GET_CUSTOMERS, user=current_user.user_id, business_id=business_id)
+    )
+    await _cache_manager().delete(
+        build_keys(CacheKey.GET_CUSTOMER_BY_ID, user=current_user.user_id, business_id=business_id, customer_id=customer_id)
+    )
     return customer_id_exist
 
 
@@ -178,6 +234,12 @@ async def deactivate_customer(
 
     await db.commit()
     await db.refresh(customer)
+    await _cache_manager().delete_by_pattern(
+        build_keys(CacheKey.GET_CUSTOMERS, user=current_user.user_id, business_id=business_id)
+    )
+    await _cache_manager().delete(
+        build_keys(CacheKey.GET_CUSTOMER_BY_ID, user=current_user.user_id, business_id=business_id, customer_id=customer_id)
+    )
     return customer
 
 
@@ -210,4 +272,10 @@ async def delete_customer(business_id: int,
     
     await db.delete(customer)
     await db.commit()
+    await _cache_manager().delete_by_pattern(
+        build_keys(CacheKey.GET_CUSTOMERS, user=current_user.user_id, business_id=business_id)
+    )
+    await _cache_manager().delete(
+        build_keys(CacheKey.GET_CUSTOMER_BY_ID, user=current_user.user_id, business_id=business_id, customer_id=customer_id)
+    )
     return {"msg": "customer is deleted successfully."}

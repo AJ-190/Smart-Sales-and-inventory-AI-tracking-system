@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from src.errors.handlers import custom_http_exception_handler
-from src.database import engine, Base, get_db
+from src.db.database import engine, Base, get_db
 from src.middleware.auth_middleware import auth_middleware
 from src.businesses.router import router as main_router
 from src.businesses import service as biz_service

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from typing import Optional
-from src.database import get_db
+from src.db.database import get_db
 from src.products import schemas, service as product_service
 from src.auth import dependencies as auth_deps
 from src.users import models as um

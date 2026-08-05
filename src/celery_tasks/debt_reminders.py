@@ -94,7 +94,7 @@ async def _dispatch(db) -> None:
 
 @celery.task
 def dispatch_debt_reminders():
-    from src.database import get_async_session_maker
+    from src.db.database import get_async_session_maker
 
     async def _run():
         async with get_async_session_maker() as session:

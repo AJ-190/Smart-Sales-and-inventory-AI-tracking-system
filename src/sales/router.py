@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from datetime import date
-from src.database import get_db
+from src.db.database import get_db
 from src.sales import schemas, service as sale_service
 from src.auth import dependencies as auth_deps
 from src.users import models as um

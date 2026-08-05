@@ -1,7 +1,7 @@
 from fastapi import status, HTTPException, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from src.database import get_db
+from src.db.database import get_db
 from src.users import models as um
 from src.users import schemas as users_schema
 from src.db.redis import check_jti_blocked

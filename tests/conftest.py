@@ -3,7 +3,7 @@ import asyncio
 from unittest.mock import AsyncMock
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import StaticPool
-from src.database import get_db, Base
+from src.db.database import get_db, Base
 from src.main import app
 from fastapi.testclient import TestClient
 from src.auth import utils as auth_utils
@@ -47,6 +47,9 @@ def session(async_engine):
 
 @pytest.fixture(autouse=True)
 def setup_redis():
+    async def _no_keys(*args, **kwargs):
+        if False:
+            yield
     app.state.redis = AsyncMock()
     app.state.redis.get.return_value = None
     app.state.redis.incr.return_value = 1
@@ -54,6 +57,7 @@ def setup_redis():
     app.state.redis.hset = AsyncMock()
     app.state.redis.hincrby = AsyncMock()
     app.state.redis.expire = AsyncMock()
+    app.state.redis.scan_iter = _no_keys
     with patch("src.celery_tasks.otp_task._send_otp_email", new_callable=AsyncMock, return_value=True):
         yield
 

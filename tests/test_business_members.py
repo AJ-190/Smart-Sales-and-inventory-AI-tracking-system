@@ -4,7 +4,7 @@ from sqlalchemy import select, update
 from src.users import models as um
 from src.auth import utils as auth_utils
 from fastapi.testclient import TestClient
-from src.database import get_db
+from src.db.database import get_db
 from src.main import app
 
 

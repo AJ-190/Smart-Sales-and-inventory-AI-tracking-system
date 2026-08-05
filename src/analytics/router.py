@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from datetime import date
-from src.database import get_db
+from src.db.database import get_db
 from src.analytics import schemas, service as analytics_service
 from src.products.schemas import LowStockResponse
 from src.sales.schemas import DebtResponse

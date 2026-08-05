@@ -1,5 +1,5 @@
 from fastapi import status, HTTPException, Depends, APIRouter
-from src.database import get_db
+from src.db.database import get_db
 from src.users import schemas, service as users_service, models as um
 from src.auth import dependencies as auth_deps
 

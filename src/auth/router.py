@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Body, Depends, status, HTTPException
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
-from src.database import get_db
+from src.db.database import get_db
 from src.auth import schemas, service as auth_service, utils
 from src.celery_tasks.otp_task import send_otp, verify_otp
 from src.users.schemas import UserSignUpResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.database import get_db
+from src.db.database import get_db
 from src.users import service, models as um, schemas as us_schema
 from src.auth.dependencies import role_checker
 from sqlalchemy import select
