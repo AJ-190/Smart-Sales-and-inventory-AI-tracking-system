@@ -41,7 +41,7 @@ async def add_business(post, db: AsyncSession, current_user):
 
     if current_user.role != um.RoleEnum.super_admin:
         role_update = user_schemas.UserUpdate.model_validate({"role": um.RoleEnum.admin})
-        await update_user(current_user.user_id, role_update, db, current_user)
+        await update_user(current_user.user_id, role_update, db, current_user, internal_call=True)
 
     business_member = um.BusinessMember(
         user_id=current_user.user_id,

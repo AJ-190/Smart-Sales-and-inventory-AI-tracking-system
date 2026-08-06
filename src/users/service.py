@@ -162,7 +162,7 @@ async def get_user(id, db: AsyncSession, current_user):
     return user_
 
 
-async def update_user(id: int, post: schemas.UserUpdate, db: AsyncSession, current_user):
+async def update_user(id: int, post: schemas.UserUpdate, db: AsyncSession, current_user, internal_call: bool = False):
     result = await db.execute(select(um.Users).where(um.Users.user_id == id))
     user_ = result.scalar_one_or_none()
 
@@ -171,6 +171,26 @@ async def update_user(id: int, post: schemas.UserUpdate, db: AsyncSession, curre
 
     if not (current_user.role == um.RoleEnum.super_admin or current_user.user_id == id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unauthorized to perform this action")
+
+    if post.role is not None and not internal_call:
+        if current_user.role != um.RoleEnum.super_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only super admin can change roles",
+            )
+        try:
+            post.role = um.RoleEnum(post.role).value
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid role: {post.role}. Must be one of: {[r.value for r in um.RoleEnum]}",
+            )
+
+    if current_user.role != um.RoleEnum.super_admin and post.email == get_settings().SUPER_ADMIN_EMAIL:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This email cannot be used",
+        )
 
     if post.password:
         post.password = auth_utils.hash(post.password)

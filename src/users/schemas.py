@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, ConfigDict, field_validator
 from typing import Optional
-
+from datetime import datetime
 
 class UserSignUp(BaseModel):
     name: str
@@ -45,7 +45,7 @@ class UsersOutUsers(BaseModel):
     name: str
     email: str
     is_verified: bool = False
-    created_at: Optional[str] = None
+    created_at: Optional[datetime] = None
 
     @field_validator("is_verified", mode="before")
     @classmethod
