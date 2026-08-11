@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from src.database import Base, create_async_engine
+from src.db.database import Base, create_async_engine
 import src.users.models
 import src.businesses.models
 import src.debts.models

@@ -20,7 +20,7 @@ class Users(Base):
     user_id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True)
-    is_verified = Column(Boolean, default=False, nullable=True)
+    is_verified = Column(Boolean, default=False)
     phone = Column(String, nullable=True)
     password = Column(String, nullable=False)
     role = Column(SAEnum(RoleEnum), default=RoleEnum.user, nullable=False)

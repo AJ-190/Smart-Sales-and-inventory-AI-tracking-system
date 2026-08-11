@@ -18,7 +18,17 @@ class UserSignUp(BaseModel):
         if not any(char.isupper() for char in value):
             raise ValueError("Password must contain at least one uppercase letter")
         return value
+    
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, email):
+        if not any(char.find("@") for char in email):
+            raise ValueError("Email must contain '@'")
 
+        if  email.split("@")[1] not in ["gmail.com", "outlook.com", "icloud.com", "yahoo.com"]:
+            raise ValueError("Email domain name not supported")
+        return email
+        
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
