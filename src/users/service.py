@@ -162,7 +162,7 @@ async def get_user(id, db: AsyncSession, current_user):
     return user_
 
 
-async def update_user(id: int, post: schemas.UserUpdate, db: AsyncSession, current_user, internal_call: bool = False):
+async def update_user(id: int, post: schemas.UserUpdate, db: AsyncSession, current_user: um.Users, internal_call: bool = False):
     result = await db.execute(select(um.Users).where(um.Users.user_id == id))
     user_ = result.scalar_one_or_none()
 
@@ -173,11 +173,14 @@ async def update_user(id: int, post: schemas.UserUpdate, db: AsyncSession, curre
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unauthorized to perform this action")
 
     if post.role is not None and not internal_call:
-        if current_user.role != um.RoleEnum.super_admin:
+        if (current_user.role != um.RoleEnum.super_admin or current_user.user_id != id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only super admin can change roles",
             )
+            
+        if post.role == um.RoleEnum.super_admin:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unahtorixed to prerform this action.")
         try:
             post.role = um.RoleEnum(post.role).value
         except ValueError:

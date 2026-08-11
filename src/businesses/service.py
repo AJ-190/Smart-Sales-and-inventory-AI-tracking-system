@@ -522,6 +522,8 @@ async def update_business_member(business_id: int, member_id: int, post: schemas
     update_data = post.model_dump(exclude_unset=True)
 
     if "role" in update_data:
+        if update_data.role == um.RoleEnum.super_admin:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action.")
         try:
             role_value = um.RoleEnum(update_data["role"])
         except ValueError:
