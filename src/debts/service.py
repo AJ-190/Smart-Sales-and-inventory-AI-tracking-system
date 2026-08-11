@@ -298,9 +298,6 @@ async def get_transactions(business_id, customer_id, current_user: um.Users, ses
 async def set_reminders(business_id, current_user: um.Users, session: AsyncSession, post: schemas.scheduleReminder):
     await service.business_authorized_access(current_user, business_id, session)
     
-    customer = await cv.get_customer(business_id, post.customer_id, session, current_user)
-    
-    
     customer_with_debt = (
         await session.execute(
             select(dm.Debt)
@@ -310,8 +307,20 @@ async def set_reminders(business_id, current_user: um.Users, session: AsyncSessi
         )
     ).scalar_one_or_none()
     
+    reminder_exist = (
+        await session.execute(
+            select(dm.Reminders)
+            .where(dm.Reminders.debt_id == post.debt_id)
+            .where(dm.Reminders.business_id == business_id)
+            .where(dm.Reminders.customer_id == post.customer_id)
+        )
+    ).scalar_one_or_none()
+    
     if not customer_with_debt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No debt found for this customer")
+    
+    if reminder_exist:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Reminder for thisi customer already set")
     
     data = post.model_dump()
     data["business_id"] = business_id
