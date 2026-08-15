@@ -256,5 +256,5 @@ async def delete_customer(business_id, customer_id, db: AsyncSession, current_us
     await _cache_manager().delete(build_keys(CacheKey.GET_CUSTOMER_BY_ID, user = current_user.user_id, business_id=business_id, customer_id=customer_id))
     
     await db.delete(customer)
-    await db.commit(customer)
+    await db.commit()
     return
