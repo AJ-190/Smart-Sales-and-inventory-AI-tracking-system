@@ -48,7 +48,7 @@ app.include_router(customers_router)
 
 @app.get("/")
 async def root():
-    return "Gyg is running"
+    return "API is running"
 
 
 @app.post("/leave_business/{business_id}")

@@ -155,6 +155,8 @@ async def update_customer(customer: schemas.CustomerUpdate,
     
     await service.business_authorized_access(current_user, business_id, db)
     
+    cache_key = build_keys(CacheKey.GET_CUSTOMER_BY_ID, user=current_user.user_id, business_id=business_id, customer_id=customer_id)
+    
     base_query = (
     
             select(cm.Customer)
@@ -196,9 +198,8 @@ async def update_customer(customer: schemas.CustomerUpdate,
     await _cache_manager().delete_by_pattern(
         build_keys(CacheKey.GET_CUSTOMERS, user=current_user.user_id, business_id=business_id)
     )
-    await _cache_manager().delete(
-        build_keys(CacheKey.GET_CUSTOMER_BY_ID, user=current_user.user_id, business_id=business_id, customer_id=customer_id)
-    )
+    await _cache_manager().delete(cache_key)
+    await _cache_manager().set(cache_key,customer_id_exist )
     return customer_id_exist
 
 
@@ -247,35 +248,13 @@ async def deactivate_customer(
         
     
     
-async def delete_customer(business_id: int, 
-                          customer_id: int, 
-                          db: AsyncSession, 
-                          current_user: str
-                          ):
-    await service.business_authorized_access(current_user, business_id, db)
+async def delete_customer(business_id, customer_id, db: AsyncSession, current_user):
+    await service.business_authorized_access(current_user, business_id,db)
     
+    customer = await get_customer(business_id,customer_id,db, current_user)
     
-    customer = (
-        await(
-            db.execute(
-                select(cm.Customer)
-                .where(cm.Customer.business_id == business_id)
-                .where(cm.Customer.customer_id == customer_id)
-                
-            )
-            
-        )
-    ).scalar_one_or_none()
-    
-    if not customer:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer does not exist")
+    await _cache_manager().delete(build_keys(CacheKey.GET_CUSTOMER_BY_ID, user = current_user.user_id, business_id=business_id, customer_id=customer_id))
     
     await db.delete(customer)
-    await db.commit()
-    await _cache_manager().delete_by_pattern(
-        build_keys(CacheKey.GET_CUSTOMERS, user=current_user.user_id, business_id=business_id)
-    )
-    await _cache_manager().delete(
-        build_keys(CacheKey.GET_CUSTOMER_BY_ID, user=current_user.user_id, business_id=business_id, customer_id=customer_id)
-    )
-    return {"msg": "customer is deleted successfully."}
+    await db.commit(customer)
+    return

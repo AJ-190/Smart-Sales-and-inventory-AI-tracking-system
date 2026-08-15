@@ -58,7 +58,8 @@ def setup_redis():
     app.state.redis.hincrby = AsyncMock()
     app.state.redis.expire = AsyncMock()
     app.state.redis.scan_iter = _no_keys
-    with patch("src.celery_tasks.otp_task._send_otp_email", new_callable=AsyncMock, return_value=True):
+    with patch("src.celery_tasks.otp_task._send_otp_email", new_callable=AsyncMock, return_value=True), \
+         patch("src.celery_tasks.email_report.EmailReport.send", return_value=True):
         yield
 
 @pytest.fixture

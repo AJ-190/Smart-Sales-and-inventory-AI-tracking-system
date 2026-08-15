@@ -16,7 +16,7 @@ def test_approval_creates_business_member(session):
     client = TestClient(app)
 
     res = client.post("/users/sign_up", json={
-        "name": "Admin", "email": "admin_approval@test.com",
+        "name": "Admin", "email": "admin_approval@gmail.com",
         "password": "TestPass123", "phone": "0000000000"
     })
     assert res.status_code == 201
@@ -41,7 +41,7 @@ def test_approval_creates_business_member(session):
     business_key = res.json()["business_key"]
 
     res = client.post("/users/sign_up", json={
-        "name": "Requester", "email": "req_approval@test.com",
+        "name": "Requester", "email": "req_approval@gmail.com",
         "password": "TestPass123", "phone": "1111111111"
     })
     assert res.status_code == 201
@@ -90,7 +90,7 @@ def test_reject_does_not_create_business_member(session):
     client = TestClient(app)
 
     res = client.post("/users/sign_up", json={
-        "name": "Admin2", "email": "admin_reject@test.com",
+        "name": "Admin2", "email": "admin_reject@gmail.com",
         "password": "TestPass123", "phone": "2222222222"
     })
     admin_id = res.json()["user_id"]
@@ -112,7 +112,7 @@ def test_reject_does_not_create_business_member(session):
     business_key = res.json()["business_key"]
 
     res = client.post("/users/sign_up", json={
-        "name": "Requester2", "email": "req_reject@test.com",
+        "name": "Requester2", "email": "req_reject@gmail.com",
         "password": "TestPass123", "phone": "3333333333"
     })
     requester_id = res.json()["user_id"]
@@ -156,7 +156,7 @@ def test_approve_sets_correct_role(session):
     client = TestClient(app)
 
     res = client.post("/users/sign_up", json={
-        "name": "Admin3", "email": "admin_role@test.com",
+        "name": "Admin3", "email": "admin_role@gmail.com",
         "password": "TestPass123", "phone": "4444444444"
     })
     admin_id = res.json()["user_id"]
@@ -178,7 +178,7 @@ def test_approve_sets_correct_role(session):
     business_key = res.json()["business_key"]
 
     res = client.post("/users/sign_up", json={
-        "name": "Requester3", "email": "req_role@test.com",
+        "name": "Requester3", "email": "req_role@gmail.com",
         "password": "TestPass123", "phone": "5555555555"
     })
     requester_id = res.json()["user_id"]
@@ -223,7 +223,7 @@ def test_delete_approval_removes_record(session):
     client = TestClient(app)
 
     res = client.post("/users/sign_up", json={
-        "name": "AdminDel", "email": "admin_del@test.com",
+        "name": "AdminDel", "email": "admin_del@gmail.com",
         "password": "TestPass123", "phone": "6666666666"
     })
     assert res.status_code == 201
@@ -247,7 +247,7 @@ def test_delete_approval_removes_record(session):
     business_key = res.json()["business_key"]
 
     res = client.post("/users/sign_up", json={
-        "name": "RequesterDel", "email": "req_del@test.com",
+        "name": "RequesterDel", "email": "req_del@gmail.com",
         "password": "TestPass123", "phone": "7777777777"
     })
     requester_id = res.json()["user_id"]

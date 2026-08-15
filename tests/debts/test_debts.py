@@ -10,7 +10,7 @@ from src.main import app
 
 def _setup_business_with_debt(client, session):
     res = client.post("/users/sign_up", json={
-        "name": "RemAdmin", "email": "rem_admin@test.com",
+        "name": "RemAdmin", "email": "rem_admin@gmail.com",
         "password": "TestPass123", "phone": "8888888888"
     })
     assert res.status_code == 201
@@ -31,7 +31,7 @@ def _setup_business_with_debt(client, session):
     business_id = res.json()["business_id"]
 
     res = client.post(f"/business/customers/{business_id}", json={
-        "name": "Debtor", "phone": "0555555555", "email": "debtor@test.com"
+        "name": "Debtor", "phone": "0555555555", "email": "debtor@gmail.com"
     })
     assert res.status_code == 200, res.text
     customer_id = res.json()["customer_id"]

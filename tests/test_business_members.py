@@ -15,7 +15,7 @@ def test_update_member_role(session):
     client = TestClient(app)
 
     res = client.post("/users/sign_up", json={
-        "name": "Admin4", "email": "admin_member_role@test.com",
+        "name": "Admin4", "email": "admin_member_role@gmail.com",
         "password": "TestPass123", "phone": "6000000000"
     })
     admin_id = res.json()["user_id"]
@@ -37,7 +37,7 @@ def test_update_member_role(session):
     business_key = res.json()["business_key"]
 
     res = client.post("/users/sign_up", json={
-        "name": "Role Member", "email": "role_member@test.com",
+        "name": "Role Member", "email": "role_member@gmail.com",
         "password": "TestPass123", "phone": "6000000001"
     })
     user_id = res.json()["user_id"]
@@ -90,7 +90,7 @@ def test_update_member_deactivate(session):
     client = TestClient(app)
 
     res = client.post("/users/sign_up", json={
-        "name": "Admin5", "email": "admin_member_deact@test.com",
+        "name": "Admin5", "email": "admin_member_deact@gmail.com",
         "password": "TestPass123", "phone": "6100000000"
     })
     admin_id = res.json()["user_id"]
@@ -112,7 +112,7 @@ def test_update_member_deactivate(session):
     business_key = res.json()["business_key"]
 
     res = client.post("/users/sign_up", json={
-        "name": "Deact Member", "email": "deact_member@test.com",
+        "name": "Deact Member", "email": "deact_member@gmail.com",
         "password": "TestPass123", "phone": "6100000001"
     })
     user_id = res.json()["user_id"]
@@ -163,7 +163,7 @@ def test_update_member_role_and_active(session):
     client = TestClient(app)
 
     res = client.post("/users/sign_up", json={
-        "name": "Admin6", "email": "admin_member_both@test.com",
+        "name": "Admin6", "email": "admin_member_both@gmail.com",
         "password": "TestPass123", "phone": "6200000000"
     })
     admin_id = res.json()["user_id"]
@@ -185,7 +185,7 @@ def test_update_member_role_and_active(session):
     business_key = res.json()["business_key"]
 
     res = client.post("/users/sign_up", json={
-        "name": "Both Member", "email": "both_member@test.com",
+        "name": "Both Member", "email": "both_member@gmail.com",
         "password": "TestPass123", "phone": "6200000001"
     })
     user_id = res.json()["user_id"]
@@ -237,7 +237,7 @@ def test_update_member_unauthorized(session):
     client = TestClient(app)
 
     res = client.post("/users/sign_up", json={
-        "name": "Admin7", "email": "admin_member_unauth@test.com",
+        "name": "Admin7", "email": "admin_member_unauth@gmail.com",
         "password": "TestPass123", "phone": "6300000000"
     })
     admin_id = res.json()["user_id"]
@@ -259,7 +259,7 @@ def test_update_member_unauthorized(session):
     business_key = res.json()["business_key"]
 
     res = client.post("/users/sign_up", json={
-        "name": "Unauth Member", "email": "unauth_member@test.com",
+        "name": "Unauth Member", "email": "unauth_member@gmail.com",
         "password": "TestPass123", "phone": "6300000001"
     })
     user_id = res.json()["user_id"]
@@ -309,7 +309,7 @@ def test_update_member_not_found(session):
     client = TestClient(app)
 
     res = client.post("/users/sign_up", json={
-        "name": "Admin8", "email": "admin_member_notfound@test.com",
+        "name": "Admin8", "email": "admin_member_notfound@gmail.com",
         "password": "TestPass123", "phone": "6400000000"
     })
     admin_id = res.json()["user_id"]
@@ -343,7 +343,7 @@ def test_update_member_invalid_role(session):
     client = TestClient(app)
 
     res = client.post("/users/sign_up", json={
-        "name": "Admin9", "email": "admin_member_invalid@test.com",
+        "name": "Admin9", "email": "admin_member_invalid@gmail.com",
         "password": "TestPass123", "phone": "6500000000"
     })
     admin_id = res.json()["user_id"]
@@ -365,7 +365,7 @@ def test_update_member_invalid_role(session):
     business_key = res.json()["business_key"]
 
     res = client.post("/users/sign_up", json={
-        "name": "InvalidRole Member", "email": "invalidrole_member@test.com",
+        "name": "InvalidRole Member", "email": "invalidrole_member@gmail.com",
         "password": "TestPass123", "phone": "6500000001"
     })
     user_id = res.json()["user_id"]
@@ -415,7 +415,7 @@ def test_update_member_wrong_business(session):
     client = TestClient(app)
 
     res = client.post("/users/sign_up", json={
-        "name": "Admin10", "email": "admin_member_wrongbiz@test.com",
+        "name": "Admin10", "email": "admin_member_wrongbiz@gmail.com",
         "password": "TestPass123", "phone": "6600000000"
     })
     admin_id = res.json()["user_id"]
@@ -437,7 +437,7 @@ def test_update_member_wrong_business(session):
     business_key = res.json()["business_key"]
 
     res = client.post("/users/sign_up", json={
-        "name": "WrongBiz Member", "email": "wrongbiz_member@test.com",
+        "name": "WrongBiz Member", "email": "wrongbiz_member@gmail.com",
         "password": "TestPass123", "phone": "6600000001"
     })
     user_id = res.json()["user_id"]
@@ -487,7 +487,7 @@ def test_update_member_no_auth(session):
     client = TestClient(app)
 
     res = client.post("/users/sign_up", json={
-        "name": "Admin11", "email": "admin_member_noauth@test.com",
+        "name": "Admin11", "email": "admin_member_noauth@gmail.com",
         "password": "TestPass123", "phone": "6700000000"
     })
     admin_id = res.json()["user_id"]
@@ -509,7 +509,7 @@ def test_update_member_no_auth(session):
     business_key = res.json()["business_key"]
 
     res = client.post("/users/sign_up", json={
-        "name": "NoAuth Member", "email": "noauth_member@test.com",
+        "name": "NoAuth Member", "email": "noauth_member@gmail.com",
         "password": "TestPass123", "phone": "6700000001"
     })
     user_id = res.json()["user_id"]

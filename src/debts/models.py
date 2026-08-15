@@ -29,7 +29,7 @@ class Debt(Base):
 class Transactions(Base):
     __tablename__ = "transactions"
     transaction_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
-    debt_id = Column(Integer, ForeignKey("debts.debt_id"), nullable=False)
+    debt_id = Column(Integer, ForeignKey("debts.debt_id"), nullable=True)
     performer_id= Column(Integer, ForeignKey("users.user_id"), nullable=False)
     business_id=Column(Integer, ForeignKey("businesses.business_id"), nullable=False)
     customer_id=Column(Integer, ForeignKey("customers.customer_id"), nullable=True)
