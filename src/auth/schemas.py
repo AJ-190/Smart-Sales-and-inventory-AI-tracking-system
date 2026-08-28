@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, validator, SecretStr
+from pydantic import BaseModel, EmailStr, validator, SecretStr, field_validator
 from typing import Optional
 
 
@@ -38,4 +38,24 @@ class Otp_veriification_code(BaseModel):
     
 class Email(BaseModel):
     email: EmailStr
+
+class OtpCode(BaseModel):
+    otp: str
     
+class Passwords(BaseModel):
+    old_password: SecretStr
+    new_password: SecretStr
+    conf_password: SecretStr
+    otp: str
+    
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, value):
+        pw = value.get_secret_value() if isinstance(value, SecretStr) else value
+        if len(value) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if not any(char.isdigit() for char in pw):
+            raise ValueError("Password must contain at least one number")
+        if not any(char.isupper() for char in pw):
+            raise ValueError("Password must contain at least one uppercase letter")
+        return value

@@ -10,6 +10,8 @@ from src.db.database import get_db
 from src.users import service, models as um, schemas as us_schema
 from src.auth.dependencies import role_checker
 from sqlalchemy import select
+from pydantic import SecretStr
+from src.auth.utils import verify
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -17,6 +19,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 class EmailRequest(BaseModel):
     email: EmailStr
 
+allowed_roles = {um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.viewer, um.RoleEnum.user}
 
 @router.post("/login", response_model=schemas.Token)
 async def login(
@@ -77,6 +80,24 @@ async def verify_forgot_password(otp: schemas.Otp_veriification_code,
     await session.commit()
     await session.refresh(user)
     return user
+
+@router.post("/verify/change_password", status_code=200)
+async def change_password(passwords: schemas.Passwords, current_user = Depends(role_checker([*allowed_roles])), session: AsyncSession = Depends(get_db)):
+    return await auth_service.change_password(current_user, session, passwords)
+
+@router.post("/verify/password", status_code=200)
+async def verify_password(password: SecretStr, current_user: um.Users = Depends(role_checker([*allowed_roles])), session: AsyncSession = Depends(get_db)):
+    user = (await session.execute(select(um.Users).where(um.Users.user_id == current_user.user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    
+    if not verify(password.get_secret_value(), user.password):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="incorrect passoword")
+    return 
+
+@router.post("/otp/verify_change_password", status_code=200)
+async def verify_change_password_otp(payload: schemas.OtpCode, current_user = Depends(role_checker(allowed_roles))):
+    return await auth_service.verify_change_password_otp(current_user, payload.otp)
     
 @router.post("/otp/verification", response_model=UserSignUpResponse)
 async def verify_otp_code(otp: schemas.Otp_veriification_code, 

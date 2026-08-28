@@ -6,6 +6,7 @@ from sqlalchemy import select
 from src.users import models as um
 from src.auth import schemas, utils as auth_utils
 from src.config import get_settings
+from src.celery_tasks.otp_task import send_otp, verify_otp
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
@@ -64,6 +65,31 @@ async def refresh(payload: schemas.Token, db: AsyncSession):
         "refresh_token": new_refresh_token,
         "token_type": "Bearer"
     }
+    
+    
+async def verify_change_password_otp(current_user, otp: str, password):
+    if not await verify_otp(current_user.email, otp, forgot_pass=False):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Incorrect OTP-Verification Code")
+    
+    return {"message": "OTP verified successfully"}
+
+
+async def change_password(current_user: um.Users, session: AsyncSession, passwords: schemas.Passwords):
+    user = (await session.execute(select(um.Users).where(um.Users.user_id == current_user.user_id))).scalar_one_or_none()
+    
+    if passwords.new_password.get_secret_value() != passwords.conf_password.get_secret_value():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Passwords does not much")
+    
+    if not auth_utils.verify(passwords.old_password.get_secret_value(), user.password):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Incorrect password")
+    
+    if not await verify_otp(user.email, passwords.otp, forgot_pass=False):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Incorrect OTP-Verification Code")
+    
+    
+    user.password = auth_utils.hash(passwords.new_password.get_secret_value())
+    await session.commit()
+    return "Password changed successfully"
     
     
 

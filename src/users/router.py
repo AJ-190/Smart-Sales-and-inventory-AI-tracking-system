@@ -6,7 +6,7 @@ from src.auth import dependencies as auth_deps
 router = APIRouter(prefix="/users", tags=['Users'])
 
 
-roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin, um.RoleEnum.user, um.RoleEnum.viewer}
+
 
 @router.post("/sign_up", response_model=schemas.UserSignUpResponse, status_code=201)
 async def add_user(post: schemas.UserSignUp, db=Depends(get_db)):
