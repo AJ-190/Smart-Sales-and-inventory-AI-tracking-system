@@ -10,7 +10,6 @@ from src.db.database import get_db
 from src.users import service, models as um, schemas as us_schema
 from src.auth.dependencies import role_checker
 from sqlalchemy import select
-from pydantic import SecretStr
 from src.auth.utils import verify
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -86,12 +85,12 @@ async def change_password(passwords: schemas.Passwords, current_user = Depends(r
     return await auth_service.change_password(current_user, session, passwords)
 
 @router.post("/verify/password", status_code=200)
-async def verify_password(password: SecretStr, current_user: um.Users = Depends(role_checker([*allowed_roles])), session: AsyncSession = Depends(get_db)):
+async def verify_password(payload: schemas.PasswordVerify, current_user: um.Users = Depends(role_checker([*allowed_roles])), session: AsyncSession = Depends(get_db)):
     user = (await session.execute(select(um.Users).where(um.Users.user_id == current_user.user_id))).scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
-    if not verify(password.get_secret_value(), user.password):
+    if not verify(payload.password.get_secret_value(), user.password):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="incorrect passoword")
     return 
 

@@ -42,6 +42,9 @@ class Email(BaseModel):
 class OtpCode(BaseModel):
     otp: str
     
+class PasswordVerify(BaseModel):
+    password: SecretStr
+    
 class Passwords(BaseModel):
     old_password: SecretStr
     new_password: SecretStr
