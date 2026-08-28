@@ -38,6 +38,7 @@ class Transactions(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     
     debt = relationship("Debt", back_populates="transactions")
+    customer = relationship("Customer", back_populates="transactions")
     
     
     

@@ -17,6 +17,7 @@ class Customer(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     business = relationship("Business", back_populates="customers")
-    sales = relationship("Sale", back_populates="customer")
+    sales = relationship("Sale", back_populates="customer", cascade="all, delete-orphan")
     debts = relationship("Debt", back_populates="customer", cascade="all, delete-orphan")
     reminders = relationship("Reminders", back_populates="customer", cascade="all, delete-orphan")
+    transactions = relationship("Transactions", back_populates="customer", cascade="all, delete-orphan")

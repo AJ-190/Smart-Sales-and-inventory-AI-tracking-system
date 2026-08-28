@@ -257,9 +257,9 @@ async def deactivate_customer(
         
     
     
-async def delete_customer(business_id, customer_id, db: AsyncSession, current_user):
-    await service.business_authorized_access(current_user, business_id,db)
-    
+async def delete_customer(business_id, customer_id, db: AsyncSession, current_user: um.Users):
+    await service.business_authorized_access(current_user, business_id, db)
+
     customer = (
         await db.execute(
             select(cm.Customer)
@@ -267,12 +267,24 @@ async def delete_customer(business_id, customer_id, db: AsyncSession, current_us
             .where(cm.Customer.customer_id == customer_id)
         )
     ).scalar_one_or_none()
-    
+
     if not customer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No customer found.")
-    
-    await _cache_manager().delete(build_keys(CacheKey.GET_CUSTOMER_BY_ID, user = current_user.user_id, business_id=business_id, customer_id=customer_id))
-    
+
     await db.delete(customer)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Customer cannot be deleted because they have associated sales records. Deactivate the customer instead.",
+        )
+
+    await _cache_manager().delete(
+        build_keys(CacheKey.GET_CUSTOMER_BY_ID, user=current_user.user_id, business_id=business_id, customer_id=customer_id)
+    )
+    await _cache_manager().delete_by_pattern(
+        build_keys(CacheKey.GET_CUSTOMERS, user=current_user.user_id, business_id=business_id)
+    )
     return
