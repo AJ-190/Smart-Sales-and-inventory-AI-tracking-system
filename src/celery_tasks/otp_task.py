@@ -129,7 +129,7 @@ async def send_otp(email: str, forgot_pass):
     return JSONResponse(status_code=status.HTTP_200_OK, content={"msg": "OTP-verification code is sent"})
 
 
-async def verify_otp(email: str, otp: str, forgot_pass):
+async def verify_otp(email: str, otp: str, forgot_pass, consume: bool = True):
     from src.main import app
 
     if not app.state.redis:
@@ -158,6 +158,7 @@ async def verify_otp(email: str, otp: str, forgot_pass):
     if data.get("otp") != otp:
         return False
 
-    await app.state.redis.delete(f"email:{email}")
-    await app.state.redis.delete(f"otp_attempts:{email}")
+    if consume:
+        await app.state.redis.delete(f"email:{email}")
+        await app.state.redis.delete(f"otp_attempts:{email}")
     return True

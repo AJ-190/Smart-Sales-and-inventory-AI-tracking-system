@@ -68,7 +68,7 @@ async def refresh(payload: schemas.Token, db: AsyncSession):
     
     
 async def verify_change_password_otp(current_user, otp: str):
-    if not await verify_otp(current_user.email, otp, forgot_pass=False):
+    if not await verify_otp(current_user.email, otp, forgot_pass=False, consume=False):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Incorrect OTP-Verification Code")
     
     return {"message": "OTP verified successfully"}
