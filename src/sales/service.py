@@ -108,7 +108,8 @@ async def add_sale(business_id, post: schemas.SaleCreate, db: AsyncSession, curr
         select(bm.Sale)
         .options(
             joinedload(bm.Sale.sales_items),
-            joinedload(bm.Sale.debt))
+            joinedload(bm.Sale.debt),
+            joinedload(bm.Sale.customer))
         .where(bm.Sale.sale_id == sale.sale_id)
     )
     sale_ = result.scalars().first()
@@ -138,7 +139,8 @@ async def get_sales(business_id: int, db: AsyncSession, current_user, limit: int
         stmt
         .options(
             joinedload(bm.Sale.sales_items),
-            joinedload(bm.Sale.debt)
+            joinedload(bm.Sale.debt),
+            joinedload(bm.Sale.customer)
         )
         .order_by(bm.Sale.created_at.desc())
         .limit(limit)
@@ -165,7 +167,8 @@ async def get_sale(business_id, id, db: AsyncSession, current_user):
         stmt
         .options(
             joinedload(bm.Sale.sales_items),
-            joinedload(bm.Sale.debt)
+            joinedload(bm.Sale.debt),
+            joinedload(bm.Sale.customer)
         )
         .where(bm.Sale.sale_id == id)
     )
