@@ -78,7 +78,7 @@ async def upload_file(file:UploadFile , current_user: um.Users, session: AsyncSe
                 df = pd.read_excel(io.BytesIO(contents))
         
     except Exception as e:
-            raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail="Could not parse the file")
+            raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail=f"Could not parse the file: {e} ")
         
     if df.empty:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The file contains no data rows")
@@ -108,20 +108,22 @@ async def upload_file(file:UploadFile , current_user: um.Users, session: AsyncSe
         raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail="Name column contain null values")
     
     df = df.drop_duplicates(subset=['name'], keep="first")
+    cols = {c.name for c in bm.Product.__table__.columns}
     for _, row in df.iterrows():
         await product_validity(row)
-        
-        
         existing = (
-            await session.execute(select(bm.Product).
-                                  where(bm.Product.business_id == business_id)
-                                  .where(bm.Product.name == row['name']))
-            
-        )
-        if existing.scalar() is not None:
+            await session.execute(
+                select(bm.Product)
+                .where(bm.Product.business_id == business_id)
+                .where(bm.Product.name == row['name'])
+            )
+        ).scalar()
+        if existing is not None:
             continue
-        session.add(bm.Product(**row.to_dict(), business_id=business_id))
-        
+        data = {k: x for k, x in row.to_dict().items() if k in cols}
+        data["business_id"] = business_id
+        session.add(bm.Product(**data))
+
     await session.commit()
     return {"message": "Products uploaded sucessfully"}
 
