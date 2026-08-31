@@ -1,13 +1,16 @@
 from fastapi import status, HTTPException, UploadFile
-from sqlalchemy import select
+from sqlalchemy import select, inspect 
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.users import models as um
-from src.businesses import models as bm
+from src.businesses import models as bm, service as business_service
 from src.products import schemas
+from fastapi.responses import FileResponse, StreamingResponse
 from src.businesses.service import get_member
 import pandas as pd
+
 import io
 import json
+from datetime import datetime
 
 
 def _ensure_business_id(product, business_id):
@@ -39,6 +42,7 @@ async def product_validity(post):
 
 
 async def add_product(business_id, post: schemas.Productcreate, db: AsyncSession, current_user):
+    await business_service.business_authorized_access(current_user, business_id, db)
     business_id = _as_int(business_id)
     await product_validity(post)
     existing = (
@@ -63,70 +67,132 @@ async def add_product(business_id, post: schemas.Productcreate, db: AsyncSession
     return product
 
 
-async def upload_file(file:UploadFile , current_user: um.Users, session: AsyncSession, business_id):
+async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSession, business_id):
+    await business_service.business_authorized_access(current_user, business_id, session)
     business_id = _as_int(business_id)
-
-    if not file.filename.lower().endswith((".csv", ".xls", "xlsx")):
-        raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail="Only CSV and excel files are acceptable")
-
+    
+    if not file.filename.endswith((".csv", ".xls", ".xlsx")):
+        raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail="Only csv and excel is acceptable now")
+    
     contents = await file.read()
-    filename = file.filename.lower()
     try:
-            if filename.endswith(".csv"):
-                df = pd.read_csv(io.BytesIO(contents))
-            else:
-                df = pd.read_excel(io.BytesIO(contents))
+        
+        if file.filename.endswith(".csv"):
+            df = pd.read_csv(io.BytesIO(contents))
+        else:
+            df = pd.read_excel(io.BytesIO(contents))
         
     except Exception as e:
-            raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail=f"Could not parse the file: {e} ")
-        
-    if df.empty:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The file contains no data rows")
-    
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not parse file")
+
     df = df.where(pd.notnull(df), None)
     
-    with open("src/products/column_aliases.json", "r") as  file:
-        df_cols: dict = json.load(file)
+    with open("src/products/column_aliases.json", "r") as file:
+        column_alliases: dict = json.load(file)
         
-    required_cols = ["name", "price"]
-    
-    alias_to_cononical = {}
-    for cononical, alliases in df_cols.items():
-        for allias in alliases:
-            alias_to_cononical[allias] = cononical
+    def validate_columns(frame: pd.DataFrame):
+        cleand_cols = [ str(col).lower().strip() for col in frame.columns]
+        if not cleand_cols or any (not column for column in cleand_cols):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="File must contains appropriate columns")
+        
+        if len(set(cleand_cols)) != len(cleand_cols):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="File must not contain duplicate columns")
+        
+    validate_columns(df)
+        
+    cononical_to_alias = {}
+    for col, allias in column_alliases.items():
+        for als in allias:
+            cononical_to_alias[als] = col
             
-    df.rename(columns=alias_to_cononical, inplace=True)
-    
-    missing = [c for c in required_cols if not c in df.columns]
-    if missing:
-        raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail="Name and price are required coluns")
-    
-    if df["price"].isnull().any():
-        raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail="Price column contain null values")
-    
-    if df['name'].isnull().any():
-        raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail="Name column contain null values")
-    
+    df.rename(columns=cononical_to_alias, inplace=True)
+    total_rows = len(df)
+    df.dropna(subset=['price', 'name'], inplace=True)
+    dropped_missing = total_rows - len(df)
+    rows_before_dedup = len(df)
     df = df.drop_duplicates(subset=['name'], keep="first")
-    cols = {c.name for c in bm.Product.__table__.columns}
+    skipped_duplicates = rows_before_dedup - len(df)
+    
+    
+    required_cols = ['name', "price"]
+    check_req = [c for c in required_cols if c not in df.columns]
+    
+    if check_req:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Price and product name are required columns")
+    
+    cols =  {c.name for c in bm.Product.__table__.columns}   
+    
+    created = 0
+    skipped_existing = 0
     for _, row in df.iterrows():
-        await product_validity(row)
-        existing = (
-            await session.execute(
-                select(bm.Product)
-                .where(bm.Product.business_id == business_id)
-                .where(bm.Product.name == row['name'])
-            )
+        product_ext = (
+            await session.execute(select(bm.Product)
+                                  .where(bm.Product.business_id == business_id)
+                                  .where(bm.Product.name == row['name']))
         ).scalar()
-        if existing is not None:
+        
+        if product_ext is not None:
+            skipped_existing += 1
             continue
-        data = {k: x for k, x in row.to_dict().items() if k in cols}
-        data["business_id"] = business_id
+        data = {k:x for k, x in row.to_dict().items() if k in cols}
+        data['business_id'] = business_id
         session.add(bm.Product(**data))
-
+        created += 1
+        
     await session.commit()
-    return {"message": "Products uploaded sucessfully"}
+    return {
+        "message": "Product stored successfully",
+        "created": created,
+        "skipped_missing_name_price": dropped_missing,
+        "skipped_duplicates": skipped_duplicates,
+        "skipped_existing": skipped_existing,
+    }
 
+async def export_products(current_user: um.User, session: AsyncSession, business_id, file_format):
+    await business_service.business_authorized_access(current_user, business_id, session)
+    business_id = _as_int(business_id)
+    products = (
+        await session.execute(
+            select(bm.Product)
+            .where(bm.Product.business_id == business_id)
+            
+        )
+    ).scalars().all()
+    
+    
+    if not products:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No product found to be exported")
+    products_dicts = [
+        {c.key: getattr(p, c.key) for c in inspect(p).mapper.column_attrs}
+        for p in products
+    ]
+    
+    for d in products_dicts:
+        for k, v in d.items():
+            if isinstance(v, datetime) and v.tzinfo is not None:
+                d[k] = v.replace(tzinfo=None)
+
+    df = pd.DataFrame(products_dicts)
+    buffer = io.BytesIO()
+    if file_format == bm.FileFormat.csv:
+        df.to_csv(buffer, index=False)
+        filename = "products.csv"
+        media_type = "text/csv"
+        
+    else:
+        df.to_excel(buffer, index=False)
+
+        filename = "products.xlsx"
+        media_type =  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        
+    buffer.seek(0)
+    
+    return StreamingResponse(
+        buffer,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+        
 async def get_Products(business_id, db: AsyncSession, current_user, limit, skip, search):
     business_id = _as_int(business_id)
     products = (

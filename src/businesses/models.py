@@ -12,6 +12,9 @@ class PaymentMethod(str, enum.Enum):
     card = "card"
     mobile_money = "mobile_money"
 
+class FileFormat(str, enum.Enum):
+    csv ="csv"
+    excel = "excel"
 
 class ApprovalStatus(str, enum.Enum):
     pending = "pending"

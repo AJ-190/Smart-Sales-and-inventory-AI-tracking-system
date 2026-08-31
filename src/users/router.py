@@ -7,7 +7,6 @@ router = APIRouter(prefix="/users", tags=['Users'])
 
 
 
-
 @router.post("/sign_up", response_model=schemas.UserSignUpResponse, status_code=201)
 async def add_user(post: schemas.UserSignUp, db=Depends(get_db)):
     return await users_service.add_user(post, db)

@@ -9,7 +9,7 @@ from src.users import models as um
 from src.celery_tasks import sales_task as cron_tasks
 from src.celery_tasks.celery_app import celery
 
-router = APIRouter()
+router = APIRouter(tags=['Reports'])
 
 roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin, um.RoleEnum.user, um.RoleEnum.viewer}
 
