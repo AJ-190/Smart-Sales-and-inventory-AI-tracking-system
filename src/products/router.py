@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 from typing import Optional
 from src.db.database import get_db
 from src.products import schemas, service as product_service
 from src.auth import dependencies as auth_deps
 from src.users import models as um
 
-router = APIRouter()
+router = APIRouter(tags=['Product'])
 
 roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin, um.RoleEnum.user, um.RoleEnum.viewer}
 
@@ -14,6 +14,10 @@ roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnu
 async def add_product(business_id: int, post: schemas.Productcreate, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([*roles]))):
     return await product_service.add_product(business_id, post, db, current_user)
 
+
+@router.post("/upload/products")
+async def upload_file(business_id: int, file: UploadFile = File(...), current_user = Depends(auth_deps.role_checker([*roles])), session = Depends(get_db)):
+    return await product_service.upload_file(file, current_user,session, business_id)
 
 @router.get("/products/{business_id}", response_model=list[schemas.ProductResponse])
 async def get_products(business_id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([*roles])),

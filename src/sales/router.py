@@ -6,7 +6,7 @@ from src.auth import dependencies as auth_deps
 from src.users import models as um
 from sqlalchemy.ext.asyncio import AsyncSession
 
-router = APIRouter()
+router = APIRouter(tags=['Sales'])
 
 roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin, um.RoleEnum.user, um.RoleEnum.viewer}
 
@@ -14,8 +14,7 @@ roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnu
 async def add_sale(business_id: int, post: schemas.SaleCreate,
              db=Depends(get_db),
              current_user=Depends(auth_deps.role_checker([*roles]))):
-    return await sale_service.add_sale(business_id, post, db, current_user)
-
+    return await sale_service.add_sale(business_id, post, db, current_user)    
 
 @router.get("/sales/{business_id}", response_model=list[schemas.SaleResponse])
 async def get_sales(

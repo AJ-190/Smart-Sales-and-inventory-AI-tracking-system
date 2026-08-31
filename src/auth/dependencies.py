@@ -9,22 +9,13 @@ from src.auth.utils import verify_token
 from src.config import get_settings
 
 
-async def valiate_token(request: Request):
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer"):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-    token = auth_header.split(" ")[1]
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+bearer_scheme = HTTPBearer()
+
+async def validate_token(request:  Request, creds: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+    token = creds.credentials 
 
     token_data = verify_token(token)
 
@@ -38,7 +29,7 @@ async def valiate_token(request: Request):
     return token_data
 
 
-async def AccessTokenRequired(token_data=Depends(valiate_token)):
+async def AccessTokenRequired(token_data=Depends(validate_token)):
     if token_data.get("refresh"):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -47,7 +38,7 @@ async def AccessTokenRequired(token_data=Depends(valiate_token)):
     return token_data
 
 
-async def RefreshTokenRequired(token_data=Depends(valiate_token)):
+async def RefreshTokenRequired(token_data=Depends(validate_token)):
     if not token_data.get("refresh"):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -57,7 +48,7 @@ async def RefreshTokenRequired(token_data=Depends(valiate_token)):
 
 
 async def get_current_user(
-    token_data=Depends(valiate_token),
+    token_data=Depends(validate_token),
     session: AsyncSession = Depends(get_db),
 ):
     user_id = int(token_data["user"]["sub"])

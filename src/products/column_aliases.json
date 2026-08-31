@@ -1,0 +1,11 @@
+{
+  "name": ["name", "product name", "item name", "product"],
+  "price": ["price", "selling price", "sale price", "unit price", "price (ghc)"],
+  "cost_price": ["cost_price", "cost price", "cost", "buying price", "purchase price"],
+  "sku": ["sku", "sku number", "barcode", "product code", "code"],
+  "description": ["description", "desc", "details", "notes"],
+  "category": ["category", "type", "group"],
+  "quantity": ["quantity", "qty", "stock", "quantity in stock", "on hand", "available"],
+  "low_stock_threshold": ["low_stock_threshold", "low stock threshold", "reorder level", "min stock", "threshold"],
+  "is_active": ["is_active", "active", "status"]
+}
