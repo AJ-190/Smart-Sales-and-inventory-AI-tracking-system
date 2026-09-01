@@ -57,7 +57,7 @@ class Reminders(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
-    debt = relationship("Debt", back_populates="reminders", cascade="all, delete-orphan")
+    debt = relationship("Debt", back_populates="reminders")
     business = relationship("Business", back_populates="reminders")
     customer = relationship("Customer", back_populates="reminders")
     
