@@ -190,6 +190,14 @@ async def delete_business(id, db: AsyncSession, current_user):
         dm.Transactions.__table__.delete().where(dm.Transactions.business_id == id)
     )
     await db.execute(
+        dm.Reminders.__table__.delete().where(
+            (dm.Reminders.business_id == id) |
+            (dm.Reminders.debt_id.in_(
+                select(dm.Debt.debt_id).where(dm.Debt.business_id == id)
+            ))
+        )
+    )
+    await db.execute(
         dm.Debt.__table__.delete().where(dm.Debt.business_id == id)
     )
     sales_items_stmt = bm.SalesItem.__table__.delete().where(

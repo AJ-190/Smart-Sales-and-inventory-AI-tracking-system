@@ -45,19 +45,19 @@ class Transactions(Base):
 class Reminders(Base):
     __tablename__ = "reminders"
     reminder_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
-    debt_id = Column(Integer, ForeignKey("debts.debt_id"), nullable=False)
-    business_id = Column(Integer, ForeignKey("businesses.business_id"), nullable=False)
-    customer_id = Column(Integer, ForeignKey("customers.customer_id"), nullable=False)
+    debt_id = Column(Integer, ForeignKey("debts.debt_id"), nullable=True)
+    business_id = Column(Integer, ForeignKey("businesses.business_id"), nullable=True)
+    customer_id = Column(Integer, ForeignKey("customers.customer_id"), nullable=True)
     start_date = Column(DateTime, nullable=True)
     end_date = Column(DateTime, nullable=True)
     time_of_day = Column(Time, server_default=text("'09:00'"))
-    note = Column(String, nullable=False)
+    note = Column(String, nullable=True)
     is_active = Column(Boolean, nullable=False, server_default=text("true"))
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
-    debt = relationship("Debt", back_populates="reminders")
+    debt = relationship("Debt", back_populates="reminders", cascade="all, delete-orphan")
     business = relationship("Business", back_populates="reminders")
     customer = relationship("Customer", back_populates="reminders")
     
