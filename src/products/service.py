@@ -148,7 +148,7 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
         "skipped_existing": skipped_existing,
     }
 
-async def export_products(current_user: um.User, session: AsyncSession, business_id, file_format):
+async def export_products(current_user: um.Users, session: AsyncSession, business_id, file_format):
     await business_service.business_authorized_access(current_user, business_id, session)
     business_id = _as_int(business_id)
     products = (
@@ -167,12 +167,12 @@ async def export_products(current_user: um.User, session: AsyncSession, business
         for p in products
     ]
     
-    for d in products_dicts:
-        for k, v in d.items():
-            if isinstance(v, datetime) and v.tzinfo is not None:
-                d[k] = v.replace(tzinfo=None)
 
     df = pd.DataFrame(products_dicts)
+    
+    for col in df.select_dtypes(include=['datetimetz']).columns:
+        df[col] = df[col].dt.tz_localize(None)
+    
     buffer = io.BytesIO()
     if file_format == bm.FileFormat.csv:
         df.to_csv(buffer, index=False)
