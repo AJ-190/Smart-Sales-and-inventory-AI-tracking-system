@@ -1,3 +1,4 @@
+from decimal import Decimal
 from fastapi import status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -71,7 +72,7 @@ async def add_sale(business_id, post: schemas.SaleCreate, db: AsyncSession, curr
     db.add(sale)
     await db.flush()
 
-    debt = total_amount - post.amount_paid
+    debt = total_amount - Decimal(str(post.amount_paid))
 
     for sale_item in items_list:
         sale_data = bm.SalesItem(

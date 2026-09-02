@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Numeric, String, Boolean, Integer, DateTime, ForeignKey, Float, Time, text
+from sqlalchemy import Column, Numeric, String, Boolean, Integer, DateTime, ForeignKey, Time, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from src.db.database import Base
@@ -33,14 +33,14 @@ class Transactions(Base):
     performer_id= Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     business_id=Column(Integer, ForeignKey("businesses.business_id", ondelete="CASCADE"), nullable=False)
     customer_id=Column(Integer, ForeignKey("customers.customer_id", ondelete="SET NULL"), nullable=True)
-    amount_paid = Column(Float, nullable=False)
+    amount_paid = Column(Numeric(12, 2), nullable=False)
     note = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     
     debt = relationship("Debt", back_populates="transactions")
     customer = relationship("Customer", back_populates="transactions")
     business = relationship("Business", back_populates="transactions")
-    users = relationship("Users", back_populates="transactions")
+    performer = relationship("Users", back_populates="transactions")
     
 class Reminders(Base):
     __tablename__ = "reminders"
