@@ -107,8 +107,11 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
             
     df.rename(columns=cononical_to_alias, inplace=True)
     total_rows = len(df)
+    
+    df["quantity"] = df["quantity"].fillna(0).astype(int)
     df.dropna(subset=['price', 'name'], inplace=True)
     dropped_missing = total_rows - len(df)
+    
     rows_before_dedup = len(df)
     df = df.drop_duplicates(subset=['name'], keep="first")
     skipped_duplicates = rows_before_dedup - len(df)
@@ -135,9 +138,7 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
             skipped_existing += 1
             continue
         data = {k:x for k, x in row.to_dict().items() if k in cols}
-        for key, value in data.items():
-            if data[key] is None and key in ["quantity", "low_stock_threshold"]:
-                data[key] = 0
+        
         data['business_id'] = business_id
         session.add(bm.Product(**data))
         created += 1
