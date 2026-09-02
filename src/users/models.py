@@ -28,18 +28,18 @@ class Users(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    memberships = relationship("BusinessMember", back_populates="user", cascade="all, delete-orphan")
-    sales = relationship("Sale", back_populates="user", cascade="all, delete-orphan")
+    memberships = relationship("BusinessMember", back_populates="user", passive_deletes=True)
+    sales = relationship("Sale", back_populates="user", passive_deletes=True)
     user_approvals = relationship("Approvals", foreign_keys="Approvals.requester_id", back_populates="requester")
-    reviewer_approvals = relationship("Approvals", foreign_keys="Approvals.reviewer_id", back_populates="reviewer")
-
+    reviewer_approvals = relationship("Approvals", foreign_keys="Approvals.reviewer_id", back_populates="reviewer", passive_deletes=True)
+    transactions = relationship("Transactions", back_populates="users", passive_deletes=True)
 
 class BusinessMember(Base):
     __tablename__ = "business_members"
 
     member_id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
-    business_id = Column(Integer, ForeignKey("businesses.business_id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
+    business_id = Column(Integer, ForeignKey("businesses.business_id", ondelete="SET NULL"), nullable=True)
     role = Column(SAEnum(RoleEnum), nullable=False, default=RoleEnum.cashier)
     is_active = Column(Boolean, default=True)
     joined_at = Column(DateTime(timezone=True), server_default=func.now())

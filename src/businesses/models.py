@@ -1,6 +1,6 @@
 import uuid
 import enum
-from sqlalchemy import Column, String, Float, Boolean, Integer, DateTime, ForeignKey, Enum as SAEnum
+from sqlalchemy import Column, String, Float, Boolean, Integer, DateTime, ForeignKey, Enum as SAEnum, Numeric
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from src.db.database import Base
@@ -40,14 +40,14 @@ class Business(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    members = relationship("BusinessMember", back_populates="business", cascade="all, delete-orphan")
-    products = relationship("Product", back_populates="business")
-    sales = relationship("Sale", back_populates="business")
-    customers = relationship("Customer", back_populates="business")
-    approvals = relationship("Approvals", back_populates="business")
-    debts = relationship("Debt", back_populates="business")
-    reminders = relationship("Reminders", back_populates="business")
-
+    members = relationship("BusinessMember", back_populates="business", passive_deletes=True)
+    products = relationship("Product", back_populates="business", passive_deletes=True)
+    sales = relationship("Sale", back_populates="business", passive_deletes=True)
+    customers = relationship("Customer", back_populates="business", passive_deletes=True)
+    approvals = relationship("Approvals", back_populates="business", passive_deletes=True)
+    debts = relationship("Debt", back_populates="business", passive_deletes=True)
+    reminders = relationship("Reminders", back_populates="business", passive_deletes=True)
+    transactions = relationship("Transactions", back_populates="business", passive_deletes=True)
 
 class Product(Base):
     __tablename__ = "products"
@@ -55,8 +55,8 @@ class Product(Base):
     product_id = Column(Integer, primary_key=True, autoincrement=True)
     business_id = Column(Integer, ForeignKey("businesses.business_id", ondelete="CASCADE"), nullable=False)
     name = Column(String, nullable=False)
-    price = Column(Float, nullable=False)
-    cost_price = Column(Float, nullable=True)
+    price = Column(Numeric(10, 2), nullable=False)
+    cost_price = Column(Numeric(10, 2), nullable=True)
     description = Column(String, nullable=True)
     sku = Column(String, unique=True, nullable=True)
     category = Column(String, nullable=True)
@@ -67,40 +67,40 @@ class Product(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     business = relationship("Business", back_populates="products", lazy="joined")
-    sales_items = relationship("SalesItem", back_populates="product")
+    sales_items = relationship("SalesItem", back_populates="product", passive_deletes=True)
 
 
 class Sale(Base):
     __tablename__ = "sales"
 
     sale_id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
-    business_id = Column(Integer, ForeignKey("businesses.business_id"), nullable=False)
-    customer_id = Column(Integer, ForeignKey("customers.customer_id"), nullable=True)
-    total_amount = Column(Float, default=0.0)
-    amount_paid = Column(Float, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    business_id = Column(Integer, ForeignKey("businesses.business_id", ondelete="CASCADE"), nullable=False)
+    customer_id = Column(Integer, ForeignKey("customers.customer_id", ondelete="SET NULL"), nullable=True)
+    total_amount = Column(Numeric(12, 2), default=0.0)
+    amount_paid = Column(Numeric(12, 2), nullable=False)
     payment_method = Column(String, default="cash")
-    profit = Column(Float, nullable=True)
+    profit = Column(Numeric(12, 2), nullable=True)
     notes = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     business = relationship("Business", back_populates="sales")
     customer = relationship("Customer", back_populates="sales")
     user = relationship("Users", back_populates="sales")
-    sales_items = relationship("SalesItem", back_populates="sale", cascade="all, delete-orphan")
-    debt = relationship("Debt", back_populates="sale", uselist=False, cascade="all, delete-orphan")
+    sales_items = relationship("SalesItem", back_populates="sale", passive_deletes=True)
+    debt = relationship("Debt", back_populates="sale", uselist=False, passive_deletes=True)
 
 
 class SalesItem(Base):
     __tablename__ = "sales_items"
 
     item_id = Column(Integer, primary_key=True, autoincrement=True)
-    sale_id = Column(Integer, ForeignKey("sales.sale_id"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.product_id"), nullable=False)
+    sale_id = Column(Integer, ForeignKey("sales.sale_id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.product_id", ondelete="CASCADE"), nullable=False)
     quantity = Column(Integer, nullable=False)
-    unit_price = Column(Float, nullable=False)
-    subtotal = Column(Float, nullable=False)
-    profit = Column(Float, nullable=False)
+    unit_price = Column(Numeric(10, 2), nullable=False)
+    subtotal = Column(Numeric(12, 2), nullable=False)
+    profit = Column(Numeric(12, 2), nullable=False)
 
     product = relationship("Product", back_populates="sales_items")
     sale = relationship("Sale", back_populates="sales_items")

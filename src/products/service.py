@@ -135,6 +135,9 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
             skipped_existing += 1
             continue
         data = {k:x for k, x in row.to_dict().items() if k in cols}
+        for key, value in data.items():
+            if data[key] is None and key in ["quantity", "low_stock_threshold"]:
+                data[key] = 0
         data['business_id'] = business_id
         session.add(bm.Product(**data))
         created += 1
