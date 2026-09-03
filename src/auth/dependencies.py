@@ -1,5 +1,6 @@
-from fastapi import status, HTTPException, Depends, Request
+from fastapi import status, HTTPException, Depends, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 from sqlalchemy import select
 from src.db.database import get_db
 from src.users import models as um

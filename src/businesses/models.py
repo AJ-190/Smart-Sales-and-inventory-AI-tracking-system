@@ -48,6 +48,8 @@ class Business(Base):
     debts = relationship("Debt", back_populates="business", passive_deletes=True)
     reminders = relationship("Reminders", back_populates="business", passive_deletes=True)
     transactions = relationship("Transactions", back_populates="business", passive_deletes=True)
+    notifications = relationship("Notification", back_populates="business", passive_deletes=True)
+    
 
 class Product(Base):
     __tablename__ = "products"
@@ -124,3 +126,5 @@ class Approvals(Base):
     business = relationship("Business", back_populates="approvals")
     requester = relationship("Users", foreign_keys=[requester_id], back_populates="user_approvals")
     reviewer = relationship("Users", foreign_keys=[reviewer_id], back_populates="reviewer_approvals")
+
+

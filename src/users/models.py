@@ -33,7 +33,9 @@ class Users(Base):
     user_approvals = relationship("Approvals", foreign_keys="Approvals.requester_id", back_populates="requester")
     reviewer_approvals = relationship("Approvals", foreign_keys="Approvals.reviewer_id", back_populates="reviewer", passive_deletes=True)
     transactions = relationship("Transactions", back_populates="performer", passive_deletes=True)
+    notifications = relationship("Notification", back_populates="user", passive_deletes=True)
 
+        
 class BusinessMember(Base):
     __tablename__ = "business_members"
 
