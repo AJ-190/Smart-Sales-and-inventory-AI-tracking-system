@@ -10,7 +10,12 @@ from src.debts import models as dm
 from src.customers.models import Customer
 from src.sales import schemas
 from src.businesses import models as bm_models, service as biz_service
+from src.websocket import socket_manager
+from src.notifications import service as notification_service, schemas as notification_schemas
 
+
+
+manager = socket_manager.manager
 
 
 async def add_sale(business_id, post: schemas.SaleCreate, db: AsyncSession, current_user):
@@ -114,6 +119,22 @@ async def add_sale(business_id, post: schemas.SaleCreate, db: AsyncSession, curr
         .where(bm.Sale.sale_id == sale.sale_id)
     )
     sale_ = result.scalars().first()
+
+    customer_name = sale_.customer.name if sale_.customer else "Walk-in Customer"
+    customer_id = sale_.customer.customer_id if sale_.customer else None
+
+    await manager.broadcast(business_id, f"New sale added for customer {customer_name} (ID: {customer_id})")
+    await notification_service.send_notification(
+        notification_schemas.SendNotification(
+            user_id=current_user.user_id,
+            business_id=business_id,
+            title="New Sale Added",
+            message=f"New sale added for customer {customer_name} (ID: {customer_id}) with total amount {sale_.total_amount}.",
+        ),
+        business_id,
+        db,
+        current_user
+    )
     return sale_
 
 
@@ -222,6 +243,19 @@ async def delete_sale(business_id, id, db: AsyncSession, current_user):
     
     await db.delete(sale)
     await db.commit()
+    
+    await manager.broadcast(business_id, f"Sale with ID: {id} has been deleted")
+    await notification_service.send_notification(
+        notification_schemas.SendNotification(
+            user_id=current_user.user_id,
+            business_id=business_id,
+            title="Sale Deleted",
+            message=f"Sale with ID: {id} has been deleted.",
+        ),
+        business_id,
+        db,
+        current_user
+    )
     return {"status": "success", "msg": f"sale with the ID: {id} is deleted successfully"}
 
 

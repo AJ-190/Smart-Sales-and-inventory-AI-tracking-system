@@ -7,10 +7,14 @@ from src.debts import models as dm
 from src.businesses import service, models as bm
 from src.debts import schemas
 from datetime import datetime, date, timedelta
+from src.websocket import socket_manager
+from src.notifications import service as notification_service, schemas as notification_schemas
 
 
+manager = socket_manager.manager
 
-async def add_debt(post: schemas.AddDebt, business_id: int, customer_id: int, session: AsyncSession, current_user):
+
+async def add_debt(post: schemas.AddDebt, business_id: int, customer_id: int, session: AsyncSession, current_user: um.Users):
     await service.business_authorized_access(current_user, business_id, session)
 
     result = await session.execute(
@@ -36,6 +40,20 @@ async def add_debt(post: schemas.AddDebt, business_id: int, customer_id: int, se
         due_date=post.due_date,
         is_paid=False
     )
+    
+    await manager.broadcast(business_id, f"New debt of {post.amount} added for customer {customer.name} (ID: {customer_id})")
+    await notification_service.send_notification(
+        notification_schemas.SendNotification(
+            user_id=current_user.user_id,
+            business_id=business_id,
+            title="New Debt Added",
+            message=f"A new debt of {post.amount} has been added for customer {customer.name} (ID: {customer_id}). Due date: {post.due_date}.",
+        ),
+        business_id,
+        session,
+        current_user
+    )
+    
     session.add(new_debt)
     await session.flush()
 
@@ -48,6 +66,7 @@ async def add_debt(post: schemas.AddDebt, business_id: int, customer_id: int, se
         note=post.note
     )
     session.add(transaction)
+    
 
     await session.commit()
     await session.refresh(new_debt)
@@ -222,7 +241,18 @@ async def update_customer_with_debt(post:schemas.UpdateDebt , business_id, custo
         session.add(transaction)
    
     await session.commit()
-
+    await manager.broadcast(business_id, f"Debt for customer ID {customer_id} updated. Original amount: {original_amount}, Paid amount: {paid_amount}, Remaining amount: {debt.amount}")
+    await notification_service.send_notification(
+        notification_schemas .SendNotification(
+            user_id=current_user.user_id,
+            business_id=business_id,
+            title="Debt Updated",
+            message=f"Debt for customer ID {customer_id} has been updated. Original amount: {original_amount}, Paid amount: {paid_amount}, Remaining amount: {debt.amount}.",
+        ),
+        business_id,
+        session,
+        current_user
+    )
     remaining = (
         await session.execute(
             select(dm.Debt)
@@ -263,6 +293,7 @@ async def update_customer_with_debt(post:schemas.UpdateDebt , business_id, custo
         "customer_email": customer.email,
         "customer_phone": customer.phone,
     }
+    
     
     
 async def get_transactions(business_id, customer_id, current_user: um.Users, session: AsyncSession):
@@ -334,11 +365,24 @@ async def set_reminders(business_id, current_user: um.Users, session: AsyncSessi
         
     reminder = dm.Reminders(**data)
     
+    
     session.add(reminder)
     await session.commit()
     await session.refresh(reminder)
+    
+    await manager.broadcast(business_id, f"Reminder set for customer ID {post.customer_id} with debt ID {post.debt_id} from {reminder.start_date} to {reminder.end_date}")
+    await notification_service.send_notification(
+        notification_schemas.SendNotification(
+            user_id=current_user.user_id,
+            business_id=business_id,
+            title="New Reminder Set",
+            message=f"A new reminder has been set for customer ID {post.customer_id} with debt ID {post.debt_id} from {reminder.start_date} to {reminder.end_date}.",
+        ),
+        business_id,
+        session,
+        current_user
+    )
     return reminder
-
 
 
 async def get_reminders(business_id, current_user: um.Users, session: AsyncSession, post: schemas.GetReminders | None = None):
@@ -384,6 +428,19 @@ async def edit_reminder(business_id, reminder_id, current_user: um.Users, sessio
         
     await session.commit()
     await session.refresh(reminder)
+    
+    await manager.broadcast(business_id, f"Reminder with ID {reminder_id} for customer ID {reminder.customer_id} has been updated")
+    await notification_service.send_notification(
+        notification_schemas.SendNotification(
+            user_id=current_user.user_id,
+            business_id=business_id,
+            title="Reminder Updated",
+            message=f"Reminder with ID {reminder_id} for customer ID {reminder.customer_id} has been updated.",
+        ),
+        business_id,
+        session,
+        current_user
+    )
     return reminder
 
 
@@ -403,5 +460,17 @@ async def delete_reminder(business_id, reminder_id, current_user: um.Users, sess
     
     await session.delete(reminder)
     await session.commit()
+    await manager.broadcast(business_id, f"Reminder with ID {reminder_id} for customer ID {reminder.customer_id} has been deleted")
+    await notification_service.send_notification(
+        notification_schemas.SendNotification(
+            user_id=current_user.user_id,
+            business_id=business_id,
+            title="Reminder Deleted",
+            message=f"Reminder with ID {reminder_id} for customer ID {reminder.customer_id} has been deleted.",
+        ),
+        business_id,
+        session,
+        current_user
+    )
     return reminder
 

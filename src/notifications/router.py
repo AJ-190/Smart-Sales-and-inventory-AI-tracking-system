@@ -1,33 +1,29 @@
-from fastapi import WebSocket, APIRouter, Depends, WebSocketDisconnect
-from src.websocket import dependencies, socket_manager
+from fastapi import APIRouter, Depends
+from src.auth import dependencies as auth_deps
 from src.users import models as um
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from src.db.database import get_db
-from src.notifications import schemas
+from src.notifications import schemas, service
 from src.notifications.models import Notification
 
 
+roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin, um.RoleEnum.user, um.RoleEnum.viewer}
 
 router = APIRouter(prefix="/notifications", tags=['Notifications'])
-manager = socket_manager.ConnectionManager()
 
-@router.websocket("/ws/notifications/{business_id}")
-async def send_notification(business_id: int,
-                        current_user: um.Users = Depends(dependencies.get_current_user_ws),
-                        session: AsyncSession = Depends(get_db)):
-    
-    await manager.connect(business_id, WebSocket)
-    try:
-        
-        while True:
-            text = await WebSocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect(business_id, WebSocket)
-        
-    notification = Notification(user_id = current_user.user_id,
-                                business_id = business_id,
-                                message=text)
-    
-    session.add(notification)
-    await session.commit()
-    
+@router.post("/send", status_code=201, response_model=schemas.SendNotification)
+async def send_notification(payload: schemas.SendNotification,
+                            business_id: int,
+                            session: AsyncSession = Depends(get_db),
+                            current_user: um.Users = Depends(auth_deps.role_checker([*roles]))):
+    return await service.send_notification(payload, business_id, session, current_user)
+
+
+@router.get("/get_notifications/{business_id}", response_model=list[schemas.ReadNotification])
+async def get_notifications(business_id: int,
+                            session: AsyncSession = Depends(get_db),
+                            current_user: um.Users = Depends(auth_deps.role_checker([*roles]))):
+    result = await session.execute(select(Notification).where(Notification.business_id == business_id))
+    notifications = result.scalars().all()
+    return notifications

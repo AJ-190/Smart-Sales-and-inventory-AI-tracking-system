@@ -1,4 +1,5 @@
 from pydantic import BaseModel, ConfigDict
+from datetime import datetime
 
 
 
@@ -8,7 +9,6 @@ class SendNotification(BaseModel):
     message: str
     user_id: int
     business_id: int
-    notification_type: str
 
     model_config = ConfigDict(from_attributes=True)
     
@@ -18,6 +18,7 @@ class ReadNotification(BaseModel):
     user_id: int
     message: str
     is_read: bool
-    created_at: str
+    business_id: int
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

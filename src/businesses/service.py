@@ -8,6 +8,8 @@ from src.debts import models as dm
 from src.businesses import schemas
 from src.users import schemas as user_schemas
 from src.users.service import update_user
+from src.websocket import socket_manager
+from src.notifications import service as notification_service, schemas as notification_schemas
 
 
 async def get_member(db, current_user):
@@ -50,7 +52,19 @@ async def add_business(post, db: AsyncSession, current_user):
     )
     db.add(business_member)
     await db.commit()
-
+    await notification_service.send_notification(
+        notification_schemas.SendNotification(
+            user_id=current_user.user_id,
+            business_id=business.business_id,
+            title="Business Created",
+            message=f"You have successfully created the business '{business.name}' with ID {business.business_id}.",
+        ),
+        business.business_id,
+        db,
+        current_user
+    )
+    await db.refresh(business)
+    await socket_manager.manager.broadcast(business.business_id, f"New business '{business.name}' created with ID {business.business_id}")
     return business
 
 
@@ -166,6 +180,18 @@ async def update_business(id, post, db: AsyncSession, current_user):
 
     await db.commit()
     await db.refresh(business)
+    await notification_service.send_notification(
+        notification_schemas.SendNotification(
+            user_id=current_user.user_id,
+            business_id=business.business_id,
+            title="Business Updated",
+            message=f"The business '{business.name}' with ID {business.business_id} has been updated.",
+        ),
+        business.business_id,
+        db,
+        current_user
+    ) 
+    await socket_manager.manager.broadcast(business.business_id, f"Business '{business.name}' with ID {business.business_id} has been updated")
     return business
 
 
@@ -218,6 +244,18 @@ async def delete_business(id, db: AsyncSession, current_user):
 
     await db.delete(business)
     await db.commit()
+    await notification_service.send_notification(
+        notification_schemas.SendNotification(
+            user_id=current_user.user_id,
+            business_id=business.business_id,
+            title="Business Deleted",
+            message=f"The business '{business.name}' with ID {business.business_id} has been deleted.",
+        ),
+        business.business_id,
+        db,
+        current_user
+    )
+    await socket_manager.manager.broadcast(business.business_id, f"Business '{business.name}' with ID {business.business_id} has been deleted")
     return {f"Business with the ID:{id} deleted successfully"}
 
 
@@ -300,6 +338,18 @@ async def send_approval(post, db: AsyncSession, current_user):
         db.add(user)
         await db.commit()
         await db.refresh(user)
+        await notification_service.send_notification(
+            notification_schemas.SendNotification(
+                user_id=current_user.user_id,
+                business_id=check_business_.business_id,
+                title="Approval Request Sent",
+                message=f"Your request to join the business '{check_business_.name}' with ID {check_business_.business_id} has been sent for approval.",
+            ),
+            check_business_.business_id,
+            db,
+            current_user
+        )
+        await socket_manager.manager.broadcast(check_business_.business_id, f"New approval request sent by user ID {current_user.user_id} for business '{check_business_.name}' with ID {check_business_.business_id}")
         return user
 
 
@@ -415,6 +465,19 @@ async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSessio
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid request")
         
         await db.commit()
+        await db.refresh(approval_user)
+        await notification_service.send_notification(
+            notification_schemas.SendNotification(
+                user_id=current_user.user_id,
+                business_id=business.business_id,
+                title="Approval Request Processed",     
+                message=f"Your request to join the business '{business.name}' with ID {business.business_id} has been {'approved' if post.dir == 1 else 'rejected'}.",
+            ),
+            business.business_id,
+            db,
+            current_user
+        )
+        await socket_manager.manager.broadcast(business.business_id, f"Approval request with ID {approval_user.approval_id} has been {'approved' if post.dir == 1 else 'rejected'} by user ID {current_user.user_id} for business '{business.name}' with ID {business.business_id}")
 
         return {
             "approval_id": approval_user.approval_id,
@@ -452,6 +515,19 @@ async def delete_approval(business_id, approval_id, session: AsyncSession, curre
         
         await session.delete(approval)
         await session.commit()
+        await notification_service.send_notification(
+            notification_schemas.SendNotification(
+                user_id=current_user.user_id,
+                business_id=business.business_id,
+                title="Approval Request Deleted",
+                message=f"Approval request with ID {approval.approval_id} for business '{business.name}' with ID {business.business_id} has been deleted.",
+            ),
+            business.business_id,
+            session,
+            current_user
+        )   
+        
+        await socket_manager.manager.broadcast(business.business_id, f"Approval request with ID {approval.approval_id} has been deleted by user ID {current_user.user_id} for business '{business.name}' with ID {business.business_id}")
         return {"detail": "Approval deleted successfully"}
 
 async def business_authorized_access(current_user, business_id, db: AsyncSession):
@@ -498,6 +574,18 @@ async def leave_business(business_id, member_id, current_user: um.Users, session
     
     approvals.status = bm.ApprovalStatus.rejected
     await session.delete(member_)
+    await notification_service.send_notification(
+        notification_schemas.SendNotification(
+            user_id=current_user.user_id,
+            business_id=business_id,
+            title="Business Membership Left",
+            message=f"User with ID {member_.user_id} has left the business with ID {business_id}.",
+        ),
+        business_id,
+        session,
+        current_user
+    )
+    await socket_manager.manager.broadcast(business_id, f"User with ID {member_.user_id} has left the business with ID {business_id}")
     await session.commit()
 
 
@@ -543,6 +631,19 @@ async def update_business_member(business_id: int, member_id: int, post: schemas
 
     await db.commit()
     await db.refresh(member)
+    await notification_service.send_notification(
+        notification_schemas.SendNotification(
+            user_id=current_user.user_id,
+            business_id=business_id,
+            title="Business Member Updated",
+            message=f"Member with ID {member.user_id} has been updated in the business with ID {business_id}.",
+        ),
+        business_id,
+        db,
+        current_user
+    )
+    await socket_manager.manager.broadcast(business_id, f"Member with ID {member.user_id} has been updated in the business with ID {business_id}")
+   
 
     user = (
         await db.execute(

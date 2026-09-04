@@ -2,8 +2,14 @@ import asyncio
 import websockets
 
 
+TOKEN = "YOUR_JWT_TOKEN_HERE"
+BUSINESS_ID = 123
+USER_ID = 1
+
+
 async def test_websocket():
-    async with websockets.connect("ws://localhost:8000/ws/123") as ws:
+    uri = f"ws://localhost:8000/notifications/ws/{BUSINESS_ID}/{USER_ID}"
+    async with websockets.connect(uri) as ws:
         await ws.send("Hello, Addy")
         response = await ws.recv()
         print(f"Received: {response}")
