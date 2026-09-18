@@ -2,7 +2,7 @@ import logging
 from fastapi import status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, cast, Date, select
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from src.users import models as um
 from src.businesses import models as bm
 from src.debts import models as dm
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def date_validator(date, end_date):
     if not date or not end_date:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Both start date and end date must be provided")
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
     if date > today or end_date > today:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot retrieve future data")
     if end_date < date:
@@ -27,18 +27,21 @@ async def view_profit(business_id, db: AsyncSession, current_user, date: date | 
     if date and end_date:
         date_validator(date, end_date)
 
-    profit = (
-        (await db.execute(
-            select(
-                func.sum(bm.Sale.profit).label("total_profit"),
-                func.sum(bm.Sale.total_amount).label("revenue"),
-                func.sum(bm.Sale.total_amount - bm.Sale.profit).label("total_cost")
-            )
-            .where(bm.Sale.business_id == business_id)
-            .where(cast(bm.Sale.created_at, Date) >= date)
-            .where(cast(bm.Sale.created_at, Date) <= end_date)
-        )).first()
+    profit_stmt = (
+        select(
+            func.sum(bm.Sale.profit).label("total_profit"),
+            func.sum(bm.Sale.total_amount).label("revenue"),
+            func.sum(bm.Sale.total_amount - bm.Sale.profit).label("total_cost")
+        )
+        .where(bm.Sale.business_id == business_id)
     )
+
+    if date:
+        profit_stmt = profit_stmt.where(cast(bm.Sale.created_at, Date) >= date)
+    if end_date:
+        profit_stmt = profit_stmt.where(cast(bm.Sale.created_at, Date) <= end_date)
+
+    profit = (await db.execute(profit_stmt)).first()
 
     if not profit:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"There is no profit margin for any sales between the {date} and {end_date}")
@@ -52,7 +55,7 @@ async def view_profit(business_id, db: AsyncSession, current_user, date: date | 
     }
 
 
-async def get_summery(business_id, db: AsyncSession, current_user, date, end_date):
+async def get_summary(business_id, db: AsyncSession, current_user, date, end_date):
     stmt = (
         select(
             func.sum(bm.SalesItem.quantity).label("sold_quantity"),

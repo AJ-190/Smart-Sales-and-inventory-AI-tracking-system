@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from datetime import date
+from datetime import date as date_type
 from src.db.database import get_db
 from src.analytics import schemas, service as analytics_service
 from src.products.schemas import LowStockResponse
@@ -8,31 +8,32 @@ from src.auth import dependencies as auth_deps
 from src.users import models as um
 from src.celery_tasks import sales_task as cron_tasks
 from src.celery_tasks.celery_app import celery
+from src.auth.roles import ALL_ROLES
 
 router = APIRouter(tags=['Reports'])
 
-roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin, um.RoleEnum.user, um.RoleEnum.viewer}
+roles = ALL_ROLES
 
 @router.get("/reports/profit/{business_id}", response_model=schemas.ProfitResponse)
 async def get_profit(
     business_id: int,
     db=Depends(get_db),
     current_user=Depends(auth_deps.role_checker([*roles])),
-    date: date | None = None,
-    end_date: date | None = None,
+    date: date_type | None = None,
+    end_date: date_type | None = None,
 ):
     return await analytics_service.view_profit(business_id, db=db, current_user=current_user, date=date, end_date=end_date)
 
 
-@router.get("/reports/analytics/summery/{business_id}")
-async def get_summery(
+@router.get("/reports/analytics/summary/{business_id}")
+async def get_summary(
     business_id: int,
     db=Depends(get_db),
     current_user=Depends(auth_deps.role_checker([*roles])),
-    date: date | None = None,
-    end_date: date | None = None
+    date: date_type | None = None,
+    end_date: date_type | None = None
 ):
-    return await analytics_service.get_summery(business_id, db, current_user, date, end_date)
+    return await analytics_service.get_summary(business_id, db, current_user, date, end_date)
 
 
 @router.get("/reports/analytics/dashboard/{business_id}", response_model=schemas.DashboardResponse)
@@ -40,8 +41,8 @@ async def get_dashboard(
     business_id: int,
     db=Depends(get_db),
     current_user=Depends(auth_deps.role_checker([*roles])),
-    date: date | None = None,
-    end_date: date | None = None,
+    date: date_type | None = None,
+    end_date: date_type | None = None,
 ):
     return await analytics_service.get_dashboard(business_id, db, current_user, date, end_date)
 
@@ -66,14 +67,14 @@ async def get_debts(
 @router.post("/admin/crons/{job_name}")
 async def run_cron_job(job_name: str, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.super_admin, um.RoleEnum.manager]))):
     valid_jobs = {
-        "daily_summery": "daily",
-        "weekly_summery": "weekly",
-        "monthly_summery": "monthly",
+        "daily_summary": "daily",
+        "weekly_summary": "weekly",
+        "monthly_summary": "monthly",
     }
     if job_name not in valid_jobs:
         raise HTTPException(status_code=404, detail=f"Cron job '{job_name}' not found")
     period = valid_jobs[job_name]
-    await cron_tasks.summery(period, db=db)
+    await cron_tasks.summary(period, db=db)
     return {"status": f"{job_name} cron triggered"}
 
 

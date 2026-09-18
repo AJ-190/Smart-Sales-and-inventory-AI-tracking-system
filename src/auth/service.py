@@ -78,7 +78,7 @@ async def change_password(current_user: um.Users, session: AsyncSession, passwor
     user = (await session.execute(select(um.Users).where(um.Users.user_id == current_user.user_id))).scalar_one_or_none()
     
     if passwords.new_password.get_secret_value() != passwords.conf_password.get_secret_value():
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Passwords does not much")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Passwords do not match")
     
     if not auth_utils.verify(passwords.old_password.get_secret_value(), user.password):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Incorrect password")

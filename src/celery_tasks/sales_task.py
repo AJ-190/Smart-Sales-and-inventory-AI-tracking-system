@@ -32,7 +32,7 @@ def _get_period_range(period: str):
     return start, end
 
 
-async def summery(period: str, db: AsyncSession | None = None):
+async def summary(period: str, db: AsyncSession | None = None):
     from src.users import models as um
 
     async def _run(db: AsyncSession):
@@ -52,7 +52,7 @@ async def summery(period: str, db: AsyncSession | None = None):
 
         for member, user in rows:
             try:
-                await analytics_service.get_summery(member.business_id, db, user, start, end)
+                await analytics_service.get_summary(member.business_id, db, user, start, end)
                 print(f"[CRON] summary done for {user.user_id}")
             except Exception as e:
                 logger.error(f"Error generating summary for user {user.user_id}: {e}")
@@ -66,15 +66,15 @@ async def summery(period: str, db: AsyncSession | None = None):
 
 
 @celery.task
-def daily_sale_summery():
-    asyncio.run(summery("daily"))
+def daily_sale_summary():
+    asyncio.run(summary("daily"))
 
 
 @celery.task
-def weekly_sale_summery():
-    asyncio.run(summery("weekly"))
+def weekly_sale_summary():
+    asyncio.run(summary("weekly"))
 
 
 @celery.task
-def monthly_sale_summery():
-    asyncio.run(summery("monthly"))
+def monthly_sale_summary():
+    asyncio.run(summary("monthly"))

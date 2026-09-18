@@ -84,4 +84,40 @@ def test_update_stock_quantity(authorized_user_client,authorized_user_client_tes
     assert res.status_code == 200
     product = schemas.ProductResponse(**res.json())
     assert product.product_id == test_products_create[0].product_id
+
+
+def test_product_invalid_price(authorized_user_client, authorized_user_client_test_businesses):
+    product = {
+        "name": "Zero Price",
+        "price": 0,
+        "cost_price": 10,
+        "quantity": 5
+    }
+    res = authorized_user_client.post(
+        f"/products/{authorized_user_client_test_businesses[0].business_id}",
+        json=product
+    )
+    assert res.status_code == 400
+
+
+def test_export_products_csv(authorized_user_client, authorized_user_client_test_businesses, test_products_create):
+    res = authorized_user_client.get(
+        f"/download/products?business_id={authorized_user_client_test_businesses[0].business_id}&file_format=csv"
+    )
+    assert res.status_code == 200, res.text
+    assert res.headers["content-type"].startswith("text/csv")
+
+
+def test_export_products_excel(authorized_user_client, authorized_user_client_test_businesses, test_products_create):
+    res = authorized_user_client.get(
+        f"/download/products?business_id={authorized_user_client_test_businesses[0].business_id}&file_format=excel"
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_export_products_invalid_format(authorized_user_client, authorized_user_client_test_businesses, test_products_create):
+    res = authorized_user_client.get(
+        f"/download/products?business_id={authorized_user_client_test_businesses[0].business_id}&file_format=pdf"
+    )
+    assert res.status_code == 422
     

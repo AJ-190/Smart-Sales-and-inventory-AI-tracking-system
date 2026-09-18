@@ -3,7 +3,7 @@ from fastapi import status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlalchemy import select, func, cast, Date, delete
-from datetime import timedelta, datetime, date
+from datetime import timedelta, datetime, date, timezone
 from src.users import models as um
 from src.businesses import models as bm
 from src.debts import models as dm
@@ -105,7 +105,7 @@ async def add_sale(business_id, post: schemas.SaleCreate, db: AsyncSession, curr
             customer_id=post.customer_id,
             sale_id=sale.sale_id,
             amount=debt,
-            due_date=post.due_date or (datetime.utcnow() + timedelta(days=30))
+            due_date=post.due_date or (datetime.now(timezone.utc) + timedelta(days=30))
         )
         db.add(new_debt)
 
@@ -139,7 +139,7 @@ async def add_sale(business_id, post: schemas.SaleCreate, db: AsyncSession, curr
 
 
 async def get_sales(business_id: int, db: AsyncSession, current_user, limit: int, skip: int, date: date | None = None):
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
 
     stmt = select(bm.Sale).where(bm.Sale.business_id == business_id)
 
@@ -260,19 +260,141 @@ async def delete_sale(business_id, id, db: AsyncSession, current_user):
 
 
 
-async def update_sale(business_id, sale_id, sale_data: schemas.SaleUpdate, current_user:um.Users, session:AsyncSession):
-    user = await biz_service.business_authorized_access(current_user, business_id, session)
-    
-    sale = (
-  
-            select(bm.Sale)
-            .where(bm.Sale.business_id == business_id)
-            .where(bm.Sale.sale_id == sale_id)
-        )
-    
-    if user.role == um.RoleEnum.cashier:
-        sale = (
-            sale.where(bm.Sale.user_id == user.user_id)
-        )
+async def update_sale(business_id, sale_id, sale_data: schemas.SaleUpdate, current_user: um.Users, session: AsyncSession):
+    await biz_service.business_authorized_access(current_user, business_id, session)
+
+    stmt = (
+        select(bm.Sale)
+        .options(
+            joinedload(bm.Sale.sales_items),
+            joinedload(bm.Sale.debt),
+            joinedload(bm.Sale.customer))
+        .where(bm.Sale.business_id == business_id)
+        .where(bm.Sale.sale_id == sale_id)
+    )
+    if current_user.role == um.RoleEnum.cashier:
+        stmt = stmt.where(bm.Sale.user_id == current_user.user_id)
+
+    result = await session.execute(stmt)
+    sale = result.unique().scalars().first()
+
+    if not sale:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Sale with the ID: {sale_id} not found")
+
+    updates = sale_data.model_dump(exclude_unset=True)
+
+    if sale_data.list_items is not None:
+        for old_item in sale.sales_items:
+            product = (
+                await session.execute(
+                    select(bm.Product).where(bm.Product.product_id == old_item.product_id)
+                )
+            ).scalar_one_or_none()
+            if product:
+                product.quantity += old_item.quantity
+
+        total_amount = 0
+        total_cost = 0
+        total_profit = 0
+        new_items = []
+        for item in sale_data.list_items:
+            product = (
+                await session.execute(
+                    select(bm.Product)
+                    .where(bm.Product.business_id == business_id)
+                    .where(bm.Product.product_id == item.product_id)
+                )
+            ).scalar_one_or_none()
+            if not product:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                    detail=f"Product with ID: {item.product_id} not found")
+            if not product.is_active:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                    detail=f"Product '{product.name}' is not active")
+            if item.quantity <= 0:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                    detail=f"Quantity for '{product.name}' must be greater than zero")
+            if item.quantity > product.quantity:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                    detail=f"Insufficient stock for '{product.name}'. Available: {product.quantity}")
+
+            product.quantity -= item.quantity
+            subtotal = product.price * item.quantity
+            item_cost = (product.cost_price or 0) * item.quantity
+            item_profit = subtotal - item_cost
+
+            total_amount += subtotal
+            total_cost += item_cost
+            total_profit += item_profit
+            new_items.append({
+                "product_id": product.product_id,
+                "quantity": item.quantity,
+                "unit_price": product.price,
+                "subtotal": subtotal,
+                "profit": item_profit,
+            })
+
+        for old_item in sale.sales_items:
+            await session.delete(old_item)
+        await session.flush()
+        for item in new_items:
+            session.add(bm.SalesItem(sale_id=sale.sale_id, **item))
+
+        sale.total_amount = total_amount
+        sale.profit = total_profit
+        updates.pop("list_items")
+
+    for key, value in updates.items():
+        setattr(sale, key, value)
+
+    debt = sale.total_amount - Decimal(str(sale.amount_paid))
+    if debt <= 0:
+        if sale.debt:
+            await session.delete(sale.debt)
+            sale.debt = None
+    else:
+        if not sale.customer_id:
+            await session.rollback()
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Customer ID must be provided for sales with outstanding debt")
+        if sale.debt:
+            sale.debt.amount = debt
+            sale.debt.is_paid = False
+            sale.debt.customer_id = sale.customer_id
+        else:
+            session.add(dm.Debt(
+                business_id=business_id,
+                customer_id=sale.customer_id,
+                sale_id=sale.sale_id,
+                amount=debt,
+                due_date=datetime.now(timezone.utc) + timedelta(days=30),
+            ))
+
+    await session.commit()
+
+    result = await session.execute(
+        select(bm.Sale)
+        .options(
+            joinedload(bm.Sale.sales_items),
+            joinedload(bm.Sale.debt),
+            joinedload(bm.Sale.customer))
+        .execution_options(populate_existing=True)
+        .where(bm.Sale.sale_id == sale.sale_id)
+    )
+    sale_ = result.unique().scalars().first()
+
+    await manager.broadcast(business_id, f"Sale with ID: {sale_id} has been updated")
+    await notification_service.send_notification(
+        notification_schemas.SendNotification(
+            user_id=current_user.user_id,
+            business_id=business_id,
+            title="Sale Updated",
+            message=f"Sale with ID: {sale_id} has been updated.",
+        ),
+        business_id,
+        session,
+        current_user
+    )
+    return sale_
         
         

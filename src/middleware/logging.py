@@ -9,9 +9,9 @@ import uuid
 
 
 class StructuredLogginFormat(logging.Formatter):
-    def format(seld, record: logging.LogRecord) -> str:
+    def format(self, record: logging.LogRecord) -> str:
         log_entry = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:5S", time.localtime(record.created)),
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(record.created)),
             "module": record.module,
             "level_name": record.levelname,
             "function": record.funcName,
@@ -33,7 +33,7 @@ def logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     
     handler = logging.StreamHandler()
-    handler.setFormatter(StructuredLogginFormat)
+    handler.setFormatter(StructuredLogginFormat())
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
     logger.propagate = False

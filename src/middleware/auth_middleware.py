@@ -25,8 +25,8 @@ RATE_LIMITED_ROUTES = ["/auth/login", "/users/sign_up"]
 async def auth_middleware(request: Request, call_next):
     
     if request.url.path in RATE_LIMITED_ROUTES:
-        client_ip = request.client.host
-        if await ip_rate_limiter(request.app.state.redis, client_ip, get_settings().REQUEST_LIMIT_EXPIRY):
+        client_ip = request.client.host if request.client else None
+        if client_ip and await ip_rate_limiter(request.app.state.redis, client_ip, get_settings().REQUEST_LIMIT_EXPIRY):
             
             logger.debug("Rate limiting exceeded", 
                          extra=_log_request(request, status_code=status.HTTP_429_TOO_MANY_REQUESTS))

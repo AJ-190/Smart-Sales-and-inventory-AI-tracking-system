@@ -89,8 +89,6 @@ async def get_customers(business_id: int,
         cm.Customer.created_at
     ).limit(limit).offset(skip))
     
-    if not results:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No customer found")
     customers = []
     
     for customer in results.scalars():
@@ -104,6 +102,10 @@ async def get_customers(business_id: int,
             "is_active": customer.is_active,
             "created_at": customer.created_at.isoformat() if customer.created_at else None,
         })
+
+    if not customers:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No customer found")
+
     await _cache_manager().set(cache_key, customers)
 
     return customers
@@ -177,10 +179,8 @@ async def update_customer(customer: schemas.CustomerUpdate,
     check_email_or_phone_existense = (
             base_query.where(
                 or_(
-                    cm.Customer.phone == customer.email,
+                    cm.Customer.phone == customer.phone,
                     cm.Customer.email == customer.email,
-                    
-                    
                 ),
                 cm.Customer.customer_id != customer_id
             )

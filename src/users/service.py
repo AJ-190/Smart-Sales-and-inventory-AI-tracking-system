@@ -27,7 +27,7 @@ async def add_user(post: schemas.UserSignUp, db: AsyncSession):
     await db.refresh(user)
 
     try:
-        otp = await send_otp(post.email)
+        otp = await send_otp(post.email, forgot_pass=False)
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning("OTP send failed for %s: %s", post.email, e)
@@ -170,7 +170,7 @@ async def update_user(id: int, post: schemas.UserUpdate, db: AsyncSession, curre
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     if not (current_user.role == um.RoleEnum.super_admin or current_user.user_id == id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unauthorized to perform this action")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to perform this action")
 
     if post.role is not None and not internal_call:
         if (current_user.role != um.RoleEnum.super_admin or current_user.user_id != id):
@@ -180,7 +180,7 @@ async def update_user(id: int, post: schemas.UserUpdate, db: AsyncSession, curre
             )
             
         if post.role == um.RoleEnum.super_admin:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unahtorixed to prerform this action.")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action.")
         try:
             post.role = um.RoleEnum(post.role).value
         except ValueError:
@@ -189,7 +189,7 @@ async def update_user(id: int, post: schemas.UserUpdate, db: AsyncSession, curre
                 detail=f"Invalid role: {post.role}. Must be one of: {[r.value for r in um.RoleEnum]}",
             )
 
-    if current_user.role != um.RoleEnum.super_admin and post.email == get_settings().SUPER_ADMIN_EMAIL:
+    if current_user.role != um.RoleEnum.super_admin and post.email is not None and post.email == get_settings().SUPER_ADMIN_EMAIL:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This email cannot be used",

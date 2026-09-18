@@ -105,25 +105,25 @@ def test_dashboard_forbidden_business(authorized_user_client, authorized_user_cl
 
 def test_daily_sales_report(authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli):
     res = authorized_user_client.post(
-        "/admin/crons/daily_summery"
+        "/admin/crons/daily_summary"
     )
     assert res.status_code == 200
     
 def test_weekly_sales_report(authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli):
     res = authorized_user_client.post(
-        "/admin/crons/weekly_summery"
+        "/admin/crons/weekly_summary"
     )
     assert res.status_code == 200
     
 def test_monthly_sales_report(authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli):
     res = authorized_user_client.post(
-        "/admin/crons/monthly_summery"
+        "/admin/crons/monthly_summary"
     )
     assert res.status_code == 200
 
 def test_monthly_sales_report_unauthroized(client, authorized_user_client_cre_bus, test_create_sale_cli):
     res = client.post(
-        "/admin/crons/monthly_summery"
+        "/admin/crons/monthly_summary"
     )
     assert res.status_code == 401
 
@@ -149,11 +149,19 @@ def test_reports_profit_404(authorized_user_client, authorized_user_client_cre_b
     assert res.status_code == 404
 
 
-def test_get_summmery(authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli):
+def test_reports_profit_single_date(authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli):
+    business_id = authorized_user_client_cre_bus[0].business_id
     res = authorized_user_client.get(
-        f"/reports/analytics/summery/{authorized_user_client_cre_bus[0].business_id}?date=2026-05-18&end_date=2026-05-19"
+        f"/reports/profit/{business_id}?date=2026-05-14"
+    )
+    assert res.status_code == 200
+
+
+def test_get_summary(authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli):
+    res = authorized_user_client.get(
+        f"/reports/analytics/summary/{authorized_user_client_cre_bus[0].business_id}?date=2026-05-18&end_date=2026-05-19"
     )
 
     assert res.status_code == 200
-    summery = schemas.SaleSummery(**res.json())
+    summery = schemas.SaleSummary(**res.json())
     print(summery.total_revenue)

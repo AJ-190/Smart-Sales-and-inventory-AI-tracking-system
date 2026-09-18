@@ -11,6 +11,7 @@ import pandas as pd
 import io
 import json
 from datetime import datetime
+from pathlib import Path
 
 
 def _ensure_business_id(product, business_id):
@@ -87,7 +88,7 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
 
     df = df.where(pd.notnull(df), None)
     
-    with open("src/products/column_aliases.json", "r") as file:
+    with open(Path(__file__).resolve().parent / "column_aliases.json", "r") as file:
         column_alliases: dict = json.load(file)
         
     def validate_columns(frame: pd.DataFrame):
@@ -175,7 +176,8 @@ async def export_products(current_user: um.Users, session: AsyncSession, busines
     df = pd.DataFrame(products_dicts)
     
     for col in df.select_dtypes(include=['datetimetz']).columns:
-        df[col] = df[col].dt.tz_localize(None)
+        if df[col].dt.tz is not None:
+            df[col] = df[col].dt.tz_convert("UTC").dt.tz_localize(None)
     
     buffer = io.BytesIO()
     if file_format == bm.FileFormat.csv:

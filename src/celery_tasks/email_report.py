@@ -116,7 +116,7 @@ class EmailReport:
 
 
 
-    def render_receipt_reportlab(path, business, items, total):
+    def render_receipt_reportlab(self, path, business, items, total):
         c = canvas.Canvas(path, pagesize=A4)
         width, height = A4
 

@@ -16,15 +16,15 @@ celery.conf.update(
     enable_utc=True,
     beat_schedule={
         "daily-sale-summary": {
-            "task": "src.celery_tasks.sales_task.daily_sale_summery",
+            "task": "src.celery_tasks.sales_task.daily_sale_summary",
             "schedule": crontab(hour=0, minute=0),
         },
         "weekly-sale-summary": {
-            "task": "src.celery_tasks.sales_task.weekly_sale_summery",
+            "task": "src.celery_tasks.sales_task.weekly_sale_summary",
             "schedule": crontab(hour=0, minute=0, day_of_week="mon"),
         },
         "monthly-sale-summary": {
-            "task": "src.celery_tasks.sales_task.monthly_sale_summery",
+            "task": "src.celery_tasks.sales_task.monthly_sale_summary",
             "schedule": crontab(hour=0, minute=0, day_of_month="1"),
         },
         "daily-debt-reminders": {

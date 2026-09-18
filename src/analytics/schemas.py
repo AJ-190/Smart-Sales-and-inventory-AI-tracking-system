@@ -8,7 +8,7 @@ class ProfitResponse(BaseModel):
     total_cost: float
 
 
-class SaleSummery(BaseModel):
+class SaleSummary(BaseModel):
     total_profit: float
     sold_quantity: float
     total_revenue: float

@@ -22,11 +22,10 @@ class UserSignUp(BaseModel):
     @field_validator("email")
     @classmethod
     def validate_email(cls, email):
-        if not any(char.find("@") for char in email):
+        if "@" not in email:
             raise ValueError("Email must contain '@'")
-
-        if  email.split("@")[1] not in ["gmail.com", "outlook.com", "icloud.com", "yahoo.com"]:
-            raise ValueError("Email domain name not supported")
+        if not email.split("@")[-1] or "." not in email.split("@")[-1]:
+            raise ValueError("Email domain is invalid")
         return email
         
 

@@ -22,6 +22,50 @@ def test_user_create(client):
     assert user.email == data['email']
     assert user.role == um.RoleEnum.user
     assert res.status_code == 201
+
+
+def test_user_create_custom_domain_email(client):
+    data ={
+         "name": "Custom Domain",
+         "email": "user@example.com",
+         "password": "passwordY123",
+         "phone": "0257524799"}
+    
+    res = client.post(
+        "/users/sign_up", 
+        json=data
+    )
+    assert res.status_code == 201, res.text
+    user = schemas.UserSignUpResponse(**res.json())
+    assert user.email == data['email']
+
+
+def test_user_create_weak_password(client):
+    data ={
+         "name": "Weak Password",
+         "email": "weak@example.com",
+         "password": "short",
+         "phone": "0257524798"}
+    
+    res = client.post(
+        "/users/sign_up", 
+        json=data
+    )
+    assert res.status_code == 422
+
+
+def test_user_create_invalid_email(client):
+    data ={
+         "name": "Bad Email",
+         "email": "invalid@nodot",
+         "password": "passwordY123",
+         "phone": "0257524797"}
+    
+    res = client.post(
+        "/users/sign_up", 
+        json=data
+    )
+    assert res.status_code == 422
     
 def test_create_user_duplicate_email(client, test_user):
     data ={

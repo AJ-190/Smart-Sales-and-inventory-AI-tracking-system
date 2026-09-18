@@ -256,7 +256,7 @@ async def delete_business(id, db: AsyncSession, current_user):
         current_user
     )
     await socket_manager.manager.broadcast(business.business_id, f"Business '{business.name}' with ID {business.business_id} has been deleted")
-    return {f"Business with the ID:{id} deleted successfully"}
+    return {"status": "success", "message": f"Business with the ID:{id} deleted successfully"}
 
 
 async def get_business_key(business_id, db: AsyncSession, current_user):
@@ -531,7 +531,7 @@ async def delete_approval(business_id, approval_id, session: AsyncSession, curre
         return {"detail": "Approval deleted successfully"}
 
 async def business_authorized_access(current_user, business_id, db: AsyncSession):
-    if current_user.role != bm.RoleEnum.super_admin:
+    if current_user.role != um.RoleEnum.super_admin:
         
         user_access = (
             (await db.execute(

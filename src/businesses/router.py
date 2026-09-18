@@ -3,11 +3,12 @@ from src.db.database import get_db
 from src.businesses import schemas, service as biz_service
 from src.auth import dependencies as auth_deps
 from src.users import models as um
+from src.auth.roles import ALL_ROLES
 
 
 router = APIRouter(prefix="/businesses", tags=['Business'])
 
-roles = {um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin, um.RoleEnum.user, um.RoleEnum.viewer}
+roles = ALL_ROLES
 
 @router.post("/create", status_code=201, response_model=schemas.BusinessResponse)
 async def create_business(post: schemas.BusinessCreate, db=Depends(get_db), current_user=Depends(auth_deps.get_current_user)):
@@ -30,7 +31,7 @@ async def get_business(id: int, db=Depends(get_db), current_user=Depends(auth_de
 
 
 @router.put("/{id}", response_model=schemas.BusinessResponse)
-async def update_response(id: int, post: schemas.BusinessUpdate, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin]))):
+async def update_business(id: int, post: schemas.BusinessUpdate, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin]))):
     return await biz_service.update_business(id, post, db, current_user)
 
 

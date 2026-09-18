@@ -351,7 +351,7 @@ async def set_reminders(business_id, current_user: um.Users, session: AsyncSessi
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No debt found for this customer")
     
     if reminder_exist:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Reminder for thisi customer already set")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Reminder for this customer already set")
     
     data = post.model_dump()
     data["business_id"] = business_id

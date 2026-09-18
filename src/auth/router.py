@@ -8,7 +8,7 @@ from src.users.schemas import UserSignUpResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.database import get_db
 from src.users import service, models as um, schemas as us_schema
-from src.auth.dependencies import role_checker
+from src.auth import dependencies as auth_deps
 from sqlalchemy import select
 from src.auth.utils import verify
 
@@ -40,7 +40,9 @@ async def get_verification_code(email: schemas.Email):
     return await send_otp(email.email, forgot_pass=False)
 
 @router.post("/verify_user", response_model=us_schema.UserSignUpResponse)
-async def veirfy_user(email: schemas.Email, session: AsyncSession = Depends(get_db)):
+async def verify_user(email: schemas.Email, current_user=Depends(auth_deps.get_current_user), session: AsyncSession = Depends(get_db)):
+    if current_user.role != um.RoleEnum.super_admin and current_user.email != email.email:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to verify this account")
     user = (
         await session.execute(
             select(um.Users).where(um.Users.email == email.email)
@@ -64,7 +66,7 @@ async def forgot_password(useremail: schemas.Email, session: AsyncSession = Depe
 
 
 @router.post("/verify/forgot_password", response_model=us_schema.UserSignUpResponse)
-async def verify_forgot_password(otp: schemas.Otp_veriification_code,
+async def verify_forgot_password(otp: schemas.OtpVerificationCode,
                                  
                                  session: AsyncSession = Depends(get_db)):
     if otp.password is None:
@@ -81,25 +83,25 @@ async def verify_forgot_password(otp: schemas.Otp_veriification_code,
     return user
 
 @router.post("/verify/change_password", status_code=200)
-async def change_password(passwords: schemas.Passwords, current_user = Depends(role_checker([*allowed_roles])), session: AsyncSession = Depends(get_db)):
+async def change_password(passwords: schemas.Passwords, current_user = Depends(auth_deps.role_checker([*allowed_roles])), session: AsyncSession = Depends(get_db)):
     return await auth_service.change_password(current_user, session, passwords)
 
 @router.post("/verify/password", status_code=200)
-async def verify_password(payload: schemas.PasswordVerify, current_user: um.Users = Depends(role_checker([*allowed_roles])), session: AsyncSession = Depends(get_db)):
+async def verify_password(payload: schemas.PasswordVerify, current_user: um.Users = Depends(auth_deps.role_checker([*allowed_roles])), session: AsyncSession = Depends(get_db)):
     user = (await session.execute(select(um.Users).where(um.Users.user_id == current_user.user_id))).scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
     if not verify(payload.password.get_secret_value(), user.password):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="incorrect passoword")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="incorrect password")
     return 
 
 @router.post("/otp/verify_change_password", status_code=200)
-async def verify_change_password_otp(payload: schemas.OtpCode, current_user = Depends(role_checker(allowed_roles))):
+async def verify_change_password_otp(payload: schemas.OtpCode, current_user = Depends(auth_deps.role_checker(allowed_roles))):
     return await auth_service.verify_change_password_otp(current_user, payload.otp)
     
 @router.post("/otp/verification", response_model=UserSignUpResponse)
-async def verify_otp_code(otp: schemas.Otp_veriification_code, 
+async def verify_otp_code(otp: schemas.OtpVerificationCode, 
                           db: AsyncSession = Depends(get_db),):
     verify = await verify_otp(otp.email, otp.otp, forgot_pass=True)
     if not verify:

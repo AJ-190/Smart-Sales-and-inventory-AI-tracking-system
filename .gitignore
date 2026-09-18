@@ -24,3 +24,5 @@ app.json
 procfile
 package-lock.json
 package.json
+.env.example
+media/

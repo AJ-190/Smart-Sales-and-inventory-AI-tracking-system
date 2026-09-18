@@ -56,7 +56,7 @@ src/
 ├── database.py            # SQLAlchemy engine, session factory, Base
 ├── httpx_client.py        # Shared HTTPX async client dependency
 ├── mail.py                # Email utility (fastapi-mail)
-├── redis_cllient.py       # Redis async connection helper *(unused — legacy)*
+├── redis_client.py       # Redis async connection helper *(unused — legacy)*
 ├── auth/                  # Authentication module
 │   ├── router.py          #   /auth/login, /auth/refresh, /auth/logout, /auth/otp/*
 │   ├── schemas.py         #   Request/response models
@@ -339,7 +339,7 @@ The following data points are available via existing endpoints:
 |---|---|---|
 | `/reports/profit/{business_id}` | GET | View profit, revenue, cost |
 | `/reports/analytics/dashboard/{business_id}` | GET | Full dashboard with all KPIs |
-| `/reports/analytics/summery/{business_id}` | GET | Full sales summary (also emailed) |
+| `/reports/analytics/summary/{business_id}` | GET | Full sales summary (also emailed) |
 | `/reports/analytics/low_stock` | GET | Low stock alert list |
 | `/reports/analytics/debts/{business_id}` | GET | Outstanding debt totals |
 
@@ -349,9 +349,9 @@ The following data points are available via existing endpoints:
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/admin/crons/daily_summery` | POST | Trigger daily sales report |
-| `/admin/crons/weekly_summery` | POST | Trigger weekly sales report |
-| `/admin/crons/monthly_summery` | POST | Trigger monthly sales report |
+| `/admin/crons/daily_summary` | POST | Trigger daily sales report |
+| `/admin/crons/weekly_summary` | POST | Trigger weekly sales report |
+| `/admin/crons/monthly_summary` | POST | Trigger monthly sales report |
 | `/admin/crons/jobs` | GET | List scheduled cron jobs |
 
 ---

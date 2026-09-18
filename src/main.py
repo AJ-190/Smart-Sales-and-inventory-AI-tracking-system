@@ -18,8 +18,10 @@ from src.db.redis import get_redis_client
 from src.debts.router import router as debts_router
 from src.customers.router import router as customers_router
 from src.chat.router import router as chat_router
+from src.external_services.weather_api import router as weather_router
 from src.auth import dependencies as auth_deps
 from src.users import models as um
+from src.middleware.logging import LoggingMiddleware
 from contextlib import asynccontextmanager
 
 
@@ -39,6 +41,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.middleware("http")(auth_middleware)
+app.add_middleware(LoggingMiddleware)
 app.add_exception_handler(StarletteHTTPException, custom_http_exception_handler)
 app.include_router(main_router)
 app.include_router(products_router)
@@ -50,6 +53,7 @@ app.include_router(users_router)
 app.include_router(debts_router)
 app.include_router(customers_router)
 app.include_router(chat_router)
+app.include_router(weather_router)
 
 from src.chat.storage import MEDIA_ROOT
 os.makedirs(MEDIA_ROOT, exist_ok=True)
