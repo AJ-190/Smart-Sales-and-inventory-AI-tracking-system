@@ -41,5 +41,19 @@ class ConnectionManager:
     async def send_personal_message(self, websocket: WebSocket, message: str) -> None:
         await websocket.send_text(message)
 
+    def online_users(self, business_id: int) -> set[int]:
+        """User_ids currently connected to a business, excluding dead sockets."""
+        business_sockets = self.active_connections.get(business_id)
+        if not business_sockets:
+            return set()
+        alive: set[int] = set()
+        for user_id, sockets in list(business_sockets.items()):
+            if sockets:
+                alive.add(user_id)
+        return alive
+
+    def is_connected(self, business_id: int, user_id: int) -> bool:
+        return bool(self.active_connections.get(business_id, {}).get(user_id))
+
 
 manager = ConnectionManager()

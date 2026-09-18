@@ -13,6 +13,7 @@ import src.users.models
 import src.businesses.models
 import src.debts.models
 import src.customers.models
+import src.chat.models
 
 from alembic import context
 

@@ -1,5 +1,7 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from src.errors.handlers import custom_http_exception_handler
 from src.db.database import engine, Base, get_db
@@ -48,6 +50,10 @@ app.include_router(users_router)
 app.include_router(debts_router)
 app.include_router(customers_router)
 app.include_router(chat_router)
+
+from src.chat.storage import MEDIA_ROOT
+os.makedirs(MEDIA_ROOT, exist_ok=True)
+app.mount("/media", StaticFiles(directory=MEDIA_ROOT), name="media")
 
 
 @app.get("/")
