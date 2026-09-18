@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     SENDGRID_API_KEY: str = os.getenv("SENDGRID_API_KEY", "")
     REQUEST_LIMIT_EXPIRY: int = 60
     REQUEST_LIMIT: int = 5
+    WS_TICKET_TTL: int = 60
     
 
 def get_settings():

@@ -1,4 +1,5 @@
 import logging
+import secrets
 import redis
 import redis.asyncio as airedis
 from src.config import get_settings
@@ -79,3 +80,38 @@ async def otp_increment_attempts(redis: airedis.Redis, email: str) -> int:
     if count == 1:
         await redis.expire(key, 300)
     return count
+
+
+def ws_ticket_key(ticket: str) -> str:
+    return f"ws_ticket:{ticket}"
+
+
+async def create_ws_ticket(redis: airedis.Redis, user_id: int, role: str, business_id: int, ttl: int = None) -> str:
+    ticket = secrets.token_urlsafe(32)
+    key = ws_ticket_key(ticket)
+    ttl = ttl or get_settings().WS_TICKET_TTL
+    try:
+        await redis.hset(key, mapping={
+            "user_id": str(user_id),
+            "role": role or "",
+            "business_id": str(business_id),
+        })
+        await redis.expire(key, ttl)
+        return ticket
+    except Exception as e:
+        logger.error("Failed to create ws ticket in redis: %s", e)
+        raise
+
+
+async def consume_ws_ticket(redis: airedis.Redis, ticket: str) -> Optional[dict]:
+    if not redis or not ticket:
+        return None
+    try:
+        data = await redis.hgetall(ws_ticket_key(ticket))
+        if not data:
+            return None
+        await redis.delete(ws_ticket_key(ticket))
+        return data
+    except Exception as e:
+        logger.error("Failed to consume ws ticket in redis: %s", e)
+        return None

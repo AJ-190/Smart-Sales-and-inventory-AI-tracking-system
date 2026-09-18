@@ -15,6 +15,7 @@ from src.notifications.router import router as notifications_router
 from src.db.redis import get_redis_client
 from src.debts.router import router as debts_router
 from src.customers.router import router as customers_router
+from src.chat.router import router as chat_router
 from src.auth import dependencies as auth_deps
 from src.users import models as um
 from contextlib import asynccontextmanager
@@ -46,6 +47,7 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(debts_router)
 app.include_router(customers_router)
+app.include_router(chat_router)
 
 
 @app.get("/")

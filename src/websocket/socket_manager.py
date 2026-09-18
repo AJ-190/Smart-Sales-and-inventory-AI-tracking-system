@@ -1,57 +1,45 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from collections import defaultdict
+from fastapi import WebSocket
+from src.middleware.logging import logger as logging_module
 
-router = APIRouter(prefix="/notifications", tags=['Notifications'])
+
+logger = logging_module("Websocket")
+
+
 class ConnectionManager:
-
     def __init__(self):
-        self.active_connections: dict[int, set[WebSocket]] = defaultdict(set)
+        self.active_connections: dict[int, dict[int, set[WebSocket]]] = {}
 
-    async def connect(self, business_id: int, user_id: int, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, business_id: int, user_id: int) -> None:
         await websocket.accept()
-        self.active_connections[business_id].add(websocket)
+        sockets = self.active_connections.setdefault(business_id, {}).setdefault(user_id, set())
+        sockets.add(websocket)
+        logger.info("ws-connected business_id=%s, user_id=%s", business_id, user_id)
 
-    async def disconnect(self, business_id: int, user_id: int, websocket: WebSocket):
-        self.active_connections.get(business_id, set()).discard(websocket)
-        if business_id in self.active_connections and not self.active_connections[business_id]:
-            del self.active_connections[business_id]
-
-    async def broadcast(self, business_id: int, message: str):
-        socket_set = self.active_connections.get(business_id)
-        if not socket_set:
+    async def disconnect(self, websocket: WebSocket, business_id: int, user_id: int) -> None:
+        sockets = self.active_connections.get(business_id, {}).get(user_id)
+        if sockets is None:
             return
-        dead = []
-        for connection in socket_set:
-            try:
-                await connection.send_text(message)
-            except Exception:
-                dead.append(connection)
-        for conn in dead:
-            socket_set.discard(conn)
-        if not socket_set:
-            self.active_connections.pop(business_id, None)
+        sockets.discard(websocket)
+        if not sockets:
+            self.active_connections.get(business_id, {}).pop(user_id, None)
+        logger.info("ws-disconnected business_id=%s, user_id=%s", business_id, user_id)
 
-    async def send_to_user(self, business_id: int, user_id: int, message: str, websocket: WebSocket) -> bool:
-        socket_set = self.active_connections.get(business_id)
-        if not socket_set:
-            self.active_connections[business_id] = set()
-            self.active_connections[business_id].add(websocket)
-        for connection in socket_set:
-            if getattr(connection, "state", None) and connection.state.user_id == user_id:
-                await connection.send_text(message)
-                return True
-        return False
+    async def broadcast(self, business_id: int, message: str) -> None:
+        business_sockets = self.active_connections.get(business_id)
+        if not business_sockets:
+            return
+        for user_id, sockets in list(business_sockets.items()):
+            for websocket in list(sockets):
+                try:
+                    await websocket.send_text(message)
+                except Exception:
+                    sockets.discard(websocket)
+                    if not sockets:
+                        business_sockets.pop(user_id, None)
+                    logger.error("ws-failed to broadcast message, business=%s", business_id, exc_info=True)
+
+    async def send_personal_message(self, websocket: WebSocket, message: str) -> None:
+        await websocket.send_text(message)
 
 
 manager = ConnectionManager()
-
-@router.websocket("/ws/{business_id}/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, business_id: int, user_id: int):
-    await manager.connect(business_id, user_id, websocket)
-    
-    try:
-        while True:
-            data = await websocket.receive_text()
-            await manager.send_to_user(business_id, user_id, f"You said: {data}", websocket)
-    except WebSocketDisconnect:
-        await manager.disconnect(business_id, user_id, websocket)
