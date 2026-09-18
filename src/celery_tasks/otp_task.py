@@ -111,7 +111,7 @@ async def send_otp(email: str, forgot_pass):
             detail="OTP service is unavailable. Please try again later.",
         )
 
-    otp = str(secrets.randbelow(9000000) + 1000000)
+    otp = f"{secrets.randbelow(1_000_000):06d}"
     await otp_verification(app.state.redis, email, forgot_pass=forgot_pass, otp=otp, store=True)
 
     try:

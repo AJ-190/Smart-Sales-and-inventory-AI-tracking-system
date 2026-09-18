@@ -69,6 +69,31 @@ def test_ws_ticket_forbidden_for_non_member(session, chat_business):
     assert res.status_code == 403
 
 
+def test_ws_ticket_allows_super_admin_with_stale_role_token(session, chat_business):
+    # A user whose global role is super_admin but who holds a token minted before
+    # promotion (claiming "user") must still be admitted, matching get_current_user.
+    async def _create_sup():
+        session.add(um.Users(
+            name="Senior",
+            email="senior_chat@gmail.com",
+            password="passwordY123",
+            role=um.RoleEnum.super_admin,
+            is_verified=True,
+        ))
+        await session.commit()
+        result = await session.execute(
+            select(um.Users).where(um.Users.email == "senior_chat@gmail.com")
+        )
+        return result.scalar_one()
+
+    sup = asyncio.run(_create_sup())
+    token = auth_utils.AccessToken({"sub": str(sup.user_id), "role": "user"})
+    client = _client_with_token(session, token)
+    res = client.post(f"/chat/ws-ticket/{chat_business}")
+    assert res.status_code == 200
+    assert res.json()["ticket"]
+
+
 def test_messages_history_empty(authorized_sup_client, chat_business):
     res = authorized_sup_client.get(f"/chat/{chat_business}/messages")
     assert res.status_code == 200

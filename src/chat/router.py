@@ -51,8 +51,18 @@ def _parse_user(token_data) -> tuple[int, str]:
         )
 
 
-async def _ensure_membership(session: AsyncSession, user_id: int, business_id: int, role: str) -> None:
-    if role == um.RoleEnum.super_admin.value:
+async def _is_effective_super_admin(session: AsyncSession, user_id: int) -> bool:
+    user = await session.get(um.Users, user_id)
+    if not user:
+        return False
+    return (
+        user.role == um.RoleEnum.super_admin
+        or (user.email or "") == get_settings().SUPER_ADMIN_EMAIL
+    )
+
+
+async def _ensure_membership(session: AsyncSession, user_id: int, business_id: int) -> None:
+    if await _is_effective_super_admin(session, user_id):
         return
     membership = await session.execute(
         select(um.BusinessMember)
@@ -226,7 +236,7 @@ async def get_ws_ticket(
     session: AsyncSession = Depends(get_db),
 ):
     user_id, role = _parse_user(token_data)
-    await _ensure_membership(session, user_id, business_id, role)
+    await _ensure_membership(session, user_id, business_id)
 
     redis = getattr(request.app.state, "redis", None)
     if not redis:
@@ -262,10 +272,8 @@ async def group_chat_endpoint(websocket: WebSocket, business_id: int):
         await websocket.close(code=4401)
         return
 
-    role = ticket_data.get("role")
-
     async with get_async_session_maker() as session:
-        if role != um.RoleEnum.super_admin.value:
+        if not await _is_effective_super_admin(session, user_id):
             membership = await session.execute(
                 select(um.BusinessMember)
                 .where(
@@ -291,7 +299,7 @@ async def get_messages(
     session: AsyncSession = Depends(get_db),
 ):
     user_id, role = _parse_user(token_data)
-    await _ensure_membership(session, user_id, business_id, role)
+    await _ensure_membership(session, user_id, business_id)
 
     limit = max(1, min(limit, 200))
 
@@ -375,7 +383,7 @@ async def edit_message(
     session: AsyncSession = Depends(get_db),
 ):
     user_id, role = _parse_user(token_data)
-    await _ensure_membership(session, user_id, business_id, role)
+    await _ensure_membership(session, user_id, business_id)
 
     msg = await session.get(chm.GroupChatMessages, message_id)
     if not msg or msg.business_id != business_id:
@@ -426,7 +434,7 @@ async def delete_message(
     session: AsyncSession = Depends(get_db),
 ):
     user_id, role = _parse_user(token_data)
-    await _ensure_membership(session, user_id, business_id, role)
+    await _ensure_membership(session, user_id, business_id)
 
     msg = await session.get(chm.GroupChatMessages, message_id)
     if not msg or msg.business_id != business_id:
@@ -471,7 +479,7 @@ async def upload_attachment(
     session: AsyncSession = Depends(get_db),
 ):
     user_id, role = _parse_user(token_data)
-    await _ensure_membership(session, user_id, business_id, role)
+    await _ensure_membership(session, user_id, business_id)
     return await chat_storage.save_chat_attachment(business_id, file)
 
 
@@ -482,7 +490,7 @@ async def unread_count(
     session: AsyncSession = Depends(get_db),
 ):
     user_id, role = _parse_user(token_data)
-    await _ensure_membership(session, user_id, business_id, role)
+    await _ensure_membership(session, user_id, business_id)
 
     read_pos = await session.get(chm.ChatReadPosition, (user_id, business_id))
     last_read = read_pos.last_read_message_id if read_pos else 0
@@ -506,7 +514,7 @@ async def set_read_position(
     session: AsyncSession = Depends(get_db),
 ):
     user_id, role = _parse_user(token_data)
-    await _ensure_membership(session, user_id, business_id, role)
+    await _ensure_membership(session, user_id, business_id)
 
     read_pos = await session.get(chm.ChatReadPosition, (user_id, business_id))
     latest = await session.scalar(

@@ -11,10 +11,21 @@ class Token(BaseModel):
     refresh_token: str
     token_type: str
 
+
+def _validate_otp(value):
+    if not isinstance(value, str) or not value.isdigit() or len(value) != 6:
+        raise ValueError("OTP must be exactly 6 digits")
+    return value
+
 class OtpVerificationCode(BaseModel):
     otp: str
     email: EmailStr
     password: Optional[SecretStr] = None
+
+    @field_validator("otp")
+    @classmethod
+    def validate_otp(cls, value):
+        return _validate_otp(value)
 
     @field_validator("password")
     @classmethod
@@ -43,6 +54,11 @@ class Email(BaseModel):
 class OtpCode(BaseModel):
     otp: str
 
+    @field_validator("otp")
+    @classmethod
+    def validate_otp(cls, value):
+        return _validate_otp(value)
+
 class PasswordVerify(BaseModel):
     password: SecretStr
 
@@ -51,6 +67,11 @@ class Passwords(BaseModel):
     new_password: SecretStr
     conf_password: SecretStr
     otp: str
+
+    @field_validator("otp")
+    @classmethod
+    def validate_otp(cls, value):
+        return _validate_otp(value)
 
     @field_validator("new_password")
     @classmethod
