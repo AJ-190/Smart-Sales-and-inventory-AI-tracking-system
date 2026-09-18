@@ -69,6 +69,38 @@ def test_ws_ticket_forbidden_for_non_member(session, chat_business):
     assert res.status_code == 403
 
 
+def test_ws_ticket_allows_member_with_is_active_false(session, chat_business):
+    # A BusinessMember row whose is_active is NULL/False (e.g. rows that predate the
+    # column on Postgres) must still be admitted to chat, matching business_authorized_access.
+    async def _create():
+        session.add(um.Users(
+            name="Quiet Member",
+            email="quiet_chat@gmail.com",
+            password="passwordY123",
+            role=um.RoleEnum.user,
+            is_verified=True,
+        ))
+        await session.commit()
+        user = (await session.execute(
+            select(um.Users).where(um.Users.email == "quiet_chat@gmail.com")
+        )).scalar_one()
+        session.add(um.BusinessMember(
+            user_id=user.user_id,
+            business_id=chat_business,
+            role=um.RoleEnum.cashier,
+            is_active=False,
+        ))
+        await session.commit()
+        return user
+
+    user = asyncio.run(_create())
+    token = auth_utils.AccessToken({"sub": str(user.user_id), "role": "user"})
+    client = _client_with_token(session, token)
+    res = client.post(f"/chat/ws-ticket/{chat_business}")
+    assert res.status_code == 200
+    assert res.json()["ticket"]
+
+
 def test_ws_ticket_allows_super_admin_with_stale_role_token(session, chat_business):
     # A user whose global role is super_admin but who holds a token minted before
     # promotion (claiming "user") must still be admitted, matching get_current_user.
