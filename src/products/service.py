@@ -28,16 +28,20 @@ def _as_int(business_id):
         
 
 async def product_validity(post):
-    if post.price <= 0:
+    if post.price is not None and post.price <= 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Price must be greater than 0")
 
     if post.cost_price is not None and post.cost_price < 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cost price cannot be negative")
 
-    if post.cost_price is not None and post.cost_price > post.price:
+    if (
+        post.cost_price is not None
+        and post.price is not None
+        and post.cost_price > post.price
+    ):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cost price cannot exceed selling price")
 
-    if post.quantity < 0:
+    if post.quantity is not None and post.quantity < 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quantity cannot be negative")
 
 
@@ -237,6 +241,8 @@ async def get_product(business_id, id, db: AsyncSession, current_user, limit, sk
 async def update_product(business_id, id, post: schemas.ProductUpdate, db: AsyncSession, current_user):
     await get_member(db, current_user)
     business_id = _as_int(business_id)
+    await product_validity(post)
+    
     product = (
         (await db.execute(
             select(bm.Product)

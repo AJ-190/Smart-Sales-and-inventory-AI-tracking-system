@@ -34,10 +34,13 @@ class ProductResponse(BaseModel):
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
     price: Optional[float] = None
+    cost_price: Optional[float] = None
+    quantity: Optional[int] = None
+    sku: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
     low_stock_threshold: Optional[int] = None
-    quantity: Optional[int] = None
+
 
 
 class Restock(BaseModel):
