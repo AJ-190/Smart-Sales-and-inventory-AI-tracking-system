@@ -23,5 +23,6 @@ app.json
 procfile
 package-lock.json
 package.json
-.env.example
+# .env.example is intentionally NOT ignored - it is the documented list of
+# required env vars (including the SMS settings) that every new deployer needs.
 media/

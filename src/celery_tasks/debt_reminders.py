@@ -57,7 +57,25 @@ async def _send_sms(phone: str, message: str) -> bool:
     return False
 
 
-async def _dispatch(db) -> None:
+async def _dispatch(db) -> dict:
+    settings = get_settings()
+
+    # Abort loudly and once. Previously every send attempt logged the same
+    # "SMS_API_KEY is not configured" error, so a misconfigured deployment
+    # produced one line per customer and the real cause was easy to miss.
+    if not settings.sms_configured:
+        logger.error(
+            "Debt reminders are DISABLED: SMS_KEY is not set. No SMS will be sent. "
+            "Set SMS_KEY (and SMS_SENDER_ID) on the worker and beat services."
+        )
+        return {"status": "disabled", "reason": "SMS_KEY not configured", "sent": 0}
+
+    if settings.sms_using_sandbox:
+        logger.warning(
+            "SMS is pointed at the Africa's Talking SANDBOX - messages are accepted "
+            "but never delivered. Set SMS_API_URL to the live endpoint for real sends."
+        )
+
     today = date.today()
     rows = (
         await db.execute(
@@ -79,17 +97,34 @@ async def _dispatch(db) -> None:
 
     if not rows:
         logger.info("No debt reminders due today")
-        return
+        return {"status": "ok", "due": 0, "sent": 0, "skipped": 0, "failed": 0}
 
+    sent = skipped = failed = 0
     for reminder, customer_name, phone, amount, due_date in rows:
         if not phone:
             logger.warning("Reminder %s skipped: customer has no phone", reminder.reminder_id)
+            skipped += 1
             continue
         message = _build_message(customer_name, amount, due_date, reminder.note)
         if await _send_sms(phone, message):
             logger.info("Debt reminder SMS sent to %s", phone)
+            sent += 1
         else:
             logger.error("Failed to send debt reminder to %s", phone)
+            failed += 1
+
+    # A single line so the run is verifiable in the worker log without grepping.
+    logger.info(
+        "Debt reminder run complete: %d due, %d sent, %d skipped (no phone), %d failed",
+        len(rows), sent, skipped, failed,
+    )
+    return {
+        "status": "ok",
+        "due": len(rows),
+        "sent": sent,
+        "skipped": skipped,
+        "failed": failed,
+    }
 
 
 @celery.task
@@ -98,6 +133,6 @@ def dispatch_debt_reminders():
 
     async def _run():
         async with get_async_session_maker() as session:
-            await _dispatch(session)
+            return await _dispatch(session)
 
-    asyncio.run(_run())
+    return asyncio.run(_run())

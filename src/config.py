@@ -14,7 +14,14 @@ class Settings(BaseSettings):
     SMS_API_KEY: str = Field(default=os.getenv("SMS_KEY", ""), validation_alias="SMS_KEY")
     SMS_USERNAME: str = os.getenv("SMS_USERNAME", "sandbox")
     SMS_SENDER_ID: str = os.getenv("SMS_SENDER_ID", "")
-    SMS_API_URL: str = os.getenv("SMS_API_URL", "https://api.sandbox.africastalking.com/version1/messaging")
+    # Defaults to the LIVE Africa's Talking endpoint. Previously this defaulted to
+    # the sandbox, which accepted requests but delivered nothing - so a
+    # fully-configured deployment still sent zero real SMS. To develop against the
+    # sandbox, set SMS_API_URL=https://api.sandbox.africastalking.com/version1/messaging
+    # and SMS_USERNAME=sandbox explicitly.
+    SMS_API_URL: str = os.getenv(
+        "SMS_API_URL", "https://api.africastalking.com/version1/messaging"
+    )
     ACCESS_TOKEN_TIME: int = 60
     SUPER_ADMIN_EMAIL: str = os.getenv("SUPER_ADMIN_EMAIL", "")
     SUPER_ADMIN_APP_PASSWORD: str = os.getenv("SUPER_ADMIN_APP_PASSWORD", "")
@@ -37,7 +44,17 @@ class Settings(BaseSettings):
     REQUEST_LIMIT_EXPIRY: int = 60
     REQUEST_LIMIT: int = 5
     WS_TICKET_TTL: int = 300
-    
+
+    @property
+    def sms_configured(self) -> bool:
+        """True when an API key is present. Without one every send fails."""
+        return bool(self.SMS_API_KEY.strip())
+
+    @property
+    def sms_using_sandbox(self) -> bool:
+        """True when pointed at Africa's Talking sandbox, which delivers nothing."""
+        return "sandbox" in self.SMS_API_URL.lower() or self.SMS_USERNAME.lower() == "sandbox"
+
 
 def get_settings():
     return Settings()
