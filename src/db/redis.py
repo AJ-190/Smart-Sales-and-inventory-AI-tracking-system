@@ -47,7 +47,6 @@ async def ip_rate_limiter(redis: airedis.Redis, ip: str, expire: int):
             await redis.expire(key, expire)
         else:
             await redis.hset(key, mapping={"count": 1})
-            await redis.expire(key, expire)
         return False
             
     except Exception as e:
