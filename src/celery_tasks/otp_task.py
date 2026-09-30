@@ -5,10 +5,11 @@ from fastapi import status, HTTPException
 from src.config import get_settings
 from src.db.redis import otp_verification, otp_increment_attempts
 from starlette.responses import JSONResponse
+import hmac
 
 logger = logging.getLogger(__name__)
 
-SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send"
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 
 
 def _build_otp_html(otp: str) -> str:
@@ -69,30 +70,31 @@ def _build_otp_html(otp: str) -> str:
 
 async def _send_otp_email(to_email: str, otp: str) -> bool:
     settings = get_settings()
-    api_key = settings.SENDGRID_API_KEY
+    api_key = settings.BREVO_API_KEY
     if not api_key:
-        logger.error("SENDGRID_API_KEY is not configured")
+        logger.error("Brevo is not configured")
         return False
 
     payload = {
-        "personalizations": [{"to": [{"email": to_email}]}],
-        "from": {"email": settings.SUPER_ADMIN_EMAIL, "name": settings.SUPER_ADMIN_NAME},
+        "sender": {"email": settings.SUPER_ADMIN_EMAIL, "name": settings.SUPER_ADMIN_NAME},
+        "to": [{"email": to_email}],
         "subject": "Account Verification",
-        "content": [{"type": "text/html", "value": _build_otp_html(otp)}],
+        "htmlContent": _build_otp_html(otp),
     }
 
     for attempt in range(3):
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(
-                    SENDGRID_API_URL,
+                    BREVO_API_URL,
                     json=payload,
                     headers={
-                        "Authorization": f"Bearer {api_key}",
+                        "api-key": api_key,
+                        "accept": "application/json",
                         "Content-Type": "application/json",
                     },
                 )
-            if resp.status_code in (200, 202):
+            if resp.status_code in (200, 201, 202):
                 return True
             logger.warning("OTP email attempt %d/3 failed for %s: %s %s", attempt + 1, to_email, resp.status_code, resp.text)
         except Exception as e:
@@ -112,7 +114,9 @@ async def send_otp(email: str, forgot_pass):
         )
 
     otp = f"{secrets.randbelow(1_000_000):06d}"
-    await otp_verification(app.state.redis, email, forgot_pass=forgot_pass, otp=otp, store=True)
+    from src.auth.service import digest
+    
+    await otp_verification(app.state.redis, email, forgot_pass=forgot_pass, otp=digest(email,otp), store=True)
 
     try:
         sent = await _send_otp_email(email, otp)
@@ -123,7 +127,7 @@ async def send_otp(email: str, forgot_pass):
     if not sent:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Failed to send verification email. Please try again later.",
+            detail=f"Failed to send verification email. Please try again later.: {sent}",
         )
 
     return JSONResponse(status_code=status.HTTP_200_OK, content={"msg": "OTP-verification code is sent"})
@@ -131,7 +135,7 @@ async def send_otp(email: str, forgot_pass):
 
 async def verify_otp(email: str, otp: str, forgot_pass, consume: bool = True):
     from src.main import app
-
+    from src.auth.service import digest
     if not app.state.redis:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -150,17 +154,15 @@ async def verify_otp(email: str, otp: str, forgot_pass, consume: bool = True):
         return False
     
     
-    if data.get("otp") != otp:
-        return False
+    if not hmac.compare_digest(data.get('otp'), digest(email, otp)):
+            attempts = await otp_increment_attempts(app.state.redis, email)
+            return HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect or expired otp code")
 
     attempts = await otp_increment_attempts(app.state.redis, email)
     if attempts > 3:
         await app.state.redis.delete(f"email:{email}")
         await app.state.redis.delete(f"otp_attempts:{email}")
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many failed attempts. Please request a new code.")
-
-    if data.get("otp") != otp:
-        return False
 
     if consume:
         await app.state.redis.delete(f"email:{email}")

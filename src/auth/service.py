@@ -6,13 +6,20 @@ from sqlalchemy import select
 from src.users import models as um
 from src.auth import schemas, utils as auth_utils
 from src.config import get_settings
-from src.celery_tasks.otp_task import send_otp, verify_otp
+from src.celery_tasks.otp_task import verify_otp
+import hmac
+import hashlib
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 def verify_token_hash(token: str, hashed_token: str) -> bool:
     return hash_token(token) == hashed_token
+
+def digest(email: str, otp):
+    otp_bytes = f"{email}:{otp}".encode("utf-8")
+    return hmac.new(get_settings().SECRET_KEY.encode("utf-8"), otp_bytes, hashlib.sha256).hexdigest()
+    
 
 async def login(user_credentials, db: AsyncSession):
     result = await db.execute(

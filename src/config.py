@@ -40,7 +40,8 @@ class Settings(BaseSettings):
     USE_CREDENTIALS:bool = True
     VALIDATE_CERTS:bool = False
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
-    SENDGRID_API_KEY: str = os.getenv("SENDGRID_API_KEY", "")
+    BREVO_API_KEY: str = os.getenv("BREVO_API_KEY", "")
+    BREVO_API_URL: str
     REQUEST_LIMIT_EXPIRY: int = 60
     REQUEST_LIMIT: int = 5
     WS_TICKET_TTL: int = 300
