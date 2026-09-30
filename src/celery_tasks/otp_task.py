@@ -148,6 +148,10 @@ async def verify_otp(email: str, otp: str, forgot_pass, consume: bool = True):
 
     if data.get("forgot_pass") == "1" and not forgot_pass:
         return False
+    
+    
+    if data.get("otp") != otp:
+        return False
 
     attempts = await otp_increment_attempts(app.state.redis, email)
     if attempts > 3:
