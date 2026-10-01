@@ -362,9 +362,7 @@ async def set_reminders(business_id, current_user: um.Users, session: AsyncSessi
     data = post.model_dump()
     data["business_id"] = business_id
     data["debt_id"] = customer_with_debt.debt_id
-    # `date` is stored as timestamptz but the API speaks plain dates. Sending a
-    # bare `date` leaves the DB to guess the timezone; pin it to midnight UTC so
-    # func.date() in the dispatcher truncates back to the same calendar day.
+
     data["date"] = datetime.combine(post.date, time.min, tzinfo=timezone.utc)
     if data.get("time_of_day") is None:
         data.pop("time_of_day", None)
@@ -406,10 +404,7 @@ async def get_reminders(business_id, current_user: um.Users, session: AsyncSessi
     
     if post.customer_id:
         reminders = reminders.where(dm.Reminders.customer_id == post.customer_id)
-    
-    # `post.date` is Optional, so it must be checked for None before it is
-    # compared. The old code did `if post.date >= date.today()` first, which
-    # raised TypeError on every bodyless GET.
+
     if post.date:
         reminders = reminders.where(func.date(dm.Reminders.date) >= post.date)
     
@@ -443,8 +438,7 @@ async def edit_reminder(business_id, reminder_id, current_user: um.Users, sessio
     
     updates = post.model_dump(exclude_unset=True)
     
-    # Same rule as set_reminders, otherwise an existing reminder can be edited
-    # into a past date and silently never fire.
+
     if updates.get("date") is not None and updates["date"] < date.today():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -454,8 +448,6 @@ async def edit_reminder(business_id, reminder_id, current_user: um.Users, sessio
     for key, value in updates.items():
         if key == "date":
             value = datetime.combine(value, time.min, tzinfo=timezone.utc)
-            # Moving a reminder to a new day should send it again, so clear the
-            # stamp the dispatcher left when it went out the first time.
             reminder.sent_at = None
         setattr(reminder, key, value)
         
