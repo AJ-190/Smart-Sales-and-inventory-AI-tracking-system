@@ -41,7 +41,12 @@ class Settings(BaseSettings):
     VALIDATE_CERTS:bool = False
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
     BREVO_API_KEY: str = os.getenv("BREVO_API_KEY", "")
-    BREVO_API_URL: str
+    # Public transactional email endpoint. Safe to default: without BREVO_API_KEY
+    # the OTP task short-circuits anyway, and a required field here breaks every
+    # environment (CI, migrations) that has no mail config.
+    BREVO_API_URL: str = os.getenv(
+        "BREVO_API_URL", "https://api.brevo.com/v3/smtp/email"
+    )
     REQUEST_LIMIT_EXPIRY: int = 60
     REQUEST_LIMIT: int = 5
     WS_TICKET_TTL: int = 300
