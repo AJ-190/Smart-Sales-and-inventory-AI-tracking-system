@@ -1,7 +1,11 @@
 from pydantic import BaseModel, ConfigDict, EmailStr
 from datetime import datetime
 from typing import Optional
-from datetime import date, time
+# `date` must be imported under a different name: in a Pydantic model the field
+# name shadows the type during annotation resolution, so `date: Optional[date]`
+# resolves the inner `date` to the class attribute (None) and the field ends up
+# typed NoneType -- which made every date update and every date filter 422.
+from datetime import date as date_type, time
 
 
 
@@ -69,8 +73,7 @@ class CustomerTransactions(BaseModel):
 class scheduleReminder(BaseModel):
     debt_id: int
     customer_id: int
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
+    date: date_type
     time_of_day: Optional[time] = None
     note: str
     
@@ -80,19 +83,20 @@ class ReminderResponse(BaseModel):
     debt_id: int
     business_id: int
     customer_id: int
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
+    date: date_type
     time_of_day: Optional[time] = None
     note: str
     is_active: bool
+    # Set once the SMS has gone out. Handy for the UI to show "sent" and to
+    # confirm the reminder will not fire a second time.
+    sent_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
     
 class UpdateReminder(BaseModel):
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
+    date: Optional[date_type] = None
     time_of_day: Optional[time] = None
     note: Optional[str] = None
     is_active: Optional[bool] = None
@@ -102,8 +106,7 @@ class UpdateReminder(BaseModel):
 class GetReminders(BaseModel):
     debt_id: Optional[int] = None
     customer_id: Optional[int] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
+    date: Optional[date_type] = None
     time_of_day: Optional[time] = None
     note: Optional[str] = None
     is_active: Optional[bool] = None

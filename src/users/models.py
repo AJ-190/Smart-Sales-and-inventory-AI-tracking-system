@@ -44,6 +44,7 @@ class BusinessMember(Base):
     business_id = Column(Integer, ForeignKey("businesses.business_id", ondelete="SET NULL"), nullable=True)
     role = Column(SAEnum(RoleEnum), nullable=False, default=RoleEnum.cashier)
     is_active = Column(Boolean, default=True)
+    leave_business = Column(Boolean, default=False)
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("Users", back_populates="memberships")

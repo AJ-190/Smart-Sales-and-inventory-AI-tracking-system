@@ -31,9 +31,10 @@ celery.conf.update(
             "task": "src.celery_tasks.sales_task.monthly_sale_summary",
             "schedule": crontab(hour=0, minute=0, day_of_month="1"),
         },
-        "daily-debt-reminders": {
+
+        "debt-reminders": {
             "task": "src.celery_tasks.debt_reminders.dispatch_debt_reminders",
-            "schedule": crontab(hour=9, minute=0),
+            "schedule": crontab(minute=0),
         },
     },
 )

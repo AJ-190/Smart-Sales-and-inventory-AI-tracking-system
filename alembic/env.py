@@ -14,6 +14,7 @@ import src.businesses.models
 import src.debts.models
 import src.customers.models
 import src.chat.models
+import src.notifications.models
 
 from alembic import context
 

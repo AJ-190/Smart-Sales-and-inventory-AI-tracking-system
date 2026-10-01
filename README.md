@@ -264,7 +264,7 @@ Only `super_admin`, `admin`, and `manager` roles can update members. Non-super-a
 
 ## Scheduled Debt Reminders
 
-Business admins, managers, and cashiers can schedule an automatic SMS reminder for a customer's outstanding debt. A Celery Beat job runs daily at **09:00 UTC** and sends an SMS for every active reminder whose date window includes today, as long as the debt is still unpaid.
+Business admins, managers, and cashiers can schedule an automatic SMS reminder for a customer's outstanding debt. A Celery Beat job runs **every hour** and sends an SMS once a reminder's `date` + `time_of_day` has arrived, as long as the debt is still unpaid.
 
 **Schedule a reminder:**
 
@@ -277,14 +277,21 @@ Authorization: Bearer <token>   (roles: admin, manager, cashier, super_admin)
 {
   "debt_id": 12,
   "customer_id": 7,
-  "start_date": "2026-07-28",
-  "end_date": "2026-07-31",
+  "date": "2026-07-28",
   "time_of_day": "09:00",
   "note": "Friendly follow-up on your balance"
 }
 ```
 
-`start_date` and `end_date` default to the debt's due date minus 3 days and the due date respectively. `time_of_day` defaults to `09:00`. The SMS is sent to the customer's phone via the Africa's Talking API.
+| Field | Rules |
+|---|---|
+| `date` | Required. Cannot be in the past. |
+| `time_of_day` | Optional, defaults to `09:00`. Interpreted as UTC. |
+| `note` | Optional. |
+
+A reminder fires exactly once — the dispatcher stamps `sent_at` after a successful send, and the value is returned on the API so the UI can show "sent". Editing a reminder's `date` clears that stamp so it goes out again on the new day. A failed send stays unstamped and is retried on the next hourly run.
+
+The SMS goes to the customer's phone via Africa's Talking. Numbers are converted to international format on the way out, so a locally stored `0555555555` is sent as `+233555555555`.
 
 **Beat schedule** (`src/celery_tasks/celery_app.py`):
 
@@ -293,7 +300,9 @@ Authorization: Bearer <token>   (roles: admin, manager, cashier, super_admin)
 | Daily sales summary | Every day at 00:00 UTC |
 | Weekly sales summary | Every Monday at 00:00 UTC |
 | Monthly sales summary | 1st of the month at 00:00 UTC |
-| Debt reminders | Every day at 09:00 UTC |
+| Debt reminders | Every hour |
+
+Each run logs one summary line, e.g. `Debt reminder run complete: 3 due, 2 sent, 1 skipped, 0 failed`.
 
 Run the worker and beat scheduler locally:
 

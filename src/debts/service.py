@@ -6,7 +6,7 @@ from src.customers import models as cm, service as cv
 from src.debts import models as dm
 from src.businesses import service, models as bm
 from src.debts import schemas
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, time, timezone
 from src.websocket import socket_manager
 from src.notifications import service as notification_service, schemas as notification_schemas
 
@@ -338,45 +338,51 @@ async def set_reminders(business_id, current_user: um.Users, session: AsyncSessi
         )
     ).scalar_one_or_none()
     
-    reminder_exist = (
-        await session.execute(
-            select(dm.Reminders)
-            .where(dm.Reminders.debt_id == post.debt_id)
-            .where(dm.Reminders.business_id == business_id)
-            .where(dm.Reminders.customer_id == post.customer_id)
-        )
-    ).scalar_one_or_none()
+    
     
     if not customer_with_debt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No debt found for this customer")
-    
-    if reminder_exist:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Reminder for this customer already set")
-    
+
+    if customer_with_debt.is_paid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot schedule a reminder for a debt that is already paid",
+        )
+
+    # The guard used to read `post.date >= date.today()`, which rejected every
+    # future date and accepted every past one -- the exact opposite of the error
+    # it raised. The dispatcher only fires on the reminder's own date, so a past
+    # date can never send again.
+    if post.date < date.today():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Reminder date cannot be in the past",
+        )
+
     data = post.model_dump()
     data["business_id"] = business_id
     data["debt_id"] = customer_with_debt.debt_id
+    # `date` is stored as timestamptz but the API speaks plain dates. Sending a
+    # bare `date` leaves the DB to guess the timezone; pin it to midnight UTC so
+    # func.date() in the dispatcher truncates back to the same calendar day.
+    data["date"] = datetime.combine(post.date, time.min, tzinfo=timezone.utc)
+    if data.get("time_of_day") is None:
+        data.pop("time_of_day", None)
 
-    if not data.get("start_date"):
-        data["start_date"] = customer_with_debt.due_date.date() - timedelta(days=3)
-
-    if not data.get("end_date"):
-        data["end_date"] = customer_with_debt.due_date.date()
-        
     reminder = dm.Reminders(**data)
-    
     
     session.add(reminder)
     await session.commit()
     await session.refresh(reminder)
-    
-    await manager.broadcast(business_id, f"Reminder set for customer ID {post.customer_id} with debt ID {post.debt_id} from {reminder.start_date} to {reminder.end_date}")
+
+    message = f"A new reminder has been set for customer ID {post.customer_id} with debt ID {post.debt_id} on {post.date}."
+    await manager.broadcast(business_id, f"Reminder set for customer ID {post.customer_id} with debt ID {post.debt_id} on {post.date}")
     await notification_service.send_notification(
         notification_schemas.SendNotification(
             user_id=current_user.user_id,
             business_id=business_id,
             title="New Reminder Set",
-            message=f"A new reminder has been set for customer ID {post.customer_id} with debt ID {post.debt_id} from {reminder.start_date} to {reminder.end_date}.",
+            message=message,
         ),
         business_id,
         session,
@@ -395,14 +401,26 @@ async def get_reminders(business_id, current_user: um.Users, session: AsyncSessi
         .where(dm.Reminders.business_id == business_id)
     )
     
+    if post.debt_id:
+        reminders = reminders.where(dm.Reminders.debt_id == post.debt_id)
+    
     if post.customer_id:
         reminders = reminders.where(dm.Reminders.customer_id == post.customer_id)
-        
-    if post.start_date:
-        reminders = reminders.where(func.date(dm.Reminders.start_date) >= post.start_date)
-        
-    if post.end_date:
-        reminders = reminders.where(func.date(dm.Reminders.end_date) <= post.end_date)
+    
+    # `post.date` is Optional, so it must be checked for None before it is
+    # compared. The old code did `if post.date >= date.today()` first, which
+    # raised TypeError on every bodyless GET.
+    if post.date:
+        reminders = reminders.where(func.date(dm.Reminders.date) >= post.date)
+    
+    if post.time_of_day:
+        reminders = reminders.where(dm.Reminders.time_of_day == post.time_of_day)
+    
+    if post.note:
+        reminders = reminders.where(dm.Reminders.note == post.note)
+    
+    if post.is_active is not None:
+        reminders = reminders.where(dm.Reminders.is_active.is_(post.is_active))
         
     result = await session.execute(reminders.order_by(dm.Reminders.created_at.desc()))
     reminders_list = result.scalars().all()
@@ -423,7 +441,22 @@ async def edit_reminder(business_id, reminder_id, current_user: um.Users, sessio
     if not reminder:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No reminder found for this customer")
     
-    for key, value in post.model_dump(exclude_unset=True).items():
+    updates = post.model_dump(exclude_unset=True)
+    
+    # Same rule as set_reminders, otherwise an existing reminder can be edited
+    # into a past date and silently never fire.
+    if updates.get("date") is not None and updates["date"] < date.today():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Reminder date cannot be in the past",
+        )
+    
+    for key, value in updates.items():
+        if key == "date":
+            value = datetime.combine(value, time.min, tzinfo=timezone.utc)
+            # Moving a reminder to a new day should send it again, so clear the
+            # stamp the dispatcher left when it went out the first time.
+            reminder.sent_at = None
         setattr(reminder, key, value)
         
     await session.commit()

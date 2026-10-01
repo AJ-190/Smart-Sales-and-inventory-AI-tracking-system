@@ -565,7 +565,7 @@ async def leave_business(business_id, member_id, current_user: um.Users, session
                          detail="User not found in the business")
 
     member_, approvals = result
-
+    
     
     if not (current_user.user_id == member_.user_id or current_user.role in [um.RoleEnum.super_admin, um.RoleEnum.admin ]):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, 
@@ -573,7 +573,7 @@ async def leave_business(business_id, member_id, current_user: um.Users, session
     
     
     approvals.status = bm.ApprovalStatus.rejected
-    await session.delete(member_)
+    member_.leave_business = True
     await notification_service.send_notification(
         notification_schemas.SendNotification(
             user_id=current_user.user_id,
