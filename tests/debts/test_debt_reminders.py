@@ -6,14 +6,17 @@ never sending the same reminder twice.
 """
 
 import asyncio
+import json
 from datetime import date, datetime, time, timezone
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 from sqlalchemy import select, update
 
 from src.celery_tasks import debt_reminders
+from src.config import Settings, get_settings
 from src.customers import models as cm
 from src.debts import models as dm
 from src.main import app
@@ -231,6 +234,95 @@ def test_disabled_when_api_key_is_missing(session):
     assert result["sent"] == 0
 
     app.dependency_overrides.clear()
+
+
+def sailup_settings(**overrides):
+    """Real Settings with the Sailup provider switched on.
+
+    Pydantic v2 keeps field values off the class, so these have to be set per
+    instance rather than patched onto Settings itself.
+    """
+    base = {"SMS_PROVIDER": "sailup", "SAILUP_API_KEY": "k", "SAILUP_SENDER_ID": "BusinessBot"}
+    base.update(overrides)
+    return Settings(**base)
+
+
+def run_sailup_send(handler, **overrides):
+    """Drive send_sms against a mock transport, returning (result, requests seen)."""
+    seen = []
+
+    def wrapped(request):
+        seen.append(request)
+        return handler(request)
+
+    settings = sailup_settings(**overrides)
+    transport = httpx.MockTransport(wrapped)
+    real_client = httpx.AsyncClient
+
+    def fake_client(**kw):
+        kw["transport"] = transport
+        return real_client(**kw)
+
+    with patch.object(debt_reminders, "get_settings", lambda: settings), \
+         patch("httpx.AsyncClient", fake_client):
+        result = asyncio.run(debt_reminders.send_sms("+233555555555", "hello"))
+    return result, seen
+
+
+def test_sailup_payload_matches_the_documented_shape():
+    """Sailup wants from/to/body, `to` as an array, and a Bearer token."""
+    captured = {}
+
+    def handler(request):
+        captured["url"] = str(request.url)
+        captured["auth"] = request.headers.get("authorization")
+        captured["json"] = json.loads(request.content)
+        return httpx.Response(202, json={"id": "abc", "status": "queued"})
+
+    result, _ = run_sailup_send(handler, SAILUP_API_KEY="sailup_test_key")
+
+    assert result is True
+    assert captured["auth"] == "Bearer sailup_test_key"
+    assert captured["json"] == {
+        "from": "BusinessBot",
+        "to": ["+233555555555"],
+        "body": "hello",
+    }
+    # Sailup's resource paths need the trailing slash.
+    assert captured["url"].endswith("/v1/sms/")
+
+
+def test_sailup_202_means_queued_and_counts_as_sent():
+    """A 202 is queued, not delivered, but the send itself succeeded."""
+    result, seen = run_sailup_send(lambda request: httpx.Response(202, json={"id": "abc"}))
+
+    assert result is True
+    assert len(seen) == 1
+
+
+def test_sailup_failure_returns_false_after_retries():
+    result, seen = run_sailup_send(
+        lambda request: httpx.Response(422, json={"detail": "unregistered sender"})
+    )
+
+    assert result is False
+    assert len(seen) == debt_reminders.SEND_ATTEMPTS
+
+
+def test_sailup_without_sender_id_does_not_call_the_api():
+    """An unregistered `from` is rejected, so fail before spending a request."""
+    def handler(request):
+        pytest.fail("should not reach the API without a sender ID")
+
+    result, seen = run_sailup_send(handler, SAILUP_SENDER_ID="")
+
+    assert result is False
+    assert seen == []
+
+
+def test_africastalking_still_defaults():
+    """With no SMS_PROVIDER set, Africa's Talking is the one that gets used."""
+    assert get_settings().SMS_PROVIDER == "africastalking"
 
 
 def test_sends_once_the_time_arrives(session):

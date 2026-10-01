@@ -3,6 +3,9 @@
 Celery beat runs ``dispatch_debt_reminders`` every hour. On each run we look
 for reminders that are due and have not been sent yet, text the customer, and
 stamp ``sent_at`` so a reminder is only ever delivered once.
+
+Two gateways are supported, picked by the ``SMS_PROVIDER`` setting:
+``africastalking`` (the default) and ``sailup``.
 """
 
 import asyncio
@@ -52,9 +55,43 @@ def build_message(customer_name: str, amount: Decimal, due_date, note: str | Non
     return message
 
 
-async def send_sms(phone: str, message: str) -> bool:
-    """Post one text to Africa's Talking, retrying a couple of times."""
-    settings = get_settings()
+async def _send_sms_sailup(client: httpx.AsyncClient, settings, phone: str, message: str) -> bool:
+    """Post one text to Sailup. Their field names are ``from``, ``to``, ``body``.
+
+    ``to`` is an array even for one recipient, and 202 means queued rather than
+    delivered - the delivery receipt arrives later on a webhook.
+    """
+    if not settings.SAILUP_SENDER_ID:
+        logger.error(
+            "Sailup needs SAILUP_SENDER_ID: the `from` value has to be registered in "
+            "the Sailup dashboard before the send is accepted."
+        )
+        return False
+
+    response = await client.post(
+        settings.SAILUP_API_URL,
+        json={
+            "from": settings.SAILUP_SENDER_ID,
+            "to": [phone],
+            "body": message,
+        },
+        headers={
+            "Authorization": f"Bearer {settings.SAILUP_API_KEY}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+    )
+    if response.status_code in (200, 201, 202):
+        return True
+
+    logger.warning(
+        "Sailup rejected the SMS to %s: %s %s", phone, response.status_code, response.text,
+    )
+    return False
+
+
+async def _send_sms_africastalking(client: httpx.AsyncClient, settings, phone: str, message: str) -> bool:
+    """Post one text to Africa's Talking. Retrying is the caller's job."""
     payload = {
         "username": settings.SMS_USERNAME,
         "to": phone,
@@ -63,31 +100,47 @@ async def send_sms(phone: str, message: str) -> bool:
     if settings.SMS_SENDER_ID:
         payload["from"] = settings.SMS_SENDER_ID
 
+    response = await client.post(
+        settings.SMS_API_URL,
+        data=payload,
+        headers={
+            "apikey": settings.SMS_API_KEY,
+            "Accept": "application/json",
+        },
+    )
+    if response.status_code in (200, 201, 202):
+        return True
+
+    logger.warning(
+        "Africa's Talking rejected the SMS to %s: %s %s",
+        phone, response.status_code, response.text,
+    )
+    return False
+
+
+async def send_sms(phone: str, message: str) -> bool:
+    """Post one text to the configured provider, retrying a couple of times."""
+    settings = get_settings()
+
     # One client for all three attempts, rather than a new socket each time.
     async with httpx.AsyncClient(timeout=10) as client:
         for attempt in range(1, SEND_ATTEMPTS + 1):
             try:
-                response = await client.post(
-                    settings.SMS_API_URL,
-                    data=payload,
-                    headers={
-                        "apikey": settings.SMS_API_KEY,
-                        "Accept": "application/json",
-                    },
-                )
+                if settings.SMS_PROVIDER == "sailup":
+                    sent = await _send_sms_sailup(client, settings, phone, message)
+                else:
+                    sent = await _send_sms_africastalking(client, settings, phone, message)
             except httpx.HTTPError as error:
                 logger.warning("SMS to %s failed on attempt %d: %s", phone, attempt, error)
                 continue
 
-            if response.status_code in (200, 201, 202):
+            if sent:
                 return True
 
-            logger.warning(
-                "SMS to %s rejected on attempt %d: %s %s",
-                phone, attempt, response.status_code, response.text,
-            )
-
-    logger.error("Giving up on the SMS to %s after %d attempts", phone, SEND_ATTEMPTS)
+    logger.error(
+        "Giving up on the SMS to %s after %d attempts (provider=%s)",
+        phone, SEND_ATTEMPTS, settings.SMS_PROVIDER,
+    )
     return False
 
 
@@ -144,11 +197,15 @@ async def dispatch(db, now: datetime | None = None) -> dict:
     # Checked once, up front. Otherwise a misconfigured deployment logs the same
     # "no API key" error once per customer and the real cause gets lost.
     if not settings.sms_configured:
+        # Named per provider, so the log points at the variable that is actually
+        # missing rather than always blaming SMS_KEY.
+        missing = "SAILUP_API_KEY" if settings.SMS_PROVIDER == "sailup" else "SMS_KEY"
         logger.error(
-            "Debt reminders are DISABLED: SMS_KEY is not set, so no SMS will be sent. "
-            "Set SMS_KEY (and SMS_SENDER_ID) on the worker and beat services."
+            "Debt reminders are DISABLED: %s is not set, so no SMS will be sent. "
+            "Set it (and the sender ID) on the worker and beat services.",
+            missing,
         )
-        return {"status": "disabled", "reason": "SMS_KEY not configured", "sent": 0}
+        return {"status": "disabled", "reason": f"{missing} not configured", "sent": 0}
 
     if settings.sms_using_sandbox:
         logger.warning(

@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     SMS_API_URL: str = os.getenv(
         "SMS_API_URL", "https://api.africastalking.com/version1/messaging"
     )
+    SMS_PROVIDER: str = os.getenv("SMS_PROVIDER", "africastalking").strip().lower()
+    SAILUP_API_URL: str = os.getenv(
+        "SAILUP_API_URL", "https://api.sailup.io/v1/sms/"
+    )
+    SAILUP_API_KEY: str = os.getenv("SAILUP_API_KEY", "")
+    # Must be registered in the Sailup dashboard or the send is rejected.
+    SAILUP_SENDER_ID: str = os.getenv("SAILUP_SENDER_ID", "")
     ACCESS_TOKEN_TIME: int = 60
     SUPER_ADMIN_EMAIL: str = os.getenv("SUPER_ADMIN_EMAIL", "")
     SUPER_ADMIN_APP_PASSWORD: str = os.getenv("SUPER_ADMIN_APP_PASSWORD", "")
@@ -41,9 +48,6 @@ class Settings(BaseSettings):
     VALIDATE_CERTS:bool = False
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
     BREVO_API_KEY: str = os.getenv("BREVO_API_KEY", "")
-    # Public transactional email endpoint. Safe to default: without BREVO_API_KEY
-    # the OTP task short-circuits anyway, and a required field here breaks every
-    # environment (CI, migrations) that has no mail config.
     BREVO_API_URL: str = os.getenv(
         "BREVO_API_URL", "https://api.brevo.com/v3/smtp/email"
     )
@@ -53,12 +57,19 @@ class Settings(BaseSettings):
 
     @property
     def sms_configured(self) -> bool:
-        """True when an API key is present. Without one every send fails."""
+        """True when the active provider has an API key. Without one every send fails."""
+        if self.SMS_PROVIDER == "sailup":
+            return bool(self.SAILUP_API_KEY.strip())
         return bool(self.SMS_API_KEY.strip())
 
     @property
     def sms_using_sandbox(self) -> bool:
-        """True when pointed at Africa's Talking sandbox, which delivers nothing."""
+        """True when pointed at Africa's Talking sandbox, which delivers nothing.
+
+        Sailup has no sandbox, so this is always False when it is the provider.
+        """
+        if self.SMS_PROVIDER == "sailup":
+            return False
         return "sandbox" in self.SMS_API_URL.lower() or self.SMS_USERNAME.lower() == "sandbox"
 
 
