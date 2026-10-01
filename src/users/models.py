@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, String, Boolean, Integer, DateTime, Enum as SAEnum, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, Boolean, Integer, DateTime, Enum as SAEnum, ForeignKey, UniqueConstraint, or_
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from src.db.database import Base
@@ -53,3 +53,14 @@ class BusinessMember(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "business_id", name="uq_user_business"),
     )
+
+
+# A member row is kept after someone leaves (soft delete) so their history
+# survives, which means every query that means "people currently in this
+# business" has to go through this predicate instead of matching on
+# business_id alone. NULL counts as still-here: the column is nullable and
+# rows written before the flag existed have no value for it.
+ACTIVE_MEMBERSHIP = or_(
+    BusinessMember.leave_business.is_(False),
+    BusinessMember.leave_business.is_(None),
+)

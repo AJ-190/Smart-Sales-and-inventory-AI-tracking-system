@@ -41,6 +41,7 @@ async def summary(period: str, db: AsyncSession | None = None):
             select(um.BusinessMember, um.Users)
             .join(um.Users, um.BusinessMember.user_id == um.Users.user_id)
             .where(
+                um.ACTIVE_MEMBERSHIP,
                 um.BusinessMember.role.in_([
                     um.RoleEnum.admin,
                     um.RoleEnum.super_admin,

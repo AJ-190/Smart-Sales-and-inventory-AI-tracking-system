@@ -53,9 +53,6 @@ class Reminders(Base):
     time_of_day = Column(Time, server_default=text("'09:00'"))
     note = Column(String, nullable=True)
     is_active = Column(Boolean, nullable=False, server_default=text("true"))
-    # Set the first time the SMS goes out. It is what makes a reminder fire
-    # exactly once - without it a re-run (or a beat double-fire) would text the
-    # customer again.
     sent_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())

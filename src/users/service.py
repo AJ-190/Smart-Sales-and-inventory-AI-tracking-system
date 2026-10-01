@@ -1,6 +1,6 @@
 from fastapi import status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from src.users import models as um
 from src.businesses import models as bm
 from src.users import schemas
@@ -50,6 +50,7 @@ async def get_users(db: AsyncSession, current_user):
         )
         .join(um.BusinessMember, um.Users.user_id == um.BusinessMember.user_id)
         .join(bm.Business, bm.Business.business_id == um.BusinessMember.business_id)
+        .where(um.ACTIVE_MEMBERSHIP)
     )
     users = result.all()
 
@@ -69,7 +70,13 @@ async def get_all_users(db: AsyncSession, current_user):
                um.Users.is_verified,
                um.BusinessMember.business_id,
                um.BusinessMember.member_id)
-        .outerjoin(um.BusinessMember, um.BusinessMember.user_id == um.Users.user_id)
+        .outerjoin(
+            um.BusinessMember,
+            and_(
+                um.BusinessMember.user_id == um.Users.user_id,
+                um.ACTIVE_MEMBERSHIP,
+            ),
+        )
     )
     users = result.all()
 
@@ -103,6 +110,7 @@ async def get_members(db: AsyncSession, current_user):
                um.BusinessMember.role.label("role"))
         .join(um.Users, um.BusinessMember.user_id == um.Users.user_id)
         .where(um.BusinessMember.business_id == current_user.business_id)
+        .where(um.ACTIVE_MEMBERSHIP)
     )
     members = result.all()
 
@@ -129,6 +137,7 @@ async def get_member(member_id: int, db: AsyncSession, current_user):
         .join(um.Users, um.BusinessMember.user_id == um.Users.user_id)
         .where(um.BusinessMember.member_id == member_id)
         .where(um.BusinessMember.business_id == current_user.business_id)
+        .where(um.ACTIVE_MEMBERSHIP)
     )
     member = result.first()
 
@@ -149,7 +158,8 @@ async def get_user(id, db: AsyncSession, current_user):
                um.BusinessMember.member_id,
                um.BusinessMember.business_id)
         .outerjoin(um.BusinessMember,
-                   um.BusinessMember.user_id == um.Users.user_id)
+                   and_(um.BusinessMember.user_id == um.Users.user_id,
+                        um.ACTIVE_MEMBERSHIP))
         .where(um.Users.user_id == id)
     )
     if current_user.business_id:
@@ -218,6 +228,7 @@ async def delete_user(id, db: AsyncSession, current_user):
             select(um.BusinessMember)
             .where(um.BusinessMember.user_id == id)
             .where(um.BusinessMember.business_id == current_user.business_id)
+            .where(um.ACTIVE_MEMBERSHIP)
         )
         if not membership.scalar_one_or_none():
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to delete users from other businesses")

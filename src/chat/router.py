@@ -69,6 +69,7 @@ async def _ensure_membership(session: AsyncSession, user_id: int, business_id: i
         .where(
             um.BusinessMember.user_id == user_id,
             um.BusinessMember.business_id == business_id,
+            um.ACTIVE_MEMBERSHIP,
         )
     )
     if membership.scalar_one_or_none() is None:
@@ -278,6 +279,7 @@ async def group_chat_endpoint(websocket: WebSocket, business_id: int):
                 .where(
                     um.BusinessMember.user_id == user_id,
                     um.BusinessMember.business_id == business_id,
+                    um.ACTIVE_MEMBERSHIP,
                 )
             )
             if membership.scalar_one_or_none() is None:
@@ -330,6 +332,7 @@ async def get_messages(
             select(um.BusinessMember.user_id, um.BusinessMember.role).where(
                 um.BusinessMember.user_id.in_(user_ids),
                 um.BusinessMember.business_id == business_id,
+                um.ACTIVE_MEMBERSHIP,
             )
         )).all()
 

@@ -1,7 +1,7 @@
 from fastapi import status, HTTPException, Depends, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from src.db.database import get_db
 from src.users import models as um
 from src.users import schemas as users_schema
@@ -68,7 +68,13 @@ async def get_current_user(
             um.BusinessMember.member_id,
             um.BusinessMember.business_id,
         )
-        .outerjoin(um.BusinessMember, um.BusinessMember.user_id == um.Users.user_id)
+        .outerjoin(
+            um.BusinessMember,
+            and_(
+                um.BusinessMember.user_id == um.Users.user_id,
+                um.ACTIVE_MEMBERSHIP,
+            ),
+        )
         .where(um.Users.user_id == user_id)
     )
     row = result.first()

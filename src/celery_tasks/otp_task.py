@@ -9,7 +9,7 @@ import hmac
 
 logger = logging.getLogger(__name__)
 
-BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
+
 
 
 def _build_otp_html(otp: str) -> str:
@@ -86,7 +86,7 @@ async def _send_otp_email(to_email: str, otp: str) -> bool:
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(
-                    BREVO_API_URL,
+                    get_settings().BREVO_API_URL,
                     json=payload,
                     headers={
                         "api-key": api_key,

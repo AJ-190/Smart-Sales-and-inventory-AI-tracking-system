@@ -1,6 +1,6 @@
 from fastapi import status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, select
+from sqlalchemy import func, select, and_
 from src.users import models as um
 from src.businesses import models as bm
 from src.customers import models as cm
@@ -16,6 +16,7 @@ async def get_member(db, current_user):
     member = (
         await db.execute(
             select(um.BusinessMember).where(um.BusinessMember.user_id == current_user.user_id)
+            .where(um.ACTIVE_MEMBERSHIP)
         )
     ).scalars().first()
     if not member:
@@ -78,7 +79,10 @@ async def my_businesses(db: AsyncSession, current_user):
                 )
                 .outerjoin(
                     um.BusinessMember,
-                    um.BusinessMember.business_id == bm.Business.business_id,
+                    and_(
+                        um.BusinessMember.business_id == bm.Business.business_id,
+                        um.ACTIVE_MEMBERSHIP,
+                    ),
                 )
                 .where(um.BusinessMember.user_id == current_user.user_id)
                 .group_by(bm.Business.business_id)
@@ -103,7 +107,10 @@ async def get_businesses(db, current_user):
                 )
                 .outerjoin(
                     um.BusinessMember,
-                    um.BusinessMember.business_id == bm.Business.business_id,
+                    and_(
+                        um.BusinessMember.business_id == bm.Business.business_id,
+                        um.ACTIVE_MEMBERSHIP,
+                    ),
                 )
                 .group_by(bm.Business.business_id)
             )
@@ -124,7 +131,10 @@ async def get_business(id, db: AsyncSession, current_user):
         )
         .outerjoin(
             um.BusinessMember,
-            um.BusinessMember.business_id == bm.Business.business_id,
+            and_(
+                um.BusinessMember.business_id == bm.Business.business_id,
+                um.ACTIVE_MEMBERSHIP,
+            ),
         )
         .where(bm.Business.business_id == id)
         .group_by(bm.Business.business_id)
@@ -167,6 +177,7 @@ async def update_business(id, post, db: AsyncSession, current_user):
                 .where(
                     bm.Business.business_id == id,
                     um.BusinessMember.user_id == current_user.user_id,
+                    um.ACTIVE_MEMBERSHIP,
                 )
             )
         ).scalars().first()
@@ -207,6 +218,7 @@ async def delete_business(id, db: AsyncSession, current_user):
             select(um.BusinessMember).where(
                 um.BusinessMember.business_id == id,
                 um.BusinessMember.user_id == current_user.user_id,
+                um.ACTIVE_MEMBERSHIP,
             )
         )).scalars().first()
         if not is_member:
@@ -267,6 +279,7 @@ async def get_business_key(business_id, db: AsyncSession, current_user):
                 .join(um.BusinessMember, um.BusinessMember.business_id == bm.Business.business_id)
                 .where(bm.Business.business_id == business_id)
                 .where(um.BusinessMember.user_id == current_user.user_id)
+                .where(um.ACTIVE_MEMBERSHIP)
             )
         ).scalars().first()
     )
@@ -301,6 +314,22 @@ async def send_approval(post, db: AsyncSession, current_user):
         
         
         existing_user = (await db.execute(stmt)).scalars().first()
+
+        if existing_user and existing_user.status == bm.ApprovalStatus.approved:
+            # An approved request only blocks a new one while the person is
+            # still in the business. Someone who left afterwards is no longer
+            # a member and has to be approved again, so that request is spent.
+            still_member = (
+                await db.execute(
+                    select(um.BusinessMember)
+                    .where(um.BusinessMember.business_id == check_business_.business_id)
+                    .where(um.BusinessMember.user_id == current_user.user_id)
+                    .where(um.ACTIVE_MEMBERSHIP)
+                )
+            ).scalars().first()
+
+            if not still_member:
+                existing_user = None
 
         if existing_user:
             if existing_user.status == bm.ApprovalStatus.rejected:
@@ -455,6 +484,9 @@ async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSessio
             if existing_member:
                 existing_member.role = approval_user.role
                 existing_member.is_active = True
+                # Reinstating a previous member: clear the soft-delete flag so
+                # they show up in member lists again.
+                existing_member.leave_business = False
             else:
                 user = um.BusinessMember(role=approval_user.role, user_id=approval_user.requester_id,
                     business_id=approval_user.business_id)
@@ -538,7 +570,7 @@ async def business_authorized_access(current_user, business_id, db: AsyncSession
                 select(um.BusinessMember)
                 .where(um.BusinessMember.user_id == int(current_user.user_id))
                 .where(um.BusinessMember.business_id == business_id)
-                
+                .where(um.ACTIVE_MEMBERSHIP)
             )).scalars().first()
         )
         
@@ -551,28 +583,41 @@ async def leave_business(business_id, member_id, current_user: um.Users, session
     
     await business_authorized_access(current_user, business_id, session)
     
-    result = (
+    # Look the member up on its own. The old version inner-joined Approvals on
+    # `Approvals.requester_id == BusinessMember.member_id` and read the result
+    # with one_or_none(), which 404'd members who joined by creating the
+    # business (no approval row) and raised MultipleResultsFound for anyone
+    # with more than one. Approvals are handled separately below.
+    member_ = (
         await session.execute(
-            select(um.BusinessMember, bm.Approvals)
+            select(um.BusinessMember)
             .where(um.BusinessMember.business_id == business_id)
             .where(um.BusinessMember.user_id == member_id)
-            .join(bm.Approvals, bm.Approvals.requester_id == um.BusinessMember.member_id)
         )
-    ).one_or_none()
+    ).scalars().first()
 
-    if result is None:
+    if member_ is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                          detail="User not found in the business")
 
-    member_, approvals = result
-    
-    
     if not (current_user.user_id == member_.user_id or current_user.role in [um.RoleEnum.super_admin, um.RoleEnum.admin ]):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, 
                             detail="Unauthorized to perform this action")
-    
-    
-    approvals.status = bm.ApprovalStatus.rejected
+
+    # Close out any request still in flight so the leaver is not resurrected by
+    # a later approval.
+    pending_approvals = (
+        await session.execute(
+            select(bm.Approvals)
+            .where(bm.Approvals.business_id == business_id)
+            .where(bm.Approvals.requester_id == member_.user_id)
+            .where(bm.Approvals.status == bm.ApprovalStatus.pending)
+        )
+    ).scalars().all()
+
+    for approval in pending_approvals:
+        approval.status = bm.ApprovalStatus.rejected
+
     member_.leave_business = True
     await notification_service.send_notification(
         notification_schemas.SendNotification(
@@ -599,6 +644,7 @@ async def update_business_member(business_id: int, member_id: int, post: schemas
                 select(um.BusinessMember)
                 .where(um.BusinessMember.business_id == business_id)
                 .where(um.BusinessMember.user_id == current_user.user_id)
+                .where(um.ACTIVE_MEMBERSHIP)
             )
         ).scalars().first()
         if not is_member:
@@ -609,6 +655,7 @@ async def update_business_member(business_id: int, member_id: int, post: schemas
             select(um.BusinessMember)
             .where(um.BusinessMember.member_id == member_id)
             .where(um.BusinessMember.business_id == business_id)
+            .where(um.ACTIVE_MEMBERSHIP)
         )
     ).scalars().first()
 
