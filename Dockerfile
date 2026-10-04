@@ -11,12 +11,9 @@ EXPOSE 8000
 
 CMD ["python", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
-# This image is the API only. Celery must run as SEPARATE containers from the
-# same image, otherwise the beat schedule never fires and no debt reminder SMS
-# is ever sent:
+# Celery has been replaced by APScheduler (src/tasks/), so there is no separate
+# worker or beat container to start any more.
 #
-#   docker run ... celery -A src.celery_tasks.celery_app:celery worker --loglevel=info
-#   docker run ... celery -A src.celery_tasks.celery_app:celery beat --loglevel=info
-#
-# Both need the same REDIS_URL, SAILUP_API_KEY and SAILUP_SENDER_ID env vars
-# as the API.
+# NOTE: no startup hook calls start_report_schedulers() yet, so scheduled
+# reports and hourly debt reminders do not fire in this image. See the
+# "Scheduled Jobs Not Wired Up" section of README.md.

@@ -15,6 +15,38 @@ def test_create_user(client):
     assert res.status_code == status.HTTP_201_CREATED
 
 
+def test_create_user_cannot_self_assign_role(client):
+    """A signup must never be able to choose its own role."""
+    res = client.post(
+        "/users/sign_up",
+        json={
+            "name": "sneaky",
+            "email": "sneaky@gmail.com",
+            "password": "Testpass123",
+            "phone": "0244000111",
+            "role": "super_admin",
+        },
+    )
+    # extra="forbid" rejects the smuggled field instead of silently dropping it
+    assert res.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert "role" in res.text
+
+
+def test_signup_defaults_to_user_role(client):
+    """Omitting role yields the lowest-privilege role."""
+    res = client.post(
+        "/users/sign_up",
+        json={
+            "name": "plainuser",
+            "email": "plainuser@gmail.com",
+            "password": "Testpass123",
+            "phone": "0244000222",
+        },
+    )
+    assert res.status_code == status.HTTP_201_CREATED
+    assert res.json()["role"] == "user"
+
+
 def test_create_business(authorized_user_client):
     res = authorized_user_client.post(
         "/businesses/create",

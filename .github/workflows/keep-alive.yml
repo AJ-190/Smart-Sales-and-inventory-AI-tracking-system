@@ -1,0 +1,36 @@
+name: Keep Alive
+
+
+on:
+  schedule:
+
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  # Never stack up runs if one is slow to start.
+  group: keep-alive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    name: Ping API
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 5
+
+    steps:
+      - name: Ping the API
+        run: |
+          status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 240 "$PING_URL/")
+          echo "HTTP $status"
+
+          if [ "$status" != "200" ]; then
+            echo "::error::Keep-alive ping failed with HTTP $status"
+            exit 1
+          fi
+
+          echo "Server is awake."
+
+    env:
+      PING_URL: https://smart-sales-and-inventory-ai-tracking.onrender.com

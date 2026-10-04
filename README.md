@@ -28,7 +28,7 @@ A production-ready REST API for small businesses to manage inventory, track sale
 - **Debt Tracking** — Track outstanding customer debts with automatic SMS reminders
 - **Scheduled SMS Reminders** — Schedule debt reminders and send them via Sailup
 - **Dashboard & Analytics** — Aggregated KPIs, revenue breakdowns, profit margins, payment method splits, best-selling product insights, and a combined dashboard endpoint
-- **Automated Reports** — Daily, weekly, and monthly sales summaries sent via email to admins and managers using background cron jobs
+- **Automated Reports** — Daily, weekly, and monthly sales summaries sent via SMS to verified admins and managers using APScheduler
 
 ---
 
@@ -39,10 +39,10 @@ A production-ready REST API for small businesses to manage inventory, track sale
 | Framework | FastAPI |
 | Database | PostgreSQL (SQLAlchemy ORM) |
 | Auth | JWT (OAuth2 + Argon2 hashing) |
-| Background Jobs | Celery + Celery Beat |
-| Email | SendGrid (OTP) + SMTP/Gmail (reports) |
+| Background Jobs | APScheduler (SQLAlchemy job store) |
+| Email | Brevo (OTP) |
 | SMS | Sailup |
-| Caching | Redis (OTP storage, rate limiting, JWT revocation, Celery broker) |
+| Caching | Redis (OTP storage, rate limiting, JWT revocation) |
 | Deployment | Render / Railway |
 
 ---
@@ -93,15 +93,15 @@ src/
 │   ├── schemas.py         #   Request/response models
 │   └── service.py         #   Debt query + reminder scheduling logic
 ├── analytics/             # Dashboard & analytics module
-│   ├── router.py          #   /reports/*, /admin/crons/*
+│   ├── router.py          #   /reports/*
 │   ├── schemas.py         #   Request/response models
 │   └── service.py         #   Analytics aggregation logic
-├── celery_tasks/          # Background job module (Celery + Beat)
-│   ├── celery_app.py      #   Celery config + beat schedule
-│   ├── sales_task.py      #   Daily/weekly/monthly summary generators
-│   ├── email_report.py    #   HTML email builder + PDF receipt renderer
-│   ├── otp_task.py        #   OTP email verification task
-│   └── debt_reminders.py  #   Daily SMS debt-reminder dispatcher
+├── tasks/                 # Scheduled jobs (APScheduler)
+│   ├── scheduler.py       #   BackgroundScheduler + SQLAlchemy job store
+│   ├── jobs.py            #   Daily/weekly/monthly SMS report jobs
+│   ├── reciept.py         #   SMS business report generator
+│   ├── otp_task.py        #   OTP email verification
+│   └── debt_reminders.py  #   Hourly SMS debt-reminder dispatcher
 ├── middleware/
 │   ├── __init__.py
 │   ├── logging.py         #   Request logging middleware
@@ -264,7 +264,7 @@ Only `super_admin`, `admin`, and `manager` roles can update members. Non-super-a
 
 ## Scheduled Debt Reminders
 
-Business admins, managers, and cashiers can schedule an automatic SMS reminder for a customer's outstanding debt. A Celery Beat job runs **every hour** and sends an SMS once a reminder's `date` + `time_of_day` has arrived, as long as the debt is still unpaid.
+Business admins, managers, and cashiers can schedule an automatic SMS reminder for a customer's outstanding debt. An APScheduler job runs **every hour** and sends an SMS once a reminder's `date` + `time_of_day` has arrived, as long as the debt is still unpaid.
 
 **Schedule a reminder:**
 
@@ -293,23 +293,17 @@ A reminder fires exactly once — the dispatcher stamps `sent_at` after a succes
 
 The SMS goes to the customer's phone via Sailup. Numbers are converted to international format on the way out, so a locally stored `0555555555` is sent as `+233555555555`.
 
-**Beat schedule** (`src/celery_tasks/celery_app.py`):
+**Job schedule** (`src/tasks/jobs.py`):
 
 | Job | Schedule |
 |---|---|
-| Daily sales summary | Every day at 00:00 UTC |
-| Weekly sales summary | Every Monday at 00:00 UTC |
-| Monthly sales summary | 1st of the month at 00:00 UTC |
-| Debt reminders | Every hour |
+| Daily sales summary | Every day at 19:00 UTC |
+| Weekly sales summary | Every Sunday at 19:00 UTC |
+| Monthly sales summary | 1st of the month at 19:00 UTC |
 
-Each run logs one summary line, e.g. `Debt reminder run complete: 3 due, 2 sent, 1 skipped, 0 failed`.
+Jobs are persisted in the `apscheduler_jobs` table via `SYNC_DATABASE_URL`, so a restart does not lose them.
 
-Run the worker and beat scheduler locally:
-
-```bash
-celery -A src.celery_tasks.celery_app worker --loglevel=info
-celery -A src.celery_tasks.celery_app beat --loglevel=info
-```
+> **Note:** `start_report_schedulers()` (`src/tasks/jobs.py`) is not currently invoked from `src/main.py`, and `process_due_reminders()` has no `add_job` registration. Nothing starts the scheduler in this tree, so scheduled reports and debt reminders will not fire until a startup hook calls it. See [Scheduled Jobs Not Wired Up](#scheduled-jobs-not-wired-up).
 
 ---
 
@@ -348,31 +342,35 @@ The following data points are available via existing endpoints:
 |---|---|---|
 | `/reports/profit/{business_id}` | GET | View profit, revenue, cost |
 | `/reports/analytics/dashboard/{business_id}` | GET | Full dashboard with all KPIs |
-| `/reports/analytics/summary/{business_id}` | GET | Full sales summary (also emailed) |
+| `/reports/analytics/summary/{business_id}` | GET | Full sales summary (also sent by SMS) |
 | `/reports/analytics/low_stock` | GET | Low stock alert list |
 | `/reports/analytics/debts/{business_id}` | GET | Outstanding debt totals |
 
 ---
 
-## Admin Cron Triggers
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/admin/crons/daily_summary` | POST | Trigger daily sales report |
-| `/admin/crons/weekly_summary` | POST | Trigger weekly sales report |
-| `/admin/crons/monthly_summary` | POST | Trigger monthly sales report |
-| `/admin/crons/jobs` | GET | List scheduled cron jobs |
-
----
-
 ## Automated Reports
 
-Background cron jobs run on schedule and email reports to business admins and managers:
+Scheduled jobs run on APScheduler and send an SMS report to verified, active admins and managers:
 
 - **Daily** — End-of-day sales summary
 - **Weekly** — Weekly performance overview
-- **Monthly** — Monthly revenue and inventory report
-- **Debt Reminders** — Daily SMS reminders for scheduled outstanding debts (see [Scheduled Debt Reminders](#scheduled-debt-reminders))
+- **Monthly** — Monthly revenue summary
+- **Debt Reminders** — Hourly SMS reminders for scheduled outstanding debts (see [Scheduled Debt Reminders](#scheduled-debt-reminders))
+
+Each report contains total revenue, total profit, total orders, units sold, a cash/mobile-money/card breakdown, and the best-selling product. Messages run roughly 250-300 characters, so Sailup splits them into two segments.
+
+Recipients are resolved with `um.ACTIVE_MEMBERSHIP` plus `role in (admin, manager)`, `is_verified`, and `is_active`. Members without a usable phone are logged and skipped.
+
+---
+
+## Scheduled Jobs Not Wired Up
+
+The report jobs and the debt-reminder dispatcher exist and are covered by tests, but nothing in this tree starts the scheduler:
+
+- `start_report_schedulers()` in `src/tasks/jobs.py` is never called.
+- `process_due_reminders()` in `src/tasks/debt_reminders.py` has no `add_job` registration.
+
+Until an application startup hook calls `start_report_schedulers()` (and registers the hourly reminder job), no scheduled report or reminder SMS will be sent, even though `SAILUP_API_KEY` and `SAILUP_SENDER_ID` are set. Celery has been removed entirely, so there is no separate worker process to start.
 
 ---
 
@@ -390,17 +388,20 @@ ALGORITHM=HS256
 ACCESS_TOKEN_TIME=60
 REFRESH_TOKEN_TIME=10080
 
-# Super Admin / Email (SMTP)
+# Super Admin / Email (Brevo SMTP for OTP)
 SUPER_ADMIN_EMAIL=admin@example.com
-SUPER_ADMIN_APP_PASSWORD=your_gmail_app_password
+SUPER_ADMIN_APP_PASSWORD=your_brevo_smtp_key
 SUPER_ADMIN_NAME=Admin Name
 MAIL_SERVER=smtp.gmail.com
+BREVO_API_KEY=your_brevo_api_key
+# Optional. Defaults to https://api.brevo.com/v3/smtp/email
+BREVO_API_URL=
+
+# APScheduler SQLAlchemy job store (sync driver URL)
+SYNC_DATABASE_URL=postgresql://user:password@host:5432/dbname
 
 # API Key
 API_AUTH_KEY=your_api_auth_key
-
-# SendGrid (OTP emails)
-SENDGRID_API_KEY=your_sendgrid_api_key
 
 # Sailup (debt reminder + scheduled sales report SMS)
 SAILUP_API_KEY=your_sailup_api_key
@@ -412,6 +413,27 @@ REDIS_URL=redis://localhost:6379
 ```
 
 > **Note:** Sailup has no sandbox — every send is a real, billed message. Sends are skipped with a loud error if either `SAILUP_API_KEY` or `SAILUP_SENDER_ID` is missing. See [Notifications and Scheduled Reports](#notifications-and-scheduled-reports).
+
+---
+
+## Keeping the Server Awake
+
+Render's free plan spins down the web service after 15 minutes without inbound traffic, and a cold start takes roughly a minute. `.github/workflows/keep-alive.yml` pings the public `GET /` endpoint every 10 minutes to prevent that.
+
+| Setting | Value |
+|---|---|
+| Schedule | `*/10 * * * *` (every 10 minutes) |
+| Target | `https://smart-sales-and-inventory-ai-tracking.onrender.com/` |
+| Auth | None — `GET /` is public |
+| Failure behaviour | Exits non-zero and logs a GitHub Actions error annotation |
+
+Run it on demand from the Actions tab via **Keep Alive → Run workflow**, which is the fastest way to confirm it works.
+
+Two caveats:
+
+- GitHub only guarantees 5-minute cron granularity and may delay a scheduled run, so the service can still spin down occasionally.
+- GitHub disables scheduled workflows in public repositories after 60 days without repository activity. If pings stop, check the Actions tab.
+- This keeps only the **web** service warm. It does not keep any worker or scheduler process alive.
 
 ---
 

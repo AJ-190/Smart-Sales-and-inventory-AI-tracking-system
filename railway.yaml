@@ -7,11 +7,9 @@ deploy:
   restartPolicyMaxRetries: 3
 
 # NOTE: Railway runs ONE process per service, and this file describes only the
-# web service. Debt reminders additionally need two more Railway services built
-# from the same repo, or the Celery beat schedule never fires:
+# web service. The Celery worker/beat services that used to be documented here
+# were removed in favour of APScheduler (src/tasks/).
 #
-#   worker -> celery -A src.celery_tasks.celery_app:celery worker --loglevel=info
-#   beat   -> celery -A src.celery_tasks.celery_app:celery beat --loglevel=info
-#
-# Do not add them as extra processes here - a crashed worker would take the API
-# down with it.
+# No scheduler process is started today: nothing calls start_report_schedulers()
+# and process_due_reminders() has no add_job registration. See the
+# "Scheduled Jobs Not Wired Up" section of README.md.

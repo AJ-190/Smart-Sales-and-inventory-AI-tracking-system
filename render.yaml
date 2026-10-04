@@ -5,18 +5,10 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python -m uvicorn src.main:app --host 0.0.0.0 --port $PORT
     plan: free
-    # Debt reminders (and the sale summaries) only run if a worker and a beat
-    # process exist. Without these two services the schedule is defined but
-    # never fires, and no SMS is ever sent.
-  - type: worker
-    name: smart-sales-inventory-worker
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A src.celery_tasks.celery_app:celery worker --loglevel=info --concurrency=2
-    plan: free
-  - type: worker
-    name: smart-sales-inventory-beat
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A src.celery_tasks.celery_app:celery beat --loglevel=info
-    plan: free
+    # The free plan spins this down after 15 minutes idle. The Keep Alive
+    # GitHub Actions workflow (/.github/workflows/keep-alive.yml) pings it
+    # every 10 minutes so it stays warm.
+    #
+    # There are deliberately no worker/beat services: Celery was removed in
+    # favour of APScheduler, and nothing calls start_report_schedulers() yet.
+    # See the "Scheduled Jobs Not Wired Up" section of README.md.

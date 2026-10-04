@@ -21,7 +21,14 @@ async def add_user(post: schemas.UserSignUp, db: AsyncSession):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already registered")
 
 
-    user = um.Users(**post.model_dump(exclude={'password'}), password=auth_utils.hash(post.password))
+    # Role is assigned server-side only. Excluding it from the dump means a
+    # caller-supplied role can never reach the constructor, even if
+    # UserSignUp later gains a role field.
+    user = um.Users(
+        **post.model_dump(exclude={"password", "role"}),
+        password=auth_utils.hash(post.password),
+        role=um.RoleEnum.user,
+    )
     db.add(user)
     await db.commit()
     await db.refresh(user)
@@ -186,7 +193,7 @@ async def update_user(id: int, post: schemas.UserUpdate, db: AsyncSession, curre
         if (current_user.role != um.RoleEnum.super_admin or current_user.user_id != id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only super admin can change roles",
+                detail="Only admin can change roles",
             )
             
         if post.role == um.RoleEnum.super_admin:
