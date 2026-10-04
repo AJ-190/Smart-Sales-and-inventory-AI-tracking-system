@@ -418,7 +418,12 @@ SAILUP_SENDER_ID=your_sender_id
 
 # Redis *(optional)*
 REDIS_URL=redis://localhost:6379
+
+# CORS: comma-separated browser origins, scheme included, no trailing slash
+CORS_ORIGINS=https://www.businessbotgh.com,https://businessbotgh.com,https://sales-and-inventory-frontend.vercel.app
 ```
+
+> **Note:** `CORS_ORIGINS` must list the scheme (`https://`) and must not end in a slash, or the browser treats it as a different origin and blocks the request. Blank reflects whatever origin calls, which allows any site to reach a credentialed API — set it on any public deployment.
 
 > **Note:** Sailup has no sandbox — every send is a real, billed message. Sends are skipped with a loud error if either `SAILUP_API_KEY` or `SAILUP_SENDER_ID` is missing. See [Notifications and Scheduled Reports](#notifications-and-scheduled-reports).
 

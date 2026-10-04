@@ -56,9 +56,8 @@ async def view_profit(business_id, db: AsyncSession, current_user, date: date | 
 
 
 async def get_summary(business_id, db: AsyncSession, current_user, date, end_date):
-    # Sale-level figures must be aggregated without SalesItem. Joining line
-    # items here produces one row per item, so a 2-item sale would be counted
-    # twice and its revenue summed twice.
+    # Sale totals aggregate without SalesItem; joining line items would fan out
+    # to one row per item and double-count multi-item sales.
     stmt = (
         select(
             func.sum(bm.Sale.total_amount).label("total_revenue"),

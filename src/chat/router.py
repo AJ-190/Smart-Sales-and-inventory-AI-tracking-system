@@ -17,8 +17,6 @@ router = APIRouter(prefix="/chat", tags=['Chat'])
 
 MAX_MESSAGE_LEN = 5000
 
-# Per-process registry of who is connected to which business chat room so we can
-# emit real presence (name + role) without touching the DB on every event.
 _chatter_meta: dict[int, dict[int, dict[str, str]]] = {}
 
 

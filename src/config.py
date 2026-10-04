@@ -16,7 +16,6 @@ class Settings(BaseSettings):
         "SAILUP_API_URL", "https://api.sailup.io/v1/sms/"
     )
     SAILUP_API_KEY: str = os.getenv("SAILUP_API_KEY", "")
-    # Must be registered in the Sailup dashboard or the send is rejected.
     SAILUP_SENDER_ID: str = os.getenv("SAILUP_SENDER_ID", "")
     ACCESS_TOKEN_TIME: int = 60
     SUPER_ADMIN_EMAIL: str = os.getenv("SUPER_ADMIN_EMAIL", "")
@@ -24,8 +23,6 @@ class Settings(BaseSettings):
     SUPER_ADMIN_NAME: str = os.getenv("SUPER_ADMIN_NAME", "")
     REFRESH_TOKEN_TIME: int = 7 * 24 * 60
     API_AUTH_KEY: Optional[str] = os.getenv("API_AUTH_KEY") or os.getenv("API_auth_key", "")
-    # extra="ignore" so a stale or renamed env var in a deploy dashboard cannot
-    # stop the whole API from booting.
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
@@ -49,10 +46,18 @@ class Settings(BaseSettings):
     REQUEST_LIMIT_EXPIRY: int = 60
     REQUEST_LIMIT: int = 5
     WS_TICKET_TTL: int = 300
+    MAX_REFRESH_SESSIONS: int = 10
+    REFRESH_RATE_LIMIT: int = 30
+    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "")
+
+    @property
+    def cors_origins(self) -> list[str]:
+        raw = [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+        configured = [origin for origin in raw if origin]
+        return configured or ["*"]
 
     @property
     def sms_configured(self) -> bool:
-        """True when Sailup has an API key. Without one every send fails."""
         return bool(self.SAILUP_API_KEY.strip() and self.SAILUP_SENDER_ID.strip())
 
 

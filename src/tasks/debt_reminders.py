@@ -128,7 +128,6 @@ async def send_sms(phone: str, message: str) -> bool:
         )
         return False
 
-    # One client for all three attempts, rather than a new socket each time.
     async with httpx.AsyncClient(timeout=10) as client:
         for attempt in range(1, SEND_ATTEMPTS + 1):
             try:

@@ -349,10 +349,6 @@ async def set_reminders(business_id, current_user: um.Users, session: AsyncSessi
             detail="Cannot schedule a reminder for a debt that is already paid",
         )
 
-    # The guard used to read `post.date >= date.today()`, which rejected every
-    # future date and accepted every past one -- the exact opposite of the error
-    # it raised. The dispatcher only fires on the reminder's own date, so a past
-    # date can never send again.
     if post.date < date.today():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

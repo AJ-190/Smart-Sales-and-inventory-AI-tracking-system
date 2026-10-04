@@ -38,7 +38,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             DOCS_CSP if request.url.path in DOCS_PATHS else API_CSP,
         )
 
-        # uvicorn advertises its version; there is no reason to hand that over.
         if "server" in response.headers:
             del response.headers["server"]
 

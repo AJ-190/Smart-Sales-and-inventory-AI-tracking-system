@@ -1,10 +1,6 @@
 from pydantic import BaseModel, ConfigDict, EmailStr
 from datetime import datetime
 from typing import Optional
-# `date` must be imported under a different name: in a Pydantic model the field
-# name shadows the type during annotation resolution, so `date: Optional[date]`
-# resolves the inner `date` to the class attribute (None) and the field ends up
-# typed NoneType -- which made every date update and every date filter 422.
 from datetime import date as date_type, time
 
 
@@ -87,8 +83,6 @@ class ReminderResponse(BaseModel):
     time_of_day: Optional[time] = None
     note: str
     is_active: bool
-    # Set once the SMS has gone out. Handy for the UI to show "sent" and to
-    # confirm the reminder will not fire a second time.
     sent_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime

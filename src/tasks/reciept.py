@@ -32,12 +32,7 @@ class RecieptReportGenerator:
         self.title = title
         
     async def build_analytics_message(self) -> str:
-        """Render the analytics summary as an SMS business report.
-
-        Section order mirrors the old emailed report: headline figures, then
-        the payment breakdown, then the best seller. A period with no sales
-        returns a short notice instead of zeros.
-        """
+        """Render the analytics summary as an SMS business report."""
 
         summary = await get_summary(
             self.current_user.business_id, 

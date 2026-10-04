@@ -25,29 +25,19 @@ async def get_notifications(business_id: int,
                             unread_only: bool = False,
                             session: AsyncSession = Depends(get_db),
                             current_user: um.Users = Depends(auth_deps.role_checker([*roles]))):
-    # Scoped to the requesting user. The previous implementation returned every
-    # notification for the business, so any member could read another member's
-    # notifications. Notifications are addressed to a specific user_id, so the
-    # list must be filtered the same way.
     query = select(Notification).where(
         Notification.business_id == business_id,
         Notification.user_id == current_user.user_id,
     )
     if unread_only:
         query = query.where(Notification.is_read.is_(False))
-    # Newest first, so the client does not have to sort.
     query = query.order_by(Notification.created_at.desc(), Notification.notification_id.desc())
     result = await session.execute(query)
     return result.scalars().all()
 
 
 async def _owned_or_404(session: AsyncSession, notification_id: int, current_user: um.Users):
-    """Load a notification, but only if it belongs to the caller.
-
-    Admins and super admins may act on any notification within the platform;
-    everyone else is restricted to their own. Without this, any authenticated
-    user could delete or mark-as-read another member's notifications by id.
-    """
+    """Load a notification, but only if it belongs to the caller."""
     result = await session.execute(
         select(Notification).where(Notification.notification_id == notification_id)
     )
@@ -56,8 +46,6 @@ async def _owned_or_404(session: AsyncSession, notification_id: int, current_use
         raise HTTPException(status_code=404, detail="Notification not found")
     is_privileged = current_user.role in (um.RoleEnum.admin, um.RoleEnum.super_admin)
     if notification.user_id != current_user.user_id and not is_privileged:
-        # 404 rather than 403: do not confirm the existence of other users'
-        # notifications to a caller who has no access to them.
         raise HTTPException(status_code=404, detail="Notification not found")
     return notification
 

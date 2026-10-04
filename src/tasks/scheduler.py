@@ -10,13 +10,7 @@ logger = logging.getLogger("scheduler")
 
 
 def _build_jobstore() -> dict:
-    """Prefer the persistent SQLAlchemy store, fall back to memory.
-
-    This module is imported at startup and by the test suite, so it must not
-    raise when SYNC_DATABASE_URL is unset: APScheduler rejects an empty url,
-    which would break `from src.main import app` before anything runs. The
-    fallback keeps jobs in memory only, so they are lost on restart.
-    """
+    """Return the persistent job store, or memory if SYNC_DATABASE_URL is unset."""
     sync_url = (get_settings().SYNC_DATABASE_URL or "").strip()
     if not sync_url:
         logger.warning(

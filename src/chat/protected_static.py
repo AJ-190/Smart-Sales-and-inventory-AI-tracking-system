@@ -12,12 +12,7 @@ from src.businesses.service import business_authorized_access
 
 
 def _extract_business_id(path: str):
-    """Pull the owning business out of `chat/<business_id>/<file>`.
-
-    Storage lays every attachment out under chat/<business_id>, so the first purely
-    numeric segment identifies the tenant. Returns None when there is no such
-    segment, which the caller treats as a denial.
-    """
+    """Pull the owning business out of `chat/<business_id>/<file>`."""
     for segment in path.replace("\\", "/").split("/"):
         if segment.isdigit():
             return int(segment)
@@ -25,12 +20,7 @@ def _extract_business_id(path: str):
 
 
 def _extract_token(request: Request):
-    """Bearer header first, query param second.
-
-    Attachments are rendered by `<img src=...>` and by browser downloads, neither
-    of which can set an Authorization header, so the query param fallback is
-    required rather than a convenience.
-    """
+    """Bearer header first, query param second."""
     header = request.headers.get("authorization") or ""
     scheme, _, value = header.partition(" ")
     if scheme.lower() == "bearer" and value.strip():
@@ -39,13 +29,7 @@ def _extract_token(request: Request):
 
 
 class ProtectedStaticFiles(StaticFiles):
-    """StaticFiles that only serves a file to members of the owning business.
-
-    Mounts bypass FastAPI dependencies entirely, so without this the whole media
-    tree is world-readable by URL. Auth is re-implemented here by calling the
-    normal dependency functions directly, which keeps this in step with the
-    rest of the app instead of duplicating token and role resolution.
-    """
+    """StaticFiles that only serves a file to members of the owning business."""
 
     def __init__(self, *args, **kwargs):
         self.session_maker = kwargs.pop("session_maker", None)
