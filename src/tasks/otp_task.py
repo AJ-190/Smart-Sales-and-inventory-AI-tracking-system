@@ -9,6 +9,9 @@ import hmac
 
 logger = logging.getLogger(__name__)
 
+# Wrong codes allowed before the OTP record is thrown away and a new one sent.
+MAX_OTP_ATTEMPTS = 3
+
 
 
 
@@ -152,17 +155,21 @@ async def verify_otp(email: str, otp: str, forgot_pass, consume: bool = True):
 
     if data.get("forgot_pass") == "1" and not forgot_pass:
         return False
-    
-    
-    if not hmac.compare_digest(data.get('otp'), digest(email, otp)):
-            attempts = await otp_increment_attempts(app.state.redis, email)
-            return HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect or expired otp code")
 
-    attempts = await otp_increment_attempts(app.state.redis, email)
-    if attempts > 3:
-        await app.state.redis.delete(f"email:{email}")
-        await app.state.redis.delete(f"otp_attempts:{email}")
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many failed attempts. Please request a new code.")
+    # compare_digest needs two str, and a hash-less record would otherwise 500.
+    stored = data.get("otp") or ""
+    if not hmac.compare_digest(stored, digest(email, otp)):
+        # A wrong code counts against the attempt budget; a right one must not,
+        # otherwise a legitimate user locks themselves out by verifying twice.
+        attempts = await otp_increment_attempts(app.state.redis, email)
+        if attempts > MAX_OTP_ATTEMPTS:
+            await app.state.redis.delete(f"email:{email}")
+            await app.state.redis.delete(f"otp_attempts:{email}")
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many failed attempts. Please request a new code.")
+        # False, not an HTTPException: the router turns this into a 403. An
+        # HTTPException instance is truthy, so returning one let a wrong code
+        # through as a success.
+        return False
 
     if consume:
         await app.state.redis.delete(f"email:{email}")

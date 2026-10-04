@@ -1,11 +1,12 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 import os
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from src.errors.handlers import custom_http_exception_handler
 from src.db.database import engine, Base, get_db
 from src.middleware.auth_middleware import auth_middleware
+from src.middleware.security import SecurityHeadersMiddleware
+from src.chat.protected_static import ProtectedStaticFiles
 from src.businesses.router import router as main_router
 from src.businesses import service as biz_service
 from src.products.router import router as products_router
@@ -42,6 +43,7 @@ app.add_middleware(
 )
 app.middleware("http")(auth_middleware)
 app.add_middleware(LoggingMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_exception_handler(StarletteHTTPException, custom_http_exception_handler)
 app.include_router(main_router)
 app.include_router(products_router)
@@ -57,7 +59,11 @@ app.include_router(weather_router)
 
 from src.chat.storage import MEDIA_ROOT
 os.makedirs(MEDIA_ROOT, exist_ok=True)
-app.mount("/media", StaticFiles(directory=MEDIA_ROOT), name="media")
+app.mount(
+    "/media",
+    ProtectedStaticFiles(directory=MEDIA_ROOT),
+    name="media",
+)
 
 
 @app.get("/")

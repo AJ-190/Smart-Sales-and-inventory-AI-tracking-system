@@ -20,7 +20,7 @@ def _log_request(request: Request, **kwargs):
     context.update(kwargs)
     return context
 
-RATE_LIMITED_ROUTES = ["/auth/login", "/users/sign_up", "/otp/get_code","/verify_user"]
+RATE_LIMITED_ROUTES = ["/auth/login", "/users/sign_up", "/otp/get_code","/verify_user", "/auth/forgot_password"]
 
 async def auth_middleware(request: Request, call_next):
     

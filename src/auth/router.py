@@ -3,7 +3,7 @@ from fastapi.security.oauth2 import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from src.db.database import get_db
 from src.auth import schemas, service as auth_service, utils
-from src.celery_tasks.otp_task import send_otp, verify_otp
+from src.tasks.otp_task import send_otp, verify_otp
 from src.users.schemas import UserSignUpResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.database import get_db

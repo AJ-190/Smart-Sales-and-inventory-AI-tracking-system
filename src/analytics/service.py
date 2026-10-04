@@ -8,7 +8,7 @@ from src.businesses import models as bm
 from src.debts import models as dm
 from src.customers import models as cm
 from src.businesses.service import get_member, business_authorized_access
-from src.celery_tasks.email_report import EmailReport
+
 
 logger = logging.getLogger(__name__)
 
@@ -56,23 +56,34 @@ async def view_profit(business_id, db: AsyncSession, current_user, date: date | 
 
 
 async def get_summary(business_id, db: AsyncSession, current_user, date, end_date):
+    # Sale-level figures must be aggregated without SalesItem. Joining line
+    # items here produces one row per item, so a 2-item sale would be counted
+    # twice and its revenue summed twice.
     stmt = (
         select(
-            func.sum(bm.SalesItem.quantity).label("sold_quantity"),
             func.sum(bm.Sale.total_amount).label("total_revenue"),
             func.sum(bm.Sale.profit).label("total_profit"),
             func.count(bm.Sale.sale_id).label("Total_sales")
         )
-        .join(bm.SalesItem, bm.Sale.sale_id == bm.SalesItem.sale_id)
         .where(bm.Sale.business_id == business_id)
     )
     if date:
         stmt = stmt.where(func.date(bm.Sale.created_at) >= date)
     if end_date:
         stmt = stmt.where(func.date(bm.Sale.created_at) <= end_date)
-    result = (await db.execute(stmt)).first()
+    result = (await db.execute(stmt)).one()
 
-    sold_quantity = result.sold_quantity or 0
+    sold_quantity_stmt = (
+        select(func.sum(bm.SalesItem.quantity))
+        .join(bm.Sale, bm.Sale.sale_id == bm.SalesItem.sale_id)
+        .where(bm.Sale.business_id == business_id)
+    )
+    if date:
+        sold_quantity_stmt = sold_quantity_stmt.where(func.date(bm.Sale.created_at) >= date)
+    if end_date:
+        sold_quantity_stmt = sold_quantity_stmt.where(func.date(bm.Sale.created_at) <= end_date)
+    sold_quantity = (await db.execute(sold_quantity_stmt)).scalar() or 0
+
     total_revenue = result.total_revenue or 0.0
     total_profit = result.total_profit or 0.0
     Total_sales = result.Total_sales or 0
@@ -141,11 +152,6 @@ async def get_summary(business_id, db: AsyncSession, current_user, date, end_dat
         "card_total": card_total,
         "best_selling_product": best_selling_product,
     }
-
-    subject = "Sales Summary Report"
-    email = EmailReport(current_user.email, subject, body)
-    if not email.send():
-        logger.warning("Failed to send summary email to %s", current_user.email)
 
     return body
 

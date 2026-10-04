@@ -11,18 +11,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     SECRET_KEY: str = os.getenv("SECRET_KEY", "")
     ALGORITHM: str = "HS256"
-    SMS_API_KEY: str = Field(default=os.getenv("SMS_KEY", ""), validation_alias="SMS_KEY")
-    SMS_USERNAME: str = os.getenv("SMS_USERNAME", "sandbox")
-    SMS_SENDER_ID: str = os.getenv("SMS_SENDER_ID", "")
-    # Defaults to the LIVE Africa's Talking endpoint. Previously this defaulted to
-    # the sandbox, which accepted requests but delivered nothing - so a
-    # fully-configured deployment still sent zero real SMS. To develop against the
-    # sandbox, set SMS_API_URL=https://api.sandbox.africastalking.com/version1/messaging
-    # and SMS_USERNAME=sandbox explicitly.
-    SMS_API_URL: str = os.getenv(
-        "SMS_API_URL", "https://api.africastalking.com/version1/messaging"
-    )
-    SMS_PROVIDER: str = os.getenv("SMS_PROVIDER", "africastalking").strip().lower()
+    SYNC_DATABASE_URL: str = os.getenv("SYNC_DATABASE_URL", "")
     SAILUP_API_URL: str = os.getenv(
         "SAILUP_API_URL", "https://api.sailup.io/v1/sms/"
     )
@@ -35,7 +24,13 @@ class Settings(BaseSettings):
     SUPER_ADMIN_NAME: str = os.getenv("SUPER_ADMIN_NAME", "")
     REFRESH_TOKEN_TIME: int = 7 * 24 * 60
     API_AUTH_KEY: Optional[str] = os.getenv("API_AUTH_KEY") or os.getenv("API_auth_key", "")
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    # extra="ignore" so a stale or renamed env var in a deploy dashboard cannot
+    # stop the whole API from booting.
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",
+    }
     MAIL_USERNAME: str = os.getenv("SUPER_ADMIN_EMAIL", "")
     MAIL_PASSWORD: str = os.getenv("SUPER_ADMIN_APP_PASSWORD", "")
     MAIL_FROM:str = os.getenv("SUPER_ADMIN_EMAIL", "")
@@ -45,7 +40,7 @@ class Settings(BaseSettings):
     MAIL_STARTTLS:bool = True
     MAIL_SSL_TLS:bool = False
     USE_CREDENTIALS:bool = True
-    VALIDATE_CERTS:bool = False
+    VALIDATE_CERTS:bool = True
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
     BREVO_API_KEY: str = os.getenv("BREVO_API_KEY", "")
     BREVO_API_URL: str = os.getenv(
@@ -57,20 +52,8 @@ class Settings(BaseSettings):
 
     @property
     def sms_configured(self) -> bool:
-        """True when the active provider has an API key. Without one every send fails."""
-        if self.SMS_PROVIDER == "sailup":
-            return bool(self.SAILUP_API_KEY.strip())
-        return bool(self.SMS_API_KEY.strip())
-
-    @property
-    def sms_using_sandbox(self) -> bool:
-        """True when pointed at Africa's Talking sandbox, which delivers nothing.
-
-        Sailup has no sandbox, so this is always False when it is the provider.
-        """
-        if self.SMS_PROVIDER == "sailup":
-            return False
-        return "sandbox" in self.SMS_API_URL.lower() or self.SMS_USERNAME.lower() == "sandbox"
+        """True when Sailup has an API key. Without one every send fails."""
+        return bool(self.SAILUP_API_KEY.strip() and self.SAILUP_SENDER_ID.strip())
 
 
 def get_settings():

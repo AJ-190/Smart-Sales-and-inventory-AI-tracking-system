@@ -6,7 +6,7 @@ from sqlalchemy import select
 from src.users import models as um
 from src.auth import schemas, utils as auth_utils
 from src.config import get_settings
-from src.celery_tasks.otp_task import verify_otp
+from src.tasks.otp_task import verify_otp
 import hmac
 import hashlib
 

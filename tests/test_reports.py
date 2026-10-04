@@ -103,36 +103,6 @@ def test_dashboard_forbidden_business(authorized_user_client, authorized_user_cl
     assert res.status_code == 403
 
 
-def test_daily_sales_report(authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli):
-    res = authorized_user_client.post(
-        "/admin/crons/daily_summary"
-    )
-    assert res.status_code == 200
-    
-def test_weekly_sales_report(authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli):
-    res = authorized_user_client.post(
-        "/admin/crons/weekly_summary"
-    )
-    assert res.status_code == 200
-    
-def test_monthly_sales_report(authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli):
-    res = authorized_user_client.post(
-        "/admin/crons/monthly_summary"
-    )
-    assert res.status_code == 200
-
-def test_monthly_sales_report_unauthroized(client, authorized_user_client_cre_bus, test_create_sale_cli):
-    res = client.post(
-        "/admin/crons/monthly_summary"
-    )
-    assert res.status_code == 401
-
-def test_list_jobs(authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli):
-    res = authorized_user_client.get(
-        "/admin/crons/jobs"
-    )
-    assert res.status_code == 200
-    
 def test_reports_profit(authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli):
     res = authorized_user_client.get(
         f"/reports/profit/{authorized_user_client_cre_bus[0].business_id}?date=2026-05-16&end_date=2026-05-17"

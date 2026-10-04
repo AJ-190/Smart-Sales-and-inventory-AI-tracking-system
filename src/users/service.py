@@ -6,7 +6,7 @@ from src.businesses import models as bm
 from src.users import schemas
 from src.config import get_settings
 from src.auth import utils as auth_utils
-from src.celery_tasks.otp_task import send_otp
+from src.tasks.otp_task import send_otp
 
 
 async def add_user(post: schemas.UserSignUp, db: AsyncSession):

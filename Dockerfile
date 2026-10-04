@@ -18,4 +18,5 @@ CMD ["python", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "
 #   docker run ... celery -A src.celery_tasks.celery_app:celery worker --loglevel=info
 #   docker run ... celery -A src.celery_tasks.celery_app:celery beat --loglevel=info
 #
-# Both need the same REDIS_URL and SMS_KEY env vars as the API.
+# Both need the same REDIS_URL, SAILUP_API_KEY and SAILUP_SENDER_ID env vars
+# as the API.

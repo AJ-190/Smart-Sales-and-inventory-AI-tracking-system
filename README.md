@@ -26,7 +26,7 @@ A production-ready REST API for small businesses to manage inventory, track sale
 - **Business Approvals** — Request and manage business join approvals with role-based access control
 - **Customer Management** — Create, update, and manage customers per business
 - **Debt Tracking** — Track outstanding customer debts with automatic SMS reminders
-- **Scheduled SMS Reminders** — Schedule debt reminders and send them via Africa's Talking (sandbox/live)
+- **Scheduled SMS Reminders** — Schedule debt reminders and send them via Sailup
 - **Dashboard & Analytics** — Aggregated KPIs, revenue breakdowns, profit margins, payment method splits, best-selling product insights, and a combined dashboard endpoint
 - **Automated Reports** — Daily, weekly, and monthly sales summaries sent via email to admins and managers using background cron jobs
 
@@ -41,7 +41,7 @@ A production-ready REST API for small businesses to manage inventory, track sale
 | Auth | JWT (OAuth2 + Argon2 hashing) |
 | Background Jobs | Celery + Celery Beat |
 | Email | SendGrid (OTP) + SMTP/Gmail (reports) |
-| SMS | Africa's Talking (sandbox / live) |
+| SMS | Sailup |
 | Caching | Redis (OTP storage, rate limiting, JWT revocation, Celery broker) |
 | Deployment | Render / Railway |
 
@@ -291,7 +291,7 @@ Authorization: Bearer <token>   (roles: admin, manager, cashier, super_admin)
 
 A reminder fires exactly once — the dispatcher stamps `sent_at` after a successful send, and the value is returned on the API so the UI can show "sent". Editing a reminder's `date` clears that stamp so it goes out again on the new day. A failed send stays unstamped and is retried on the next hourly run.
 
-The SMS goes to the customer's phone via Africa's Talking. Numbers are converted to international format on the way out, so a locally stored `0555555555` is sent as `+233555555555`.
+The SMS goes to the customer's phone via Sailup. Numbers are converted to international format on the way out, so a locally stored `0555555555` is sent as `+233555555555`.
 
 **Beat schedule** (`src/celery_tasks/celery_app.py`):
 
@@ -402,18 +402,16 @@ API_AUTH_KEY=your_api_auth_key
 # SendGrid (OTP emails)
 SENDGRID_API_KEY=your_sendgrid_api_key
 
-# Africa's Talking (debt reminder SMS)
-# Sandbox: username is always "sandbox", URL below is the sandbox endpoint
-SMS_KEY=your_africastalking_api_key
-SMS_USERNAME=sandbox
-SMS_SENDER_ID=your_sender_id_or_blank
-SMS_API_URL=https://api.sandbox.africastalking.com/version1/messaging
+# Sailup (debt reminder + scheduled sales report SMS)
+SAILUP_API_KEY=your_sailup_api_key
+# Must be a sender ID registered in your Sailup dashboard
+SAILUP_SENDER_ID=your_sender_id
 
 # Redis *(optional)*
 REDIS_URL=redis://localhost:6379
 ```
 
-> **Note:** `SMS_API_URL` defaults to the Africa's Talking **sandbox** endpoint. Switch to `https://api.africastalking.com/version1/messaging` (and set `SMS_USERNAME` to your live app username) to send real SMS. Sandbox sends are simulated — they appear in the Africa's Talking dashboard but are never delivered to real phones.
+> **Note:** Sailup has no sandbox — every send is a real, billed message. Sends are skipped with a loud error if either `SAILUP_API_KEY` or `SAILUP_SENDER_ID` is missing. See [Notifications and Scheduled Reports](#notifications-and-scheduled-reports).
 
 ---
 

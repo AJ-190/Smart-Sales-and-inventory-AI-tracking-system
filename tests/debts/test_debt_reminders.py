@@ -1,13 +1,18 @@
 """Tests for the debt reminder dispatcher - the code that actually sends SMS.
 
-The API-level reminder tests live in test_debts.py. These cover the Celery
-task end to end: picking up the right reminders, honouring time_of_day, and
-never sending the same reminder twice.
+Covers the three layers that matter, and nothing else:
+
+  * the pure text helpers (``to_international`` / ``build_message``)
+  * the Sailup transport (``_send_sms_sailup`` / ``send_sms``)
+  * the dispatcher itself (``claim_due_reminders`` / ``process_due_reminders``)
+
+The Sailup API is never contacted: every transport test drives a
+``httpx.MockTransport`` and asserts on the request that would have gone out.
 """
 
 import asyncio
 import json
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
@@ -15,29 +20,49 @@ import httpx
 import pytest
 from sqlalchemy import select, update
 
-from src.celery_tasks import debt_reminders
-from src.config import Settings, get_settings
+from src.tasks import debt_reminders, reciept
+from src.config import Settings
 from src.customers import models as cm
 from src.debts import models as dm
 from src.main import app
 
 from .test_debts import _client, _setup_business_with_debt
 
-# A fixed "now" so the expectations below do not depend on when the suite runs.
-NOW = datetime(2026, 10, 1, 10, 0, tzinfo=timezone.utc)
-TODAY = date(2026, 10, 1)
+# Relative to the real clock, because claim_due_reminders filters on func.now()
+# rather than an injected timestamp.
+_DUE = date.today() - timedelta(days=1)
+_DUE_TODAY = date.today()
+_NOT_DUE = date.today() + timedelta(days=1)
 
 
-@pytest.fixture(autouse=True)
-def sms_configured():
-    """Pretend SMS_KEY is set, so the task does not exit as 'disabled'."""
-    settings = debt_reminders.get_settings()
-    with patch.object(type(settings), "sms_configured", property(lambda self: True)), \
-         patch.object(type(settings), "sms_using_sandbox", property(lambda self: False)):
-        yield
+# --- helpers ---------------------------------------------------------------
 
 
-def add_reminder(session, debt_id, customer_id, business_id, on=TODAY, at=time(9, 0), note="please pay"):
+class _SessionCtx:
+    """Stands in for ``async with get_async_session_maker() as session``.
+
+    Yields the shared test session but does NOT close it on exit, so one
+    session can back several ``process_due_reminders`` calls in one test.
+    """
+
+    def __init__(self, session):
+        self.session = session
+
+    async def __aenter__(self):
+        return self.session
+
+    async def __aexit__(self, *exc):
+        return False
+
+
+def patch_sessions(session):
+    """Point the dispatcher's own session factory at the test session."""
+    return patch.object(
+        debt_reminders, "get_async_session_maker", lambda: _SessionCtx(session)
+    )
+
+
+def add_reminder(session, debt_id, customer_id, business_id, on=_DUE, note="please pay"):
     """Insert a reminder straight into the DB so the test controls every field."""
 
     async def _add():
@@ -46,9 +71,10 @@ def add_reminder(session, debt_id, customer_id, business_id, on=TODAY, at=time(9
             customer_id=customer_id,
             business_id=business_id,
             date=datetime.combine(on, time.min, tzinfo=timezone.utc),
-            time_of_day=at,
             note=note,
             is_active=True,
+            status="pending",
+            attempts=0,
         )
         session.add(reminder)
         await session.commit()
@@ -58,191 +84,43 @@ def add_reminder(session, debt_id, customer_id, business_id, on=TODAY, at=time(9
     return asyncio.run(_add())
 
 
-def run_dispatch(session, send_sms=None, now=NOW):
-    """Run the dispatcher with the SMS call stubbed out."""
-    send_sms = send_sms or AsyncMock(return_value=True)
-    with patch.object(debt_reminders, "send_sms", send_sms):
-        result = asyncio.run(debt_reminders.dispatch(session, now=now))
-    return result, send_sms
-
-
-def sent_at_of(session, reminder_id):
+def status_of(session, reminder_id):
     async def _read():
-        return (await session.execute(
-            select(dm.Reminders.sent_at).where(dm.Reminders.reminder_id == reminder_id)
-        )).scalar_one()
+        return (
+            await session.execute(
+                select(dm.Reminders.status, dm.Reminders.attempts).where(
+                    dm.Reminders.reminder_id == reminder_id
+                )
+            )
+        ).one()
 
     return asyncio.run(_read())
 
 
-def test_to_international():
-    """Africa's Talking needs a country code; Ghanaian numbers are stored locally."""
-    assert debt_reminders.to_international("0555555555") == "+233555555555"
-    assert debt_reminders.to_international("0555 555 555") == "+233555555555"
-    assert debt_reminders.to_international("+233555555555") == "+233555555555"
-    assert debt_reminders.to_international("233555555555") == "+233555555555"
-    assert debt_reminders.to_international("") is None
-    assert debt_reminders.to_international(None) is None
+def sent_at_of(session, reminder_id):
+    async def _read():
+        return (
+            await session.execute(
+                select(dm.Reminders.sent_at).where(dm.Reminders.reminder_id == reminder_id)
+            )
+        ).scalar_one()
+
+    return asyncio.run(_read())
 
 
-def test_build_message():
-    """A missing note must not leak into the text the customer reads."""
-    due = datetime(2026, 10, 5, tzinfo=timezone.utc)
-
-    message = debt_reminders.build_message("Debtor", Decimal("250.00"), due, None)
-    assert "GHS 250.00" in message
-    assert "2026-10-05" in message
-    assert "None" not in message
-
-    with_note = debt_reminders.build_message("Debtor", Decimal("250.00"), due, "Pay today")
-    assert with_note.endswith("Pay today")
-
-
-def test_sends_a_due_reminder(session):
-    client = _client(session)
-    _, business_id, customer_id, debt_id = _setup_business_with_debt(client, session)
-
-    reminder_id = add_reminder(session, debt_id, customer_id, business_id)
-
-    result, send_sms = run_dispatch(session)
-
-    assert result["due"] == 1
-    assert result["sent"] == 1
-    assert result["failed"] == 0
-    send_sms.assert_awaited_once()
-    # Stored as 0555555555, but the API must receive +233555555555.
-    assert send_sms.await_args[0][0] == "+233555555555"
-    assert sent_at_of(session, reminder_id) is not None
-
-    app.dependency_overrides.clear()
-
-
-def test_never_sends_the_same_reminder_twice(session):
-    """sent_at is what stops a beat double-fire texting the customer again."""
-    client = _client(session)
-    _, business_id, customer_id, debt_id = _setup_business_with_debt(client, session)
-
-    add_reminder(session, debt_id, customer_id, business_id)
-
-    first, first_send = run_dispatch(session)
-    assert first["sent"] == 1
-    first_send.assert_awaited_once()
-
-    second, second_send = run_dispatch(session)
-    assert second["due"] == 0
-    assert second["sent"] == 0
-    second_send.assert_not_awaited()
-
-    app.dependency_overrides.clear()
-
-
-def test_waits_for_time_of_day(session):
-    """A 17:30 reminder must not go out on the 10:00 run."""
-    client = _client(session)
-    _, business_id, customer_id, debt_id = _setup_business_with_debt(client, session)
-
-    add_reminder(session, debt_id, customer_id, business_id, at=time(17, 30))
-
-    result, send_sms = run_dispatch(session)
-
-    assert result["due"] == 0
-    send_sms.assert_not_awaited()
-
-    app.dependency_overrides.clear()
-
-
-def test_skips_future_inactive_and_paid(session):
-    client = _client(session)
-    _, business_id, customer_id, debt_id = _setup_business_with_debt(client, session)
-
-    add_reminder(session, debt_id, customer_id, business_id, on=date(2026, 10, 2))
-    inactive = add_reminder(session, debt_id, customer_id, business_id)
-    already_sent = add_reminder(session, debt_id, customer_id, business_id)
-
-    async def _prepare():
-        await session.execute(
-            update(dm.Reminders).where(dm.Reminders.reminder_id == inactive).values(is_active=False)
-        )
-        await session.execute(
-            update(dm.Reminders).where(dm.Reminders.reminder_id == already_sent).values(sent_at=NOW)
-        )
-        await session.execute(
-            update(dm.Debt).where(dm.Debt.debt_id == debt_id).values(is_paid=True)
-        )
-        await session.commit()
-
-    asyncio.run(_prepare())
-
-    result, send_sms = run_dispatch(session)
-
-    assert result["sent"] == 0
-    send_sms.assert_not_awaited()
-
-    app.dependency_overrides.clear()
-
-
-def test_skips_customer_without_a_phone(session):
-    client = _client(session)
-    _, business_id, customer_id, debt_id = _setup_business_with_debt(client, session)
-
-    async def _remove_phone():
-        await session.execute(
-            update(cm.Customer).where(cm.Customer.customer_id == customer_id).values(phone=None)
-        )
-        await session.commit()
-
-    asyncio.run(_remove_phone())
-    add_reminder(session, debt_id, customer_id, business_id)
-
-    result, send_sms = run_dispatch(session)
-
-    assert result["skipped"] == 1
-    assert result["sent"] == 0
-    send_sms.assert_not_awaited()
-
-    app.dependency_overrides.clear()
-
-
-def test_failed_send_stays_unsent_for_the_next_run(session):
-    """If the API rejects the text, the next hourly run must retry it."""
-    client = _client(session)
-    _, business_id, customer_id, debt_id = _setup_business_with_debt(client, session)
-
-    reminder_id = add_reminder(session, debt_id, customer_id, business_id)
-
-    result, _ = run_dispatch(session, send_sms=AsyncMock(return_value=False))
-
-    assert result["failed"] == 1
-    assert result["sent"] == 0
-    assert sent_at_of(session, reminder_id) is None
-
-    app.dependency_overrides.clear()
-
-
-def test_disabled_when_api_key_is_missing(session):
-    """With no SMS_KEY the task bails out once, rather than once per customer."""
-    client = _client(session)
-    _, business_id, customer_id, debt_id = _setup_business_with_debt(client, session)
-
-    add_reminder(session, debt_id, customer_id, business_id)
-
-    settings = debt_reminders.get_settings()
-    with patch.object(type(settings), "sms_configured", property(lambda self: False)):
-        result = asyncio.run(debt_reminders.dispatch(session, now=NOW))
-
-    assert result["status"] == "disabled"
-    assert result["sent"] == 0
-
-    app.dependency_overrides.clear()
+def run_process(send_sms, session):
+    """Run the dispatcher with the SMS call stubbed out."""
+    with patch_sessions(session), patch.object(debt_reminders, "send_sms", send_sms):
+        asyncio.run(debt_reminders.process_due_reminders())
 
 
 def sailup_settings(**overrides):
-    """Real Settings with the Sailup provider switched on.
+    """Real Settings with working Sailup credentials.
 
     Pydantic v2 keeps field values off the class, so these have to be set per
     instance rather than patched onto Settings itself.
     """
-    base = {"SMS_PROVIDER": "sailup", "SAILUP_API_KEY": "k", "SAILUP_SENDER_ID": "BusinessBot"}
+    base = {"SAILUP_API_KEY": "k", "SAILUP_SENDER_ID": "BusinessBot"}
     base.update(overrides)
     return Settings(**base)
 
@@ -267,6 +145,35 @@ def run_sailup_send(handler, **overrides):
          patch("httpx.AsyncClient", fake_client):
         result = asyncio.run(debt_reminders.send_sms("+233555555555", "hello"))
     return result, seen
+
+
+# --- text helpers ----------------------------------------------------------
+
+
+def test_to_international():
+    """Sailup needs a country code; Ghanaian numbers are stored locally."""
+    assert debt_reminders.to_international("0555555555") == "+233555555555"
+    assert debt_reminders.to_international("0555 555 555") == "+233555555555"
+    assert debt_reminders.to_international("+233555555555") == "+233555555555"
+    assert debt_reminders.to_international("233555555555") == "+233555555555"
+    assert debt_reminders.to_international("") is None
+    assert debt_reminders.to_international(None) is None
+
+
+def test_build_message():
+    """A missing note must not leak into the text the customer reads."""
+    due = datetime(2026, 10, 5, tzinfo=timezone.utc)
+
+    message = debt_reminders.build_message("Debtor", Decimal("250.00"), due, None)
+    assert "GHS 250.00" in message
+    assert "2026-10-05" in message
+    assert "None" not in message
+
+    with_note = debt_reminders.build_message("Debtor", Decimal("250.00"), due, "Pay today")
+    assert with_note.endswith("Pay today")
+
+
+# --- Sailup transport ------------------------------------------------------
 
 
 def test_sailup_payload_matches_the_documented_shape():
@@ -311,6 +218,7 @@ def test_sailup_failure_returns_false_after_retries():
 
 def test_sailup_without_sender_id_does_not_call_the_api():
     """An unregistered `from` is rejected, so fail before spending a request."""
+
     def handler(request):
         pytest.fail("should not reach the API without a sender ID")
 
@@ -320,20 +228,410 @@ def test_sailup_without_sender_id_does_not_call_the_api():
     assert seen == []
 
 
-def test_africastalking_still_defaults():
-    """With no SMS_PROVIDER set, Africa's Talking is the one that gets used."""
-    assert get_settings().SMS_PROVIDER == "africastalking"
+def test_send_sms_is_skipped_when_credentials_are_blank():
+    """With no API key there is nothing to authenticate with, so never call out."""
+    result, seen = run_sailup_send(
+        lambda request: pytest.fail("should not reach the API without an API key"),
+        SAILUP_API_KEY="",
+    )
+
+    assert result is False
+    assert seen == []
 
 
-def test_sends_once_the_time_arrives(session):
+def test_sms_configured_requires_both_key_and_sender_id():
+    """Sailup needs a key AND a registered sender; either one missing is off."""
+    assert sailup_settings().sms_configured is True
+    assert sailup_settings(SAILUP_API_KEY="").sms_configured is False
+    assert sailup_settings(SAILUP_SENDER_ID="").sms_configured is False
+    assert sailup_settings(SAILUP_API_KEY="  ").sms_configured is False
+
+
+# --- claim_due_reminders ---------------------------------------------------
+
+
+def setup_debt(session):
+    """A business with one customer and one unpaid debt."""
     client = _client(session)
     _, business_id, customer_id, debt_id = _setup_business_with_debt(client, session)
+    return business_id, customer_id, debt_id
 
-    add_reminder(session, debt_id, customer_id, business_id, at=time(9, 30))
 
-    result, send_sms = run_dispatch(session)
+def claim(session, **kwargs):
+    return asyncio.run(debt_reminders.claim_due_reminders(session, **kwargs))
 
-    assert result["sent"] == 1
+
+def test_claims_a_due_reminder_and_marks_it_sending(session):
+    business_id, customer_id, debt_id = setup_debt(session)
+    reminder_id = add_reminder(session, debt_id, customer_id, business_id)
+
+    claimed = claim(session)
+
+    assert [r.reminder_id for r in claimed] == [reminder_id]
+    status, attempts = status_of(session, reminder_id)
+    assert status == "sending"
+    assert attempts == 1
+
+
+def test_claiming_twice_does_not_double_count(session):
+    """status flips to 'sending', so a second scheduler tick must find nothing."""
+    business_id, customer_id, debt_id = setup_debt(session)
+    add_reminder(session, debt_id, customer_id, business_id)
+
+    assert len(claim(session)) == 1
+    assert claim(session) == []
+
+
+def test_increments_attempts_per_claim(session):
+    """attempts is the retry counter, so it must climb on every claim."""
+    business_id, customer_id, debt_id = setup_debt(session)
+    reminder_id = add_reminder(session, debt_id, customer_id, business_id)
+
+    claim(session)
+    assert status_of(session, reminder_id)[1] == 1
+
+    # Put it back to pending to simulate a retry after a failure.
+    async def _requeue():
+        await session.execute(
+            update(dm.Reminders).where(dm.Reminders.reminder_id == reminder_id).values(status="pending")
+        )
+        await session.commit()
+
+    asyncio.run(_requeue())
+    claim(session)
+    assert status_of(session, reminder_id)[1] == 2
+
+
+def test_ignores_future_reminders(session):
+    business_id, customer_id, debt_id = setup_debt(session)
+    add_reminder(session, debt_id, customer_id, business_id, on=_NOT_DUE)
+
+    assert claim(session) == []
+
+
+def test_ignores_inactive_reminders(session):
+    business_id, customer_id, debt_id = setup_debt(session)
+    reminder_id = add_reminder(session, debt_id, customer_id, business_id)
+
+    async def _deactivate():
+        await session.execute(
+            update(dm.Reminders).where(dm.Reminders.reminder_id == reminder_id).values(is_active=False)
+        )
+        await session.commit()
+
+    asyncio.run(_deactivate())
+    assert claim(session) == []
+
+
+def test_ignores_reminders_for_paid_debts(session):
+    business_id, customer_id, debt_id = setup_debt(session)
+    add_reminder(session, debt_id, customer_id, business_id)
+
+    async def _settle():
+        await session.execute(
+            update(dm.Debt).where(dm.Debt.debt_id == debt_id).values(is_paid=True)
+        )
+        await session.commit()
+
+    asyncio.run(_settle())
+    assert claim(session) == []
+
+
+def test_ignores_reminders_that_are_not_pending(session):
+    """A reminder already marked sent/failed must never be picked up again."""
+    business_id, customer_id, debt_id = setup_debt(session)
+    reminder_id = add_reminder(session, debt_id, customer_id, business_id)
+
+    for terminal in ("sent", "failed"):
+        async def _mark(value=terminal):
+            await session.execute(
+                update(dm.Reminders).where(dm.Reminders.reminder_id == reminder_id).values(status=value)
+            )
+            await session.commit()
+
+        asyncio.run(_mark())
+        assert claim(session) == []
+
+
+def test_respects_the_limit(session):
+    business_id, customer_id, debt_id = setup_debt(session)
+    for day in (_DUE, _DUE_TODAY, _DUE_TODAY):
+        add_reminder(session, debt_id, customer_id, business_id, on=day)
+
+    assert len(claim(session, limit=2)) == 2
+
+
+def test_claim_is_empty_when_nothing_is_due(session):
+    setup_debt(session)
+    assert claim(session) == []
+
+
+# --- process_due_reminders -------------------------------------------------
+
+
+def test_marks_a_delivered_reminder_as_sent(session):
+    business_id, customer_id, debt_id = setup_debt(session)
+    reminder_id = add_reminder(session, debt_id, customer_id, business_id)
+
+    send_sms = AsyncMock(return_value=True)
+    run_process(send_sms, session)
+
     send_sms.assert_awaited_once()
+    assert status_of(session, reminder_id)[0] == "sent"
+    assert sent_at_of(session, reminder_id) is not None
 
     app.dependency_overrides.clear()
+
+
+def test_sends_the_amount_and_due_date_the_customer_owes(session):
+    """The text is the whole point of the reminder, so pin its content."""
+    business_id, customer_id, debt_id = setup_debt(session)
+    add_reminder(session, debt_id, customer_id, business_id)
+
+    send_sms = AsyncMock(return_value=True)
+    run_process(send_sms, session)
+
+    phone, message = send_sms.await_args[0]
+    assert phone == "+233555555555"
+    assert "GHS 250.00" in message
+    assert "Debtor" in message
+    assert "please pay" in message
+
+    app.dependency_overrides.clear()
+
+
+def test_a_raised_send_is_marked_failed_and_left_retryable(session):
+    """If the send blows up, the next scheduler tick must try that one again."""
+    business_id, customer_id, debt_id = setup_debt(session)
+    reminder_id = add_reminder(session, debt_id, customer_id, business_id)
+
+    run_process(AsyncMock(side_effect=RuntimeError("boom")), session)
+
+    assert status_of(session, reminder_id)[0] == "failed"
+    assert sent_at_of(session, reminder_id) is None
+
+    app.dependency_overrides.clear()
+
+
+def test_a_rejected_send_is_not_recorded_as_sent(session):
+    """send_sms returns False when Sailup refuses; that must count as a failure."""
+    business_id, customer_id, debt_id = setup_debt(session)
+    reminder_id = add_reminder(session, debt_id, customer_id, business_id)
+
+    run_process(AsyncMock(return_value=False), session)
+
+    assert status_of(session, reminder_id)[0] == "failed"
+    assert sent_at_of(session, reminder_id) is None
+
+    app.dependency_overrides.clear()
+
+
+def test_customer_without_a_phone_is_not_sent_to(session):
+    business_id, customer_id, debt_id = setup_debt(session)
+    reminder_id = add_reminder(session, debt_id, customer_id, business_id)
+
+    async def _remove_phone():
+        await session.execute(
+            update(cm.Customer).where(cm.Customer.customer_id == customer_id).values(phone=None)
+        )
+        await session.commit()
+
+    asyncio.run(_remove_phone())
+
+    send_sms = AsyncMock(return_value=True)
+    run_process(send_sms, session)
+
+    # A null recipient would be rejected by Sailup, so never spend the request.
+    send_sms.assert_not_awaited()
+    assert status_of(session, reminder_id)[0] == "failed"
+    assert sent_at_of(session, reminder_id) is None
+
+    app.dependency_overrides.clear()
+
+
+def test_customer_with_a_local_phone_is_normalised_before_sending(session):
+    """0555555555 is stored locally but Sailup needs +233555555555."""
+    business_id, customer_id, debt_id = setup_debt(session)
+    add_reminder(session, debt_id, customer_id, business_id)
+
+    send_sms = AsyncMock(return_value=True)
+    run_process(send_sms, session)
+
+    assert send_sms.await_args[0][0] == "+233555555555"
+
+    app.dependency_overrides.clear()
+
+
+def test_nothing_due_sends_nothing(session):
+    business_id, customer_id, debt_id = setup_debt(session)
+    add_reminder(session, debt_id, customer_id, business_id, on=_NOT_DUE)
+
+    send_sms = AsyncMock(return_value=True)
+    run_process(send_sms, session)
+
+    send_sms.assert_not_awaited()
+
+    app.dependency_overrides.clear()
+
+
+# --- RecieptReportGenerator ------------------------------------------------
+
+
+class _FakeMember:
+    def __init__(self, business_id=29):
+        self.business_id = business_id
+
+
+def make_report(**kwargs):
+    now = datetime(2026, 10, 1, 19, 0, tzinfo=timezone.utc)
+    defaults = dict(
+        phone="+233555555555",
+        current_user=_FakeMember(),
+        session=object(),
+        start_date=now - timedelta(days=7),
+        end_date=now,
+        title="Daily Sales Summary",
+    )
+    defaults.update(kwargs)
+    return reciept.RecieptReportGenerator(**defaults)
+
+
+def test_report_message_has_the_business_report_sections():
+    """Section order mirrors the old emailed report."""
+    summary = {
+        "total_sales": 3,
+        "total_revenue": 1200.5,
+        "total_profit": 300.25,
+        "sold_quantity": 7,
+        "cash_total": 1,
+        "momo_total": 2,
+        "card_total": 0,
+        "best_selling_product": "WIFI",
+    }
+
+    with patch.object(reciept, "get_summary", AsyncMock(return_value=summary)):
+        message = asyncio.run(make_report().build_analytics_message())
+
+    assert message.startswith("AUTOMATED REPORT")
+    assert "Total Revenue: GHS 1,200.50" in message
+    assert "Total Profit: GHS 300.25" in message
+    assert "Total Orders: 3" in message
+    assert "Units Sold: 7" in message
+    assert "Payment breakdown" in message
+    assert "Cash: 1" in message
+    assert "Mobile money: 2" in message
+    assert "Card: 0" in message
+    assert "Best selling product: WIFI" in message
+
+    # Sections must appear in the order a reader expects.
+    order = [
+        message.index("Total Revenue"),
+        message.index("Payment breakdown"),
+        message.index("Best selling product"),
+    ]
+    assert order == sorted(order)
+
+
+def test_report_message_uses_the_schedule_title():
+    for title in ("Daily Sales Summary", "Weekly Performance Overview", "Monthly Revenue Report"):
+        with patch.object(reciept, "get_summary", AsyncMock(return_value={})):
+            message = asyncio.run(make_report(title=title).build_analytics_message())
+        assert title in message
+
+
+def test_report_message_stays_within_sms_limits():
+    """A long product name must not push the body past a sane segment count."""
+    summary = {
+        "total_sales": 999999,
+        "total_revenue": 9876543.21,
+        "total_profit": 1234567.89,
+        "sold_quantity": 999999,
+        "cash_total": 111111,
+        "momo_total": 222222,
+        "card_total": 333333,
+        "best_selling_product": "Premium Wireless Noise Cancelling Over-Ear Headphones",
+    }
+
+    with patch.object(reciept, "get_summary", AsyncMock(return_value=summary)):
+        message = asyncio.run(make_report().build_analytics_message())
+
+    # 160 chars per GSM segment; 4 is the point where gateways start truncating.
+    assert len(message) <= 640
+
+
+def test_report_message_handles_an_empty_business():
+    """No sales must render zeros, not raise or emit 'None'."""
+    with patch.object(reciept, "get_summary", AsyncMock(return_value={})):
+        message = asyncio.run(make_report().build_analytics_message())
+
+    assert "Total Revenue: GHS 0.00" in message
+    assert "Total Orders: 0" in message
+    assert "Units Sold: 0" in message
+    assert "None" not in message
+    assert "Best selling product: N/A" in message
+
+
+def test_report_message_passes_plain_dates(session):
+    """get_summary filters on func.date(), so a datetime bound is a bug."""
+    seen = {}
+
+    async def _capture(business_id, db, current_user, date, end_date):
+        seen["start"] = date
+        seen["end"] = end_date
+        return {}
+
+    gen = make_report()
+    with patch.object(reciept, "get_summary", _capture):
+        asyncio.run(gen.build_analytics_message())
+
+    assert isinstance(seen["start"], date) and not isinstance(seen["start"], datetime)
+    assert isinstance(seen["end"], date) and not isinstance(seen["end"], datetime)
+
+
+def test_report_sms_is_skipped_when_sailup_is_unconfigured(session):
+    gen = make_report()
+    settings = sailup_settings(SAILUP_API_KEY="")
+
+    with patch.object(reciept, "get_settings", lambda: settings), \
+         patch.object(reciept, "send_sms", AsyncMock()) as send_sms:
+        assert asyncio.run(gen.send_report_smss()) is False
+
+    send_sms.assert_not_awaited()
+
+
+def test_report_sms_sends_the_built_message(session):
+    gen = make_report()
+    settings = sailup_settings()
+    summary = {"total_revenue": 500.0, "total_profit": 100.0, "profit_margin": 20.0}
+
+    with patch.object(reciept, "get_settings", lambda: settings), \
+         patch.object(reciept, "get_summary", AsyncMock(return_value=summary)), \
+         patch.object(reciept, "send_sms", AsyncMock(return_value=True)) as send_sms:
+        assert asyncio.run(gen.send_report_smss()) is True
+
+    send_sms.assert_awaited_once()
+    assert send_sms.await_args[0][0] == "+233555555555"
+    assert "GHS 500.00" in send_sms.await_args[0][1]
+
+
+def test_report_sms_reports_a_rejected_send_as_false(session):
+    gen = make_report()
+    settings = sailup_settings()
+
+    with patch.object(reciept, "get_settings", lambda: settings), \
+         patch.object(reciept, "get_summary", AsyncMock(return_value={})), \
+         patch.object(reciept, "send_sms", AsyncMock(return_value=False)):
+        assert asyncio.run(gen.send_report_smss()) is False
+
+
+def test_report_sms_swallows_an_analytics_failure(session):
+    """A bad report must not take the scheduler down with it."""
+    gen = make_report()
+    settings = sailup_settings()
+
+    with patch.object(reciept, "get_settings", lambda: settings), \
+         patch.object(reciept, "get_summary", AsyncMock(side_effect=RuntimeError("db down"))), \
+         patch.object(reciept, "send_sms", AsyncMock()) as send_sms:
+        assert asyncio.run(gen.send_report_smss()) is False
+
+    send_sms.assert_not_awaited()

@@ -54,6 +54,8 @@ class Reminders(Base):
     note = Column(String, nullable=True)
     is_active = Column(Boolean, nullable=False, server_default=text("true"))
     sent_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String, nullable=False, server_default=text("'pending'"))
+    attempts = Column(Integer, nullable=False, server_default=text("0"))
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
