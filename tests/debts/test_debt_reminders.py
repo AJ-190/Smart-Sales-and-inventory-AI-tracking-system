@@ -366,7 +366,6 @@ def test_claim_is_empty_when_nothing_is_due(session):
     assert claim(session) == []
 
 
-# --- process_due_reminders -------------------------------------------------
 
 
 def test_marks_a_delivered_reminder_as_sent(session):
@@ -441,7 +440,7 @@ def test_customer_without_a_phone_is_not_sent_to(session):
     send_sms = AsyncMock(return_value=True)
     run_process(send_sms, session)
 
-    # A null recipient would be rejected by Sailup, so never spend the request.
+
     send_sms.assert_not_awaited()
     assert status_of(session, reminder_id)[0] == "failed"
     assert sent_at_of(session, reminder_id) is None
@@ -474,7 +473,6 @@ def test_nothing_due_sends_nothing(session):
     app.dependency_overrides.clear()
 
 
-# --- RecieptReportGenerator ------------------------------------------------
 
 
 class _FakeMember:
@@ -560,15 +558,16 @@ def test_report_message_stays_within_sms_limits():
 
 
 def test_report_message_handles_an_empty_business():
-    """No sales must render zeros, not raise or emit 'None'."""
+    """No sales must render a clear notice, not zeros or 'None'."""
     with patch.object(reciept, "get_summary", AsyncMock(return_value={})):
         message = asyncio.run(make_report().build_analytics_message())
 
-    assert "Total Revenue: GHS 0.00" in message
-    assert "Total Orders: 0" in message
-    assert "Units Sold: 0" in message
+    assert "No sales data available" in message
+    assert "Daily Sales Summary" in message
     assert "None" not in message
-    assert "Best selling product: N/A" in message
+    # A zero-sales period has no meaningful figures to report.
+    assert "Total Revenue" not in message
+    assert "Best selling product" not in message
 
 
 def test_report_message_passes_plain_dates(session):
@@ -602,7 +601,17 @@ def test_report_sms_is_skipped_when_sailup_is_unconfigured(session):
 def test_report_sms_sends_the_built_message(session):
     gen = make_report()
     settings = sailup_settings()
-    summary = {"total_revenue": 500.0, "total_profit": 100.0, "profit_margin": 20.0}
+    summary = {
+        "total_sales": 4,
+        "total_revenue": 500.0,
+        "total_profit": 100.0,
+        "profit_margin": 20.0,
+        "sold_quantity": 7,
+        "cash_total": 3,
+        "momo_total": 1,
+        "card_total": 0,
+        "best_selling_product": "Desk",
+    }
 
     with patch.object(reciept, "get_settings", lambda: settings), \
          patch.object(reciept, "get_summary", AsyncMock(return_value=summary)), \
@@ -618,8 +627,10 @@ def test_report_sms_reports_a_rejected_send_as_false(session):
     gen = make_report()
     settings = sailup_settings()
 
+    summary = {"total_sales": 2, "total_revenue": 50.0, "total_profit": 10.0}
+
     with patch.object(reciept, "get_settings", lambda: settings), \
-         patch.object(reciept, "get_summary", AsyncMock(return_value={})), \
+         patch.object(reciept, "get_summary", AsyncMock(return_value=summary)), \
          patch.object(reciept, "send_sms", AsyncMock(return_value=False)):
         assert asyncio.run(gen.send_report_smss()) is False
 

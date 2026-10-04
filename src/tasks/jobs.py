@@ -2,12 +2,12 @@ import logging
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select
 from apscheduler.triggers.cron import CronTrigger
-
+from apscheduler.triggers.interval import IntervalTrigger
 from src.db.database import get_async_session_maker
 from src.users import models as um
 from src.tasks.scheduler import scheduler
 from src.tasks.reciept import RecieptReportGenerator
-from src.tasks.debt_reminders import to_international
+from src.tasks.debt_reminders import process_due_reminders, to_international
 from src.middleware.logging import logger
 
 logger = logger("scheduler")
@@ -134,5 +134,11 @@ def start_report_schedulers():
         replace_existing=True,
     )
     
-    if not scheduler.running:
-        scheduler.start()
+    scheduler.add_job(
+        process_due_reminders,
+        IntervalTrigger(minutes=60),
+        id="hourly-debt-reminder-job",
+        replace_existing=True,
+    )
+    
+    return scheduler

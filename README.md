@@ -295,15 +295,16 @@ The SMS goes to the customer's phone via Sailup. Numbers are converted to intern
 
 **Job schedule** (`src/tasks/jobs.py`):
 
-| Job | Schedule |
-|---|---|
-| Daily sales summary | Every day at 19:00 UTC |
-| Weekly sales summary | Every Sunday at 19:00 UTC |
-| Monthly sales summary | 1st of the month at 19:00 UTC |
+| Job | Trigger | Schedule |
+|---|---|---|
+| Daily sales summary | `CronTrigger` | Every day at 19:00 UTC |
+| Weekly sales summary | `CronTrigger` | Every Sunday at 19:00 UTC |
+| Monthly sales summary | `CronTrigger` | 1st of the month at 19:00 UTC |
+| Debt reminders | `IntervalTrigger` | Every 60 minutes |
 
 Jobs are persisted in the `apscheduler_jobs` table via `SYNC_DATABASE_URL`, so a restart does not lose them.
 
-> **Note:** `start_report_schedulers()` (`src/tasks/jobs.py`) is not currently invoked from `src/main.py`, and `process_due_reminders()` has no `add_job` registration. Nothing starts the scheduler in this tree, so scheduled reports and debt reminders will not fire until a startup hook calls it. See [Scheduled Jobs Not Wired Up](#scheduled-jobs-not-wired-up).
+The scheduler is started from the FastAPI lifespan in `src/main.py`, so jobs begin as soon as the app boots and are shut down cleanly on exit. `SYNC_DATABASE_URL` must point at a **sync** driver (for example `postgresql+psycopg2://`); if it is blank the job store cannot be created and the app fails to start.
 
 ---
 
@@ -363,14 +364,21 @@ Recipients are resolved with `um.ACTIVE_MEMBERSHIP` plus `role in (admin, manage
 
 ---
 
-## Scheduled Jobs Not Wired Up
+## Scheduler Configuration
 
-The report jobs and the debt-reminder dispatcher exist and are covered by tests, but nothing in this tree starts the scheduler:
+`src/tasks/scheduler.py` holds the shared `BackgroundScheduler`. Its job store, executors, and job defaults are passed into the constructor:
 
-- `start_report_schedulers()` in `src/tasks/jobs.py` is never called.
-- `process_due_reminders()` in `src/tasks/debt_reminders.py` has no `add_job` registration.
+| Setting | Value | Why |
+|---|---|---|
+| Job store | `SQLAlchemyJobStore` on `apscheduler_jobs` | Jobs survive a restart |
+| Executor | `ThreadPoolExecutor(max_workers=29)` | Job functions are async, run via the event loop |
+| `coalesce` | `True` | One run after downtime, not a backlog |
+| `max_instances` | `3` | Guards against overlapping runs |
+| `misfire_grace_time` | 3 hours | Tolerates a restart or deploy around fire time |
 
-Until an application startup hook calls `start_report_schedulers()` (and registers the hourly reminder job), no scheduled report or reminder SMS will be sent, even though `SAILUP_API_KEY` and `SAILUP_SENDER_ID` are set. Celery has been removed entirely, so there is no separate worker process to start.
+Celery has been removed entirely, so there is no separate worker or beat process to run — the API process owns the scheduler.
+
+> **Multi-worker deployments:** the scheduler starts in the lifespan, so every Uvicorn/Gunicorn worker would run its own copy and each would send the same reports. Run a single worker process, or move `start_report_schedulers()` into a dedicated scheduler service.
 
 ---
 
@@ -398,7 +406,7 @@ BREVO_API_KEY=your_brevo_api_key
 BREVO_API_URL=
 
 # APScheduler SQLAlchemy job store (sync driver URL)
-SYNC_DATABASE_URL=postgresql://user:password@host:5432/dbname
+SYNC_DATABASE_URL=postgresql+psycopg2://user:password@host:5432/dbname
 
 # API Key
 API_AUTH_KEY=your_api_auth_key

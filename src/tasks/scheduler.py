@@ -7,8 +7,6 @@ from src.debts import models as dm
 
 logger = logging.getLogger("scheduler")
 
-scheduler = BackgroundScheduler()
-
 jobs_store = {
     "default": SQLAlchemyJobStore(
         url=get_settings().SYNC_DATABASE_URL,
@@ -20,8 +18,13 @@ jobs_store = {
 executors = {"default": ThreadPoolExecutor(max_workers=29)}
 
 job_defaults = {
-    "coalesce": False,
+    "coalesce": True,
     "max_instances": 3,
-    "executors": executors,
-    "misfire_grace_time": 3 * 3600, 
+    "misfire_grace_time": 3 * 3600,
 }
+
+scheduler = BackgroundScheduler(
+    jobstores=jobs_store,
+    executors=executors,
+    job_defaults=job_defaults,
+)

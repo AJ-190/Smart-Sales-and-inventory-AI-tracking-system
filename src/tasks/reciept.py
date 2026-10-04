@@ -35,7 +35,8 @@ class RecieptReportGenerator:
         """Render the analytics summary as an SMS business report.
 
         Section order mirrors the old emailed report: headline figures, then
-        the payment breakdown, then the best seller.
+        the payment breakdown, then the best seller. A period with no sales
+        returns a short notice instead of zeros.
         """
 
         summary = await get_summary(
@@ -56,6 +57,15 @@ class RecieptReportGenerator:
         card_total = summary.get("card_total", 0)
         best_product = summary.get("best_selling_product") or "N/A"
 
+        if total_sales == 0:
+            return (
+                f"AUTOMATED REPORT\n"
+                f"{self.title} | {self.start_date.strftime('%b %d')} - {self.end_date.strftime('%b %d, %Y')}\n"
+                f"\n"
+                f"No sales data available for this period.\n"
+                f"\n"
+                f"This is an automated report from your Business Bot GH."
+            )
 
         start_str = self.start_date.strftime("%b %d")
         end_str = self.end_date.strftime("%b %d, %Y")
@@ -76,7 +86,7 @@ class RecieptReportGenerator:
             f"\n"
             f"Best selling product: {best_product}\n"
             f"\n"
-            f"This is an automated report from your Sales Tracker."
+            f"This is an automated report from your Business Bot GH."
         )
         
     async def send_report_smss(self) -> bool:

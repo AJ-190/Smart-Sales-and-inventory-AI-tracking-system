@@ -22,14 +22,28 @@ from src.chat.router import router as chat_router
 from src.external_services.weather_api import router as weather_router
 from src.auth import dependencies as auth_deps
 from src.users import models as um
-from src.middleware.logging import LoggingMiddleware
+from src.middleware.logging import LoggingMiddleware, logger
 from contextlib import asynccontextmanager
+from src.tasks.jobs import start_report_schedulers
 
+log = logger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.redis = await get_redis_client()
+
+    # Register jobs and start the scheduler here rather than at import time.
+    # Import-time construction runs before the app exists and breaks the
+    # lifespan handshake.
+    scheduler = start_report_schedulers()
+    if not scheduler.running:
+        scheduler.start()
+        log.info("Scheduler started successfully.")
+
     yield
+
+    scheduler.shutdown(wait=False)
+    log.info("Scheduler shut down successfully.")
 
 
 app = FastAPI(lifespan=lifespan)

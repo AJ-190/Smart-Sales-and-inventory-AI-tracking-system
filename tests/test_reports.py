@@ -135,3 +135,29 @@ def test_get_summary(authorized_user_client, authorized_user_client_cre_bus, tes
     assert res.status_code == 200
     summery = schemas.SaleSummary(**res.json())
     print(summery.total_revenue)
+
+
+def test_get_summary_counts_multi_item_sale_once(
+    authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli
+):
+    """A sale with several line items must contribute a single row.
+
+    Aggregating sale totals alongside SalesItem fans the sale out to one row
+    per item, which inflates orders and sums revenue once per item.
+    """
+    sales = test_create_sale_cli
+    business_id = authorized_user_client_cre_bus[0].business_id
+
+    res = authorized_user_client.get(
+        f"/reports/analytics/summary/{business_id}"
+    )
+    assert res.status_code == 200
+    summary = schemas.SaleSummary(**res.json())
+
+    assert summary.total_sales == len(sales)
+    assert summary.total_revenue == pytest.approx(sum(s.total_amount for s in sales))
+
+    # Line-item figures come from SalesItem and are legitimately summed.
+    assert summary.sold_quantity == pytest.approx(
+        sum(i.quantity for s in sales for i in s.sales_items)
+    )
