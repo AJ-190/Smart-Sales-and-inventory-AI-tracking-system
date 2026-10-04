@@ -42,7 +42,7 @@ A production-ready REST API for small businesses to manage inventory, track sale
 | Background Jobs | APScheduler (SQLAlchemy job store) |
 | Email | Brevo (OTP) |
 | SMS | Sailup |
-| Caching | Redis (OTP storage, rate limiting, JWT revocation) |
+| Caching | Redis (OTP storage, rate limiting) |
 | Deployment | Render / Railway |
 
 ---
@@ -153,8 +153,8 @@ Authorization: Bearer <your_token>
 |---|---|---|
 | `/users/sign_up` | POST | Create a new user account |
 | `/auth/login` | POST | Login and receive JWT + refresh token |
-| `/auth/refresh` | POST | Refresh an expired access token |
-| `/auth/logout` | POST | Invalidate refresh token |
+| `/auth/refresh` | POST | Refresh an expired access token. Body: `{ "refresh_token": "..." }` |
+| `/auth/logout` | POST | Revoke the caller's session. Body optional; token read from the body or the `Authorization` header. Send `{ "all_sessions": true }` to sign out everywhere |
 | `/auth/otp/get_code` | POST | Request OTP verification code via email |
 | `/auth/otp/verification` | POST | Verify OTP code |
 
