@@ -2,18 +2,45 @@ import logging
 from src.config import get_settings
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
 from src.debts import models as dm
 
 logger = logging.getLogger("scheduler")
 
-jobs_store = {
-    "default": SQLAlchemyJobStore(
-        url=get_settings().SYNC_DATABASE_URL,
-        tablename="apscheduler_jobs",
-        engine_options={"pool_pre_ping": True},
-    )
-}
+
+def _build_jobstore() -> dict:
+    """Prefer the persistent SQLAlchemy store, fall back to memory.
+
+    This module is imported at startup and by the test suite, so it must not
+    raise when SYNC_DATABASE_URL is unset: APScheduler rejects an empty url,
+    which would break `from src.main import app` before anything runs. The
+    fallback keeps jobs in memory only, so they are lost on restart.
+    """
+    sync_url = (get_settings().SYNC_DATABASE_URL or "").strip()
+    if not sync_url:
+        logger.warning(
+            "SYNC_DATABASE_URL is not set; APScheduler jobs will not persist "
+            "across restarts."
+        )
+        return {"default": MemoryJobStore()}
+
+    try:
+        return {
+            "default": SQLAlchemyJobStore(
+                url=sync_url,
+                tablename="apscheduler_jobs",
+                engine_options={"pool_pre_ping": True},
+            )
+        }
+    except Exception as exc:
+        logger.warning(
+            "Could not create the APScheduler job store (%s); jobs will not "
+            "persist across restarts.",
+            exc,
+        )
+        return {"default": MemoryJobStore()}
+
 
 executors = {"default": ThreadPoolExecutor(max_workers=29)}
 
@@ -24,7 +51,7 @@ job_defaults = {
 }
 
 scheduler = BackgroundScheduler(
-    jobstores=jobs_store,
+    jobstores=_build_jobstore(),
     executors=executors,
     job_defaults=job_defaults,
 )

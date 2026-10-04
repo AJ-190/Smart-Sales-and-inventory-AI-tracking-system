@@ -304,7 +304,7 @@ The SMS goes to the customer's phone via Sailup. Numbers are converted to intern
 
 Jobs are persisted in the `apscheduler_jobs` table via `SYNC_DATABASE_URL`, so a restart does not lose them.
 
-The scheduler is started from the FastAPI lifespan in `src/main.py`, so jobs begin as soon as the app boots and are shut down cleanly on exit. `SYNC_DATABASE_URL` must point at a **sync** driver (for example `postgresql+psycopg2://`); if it is blank the job store cannot be created and the app fails to start.
+The scheduler is started from the FastAPI lifespan in `src/main.py`, so jobs begin as soon as the app boots and are shut down cleanly on exit. `SYNC_DATABASE_URL` must point at a **sync** driver (for example `postgresql+psycopg2://`). If it is unset or unusable, the scheduler logs a warning and falls back to an in-memory store: the app still boots, but jobs are lost on every restart. Check the startup logs for `SYNC_DATABASE_URL is not set` before trusting persistence in production.
 
 ---
 

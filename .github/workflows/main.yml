@@ -25,6 +25,10 @@ jobs:
 
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}?statement_cache_size=0
+      # Sync driver URL for the APScheduler job store. Points at the CI
+      # postgres service so job persistence is exercised by the test run;
+      # without it the scheduler silently falls back to an in-memory store.
+      SYNC_DATABASE_URL: postgresql+psycopg2://postgres:password@localhost:5432/test_db
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       SUPER_ADMIN_EMAIL: ${{secrets.SUPER_ADMIN_EMAIL}}
       SUPER_ADMIN_APP_PASSWORD: ${{secrets.SUPER_ADMIN_PASSWORD}}
