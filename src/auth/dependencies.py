@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import status, HTTPException, Depends, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -14,6 +16,15 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 bearer_scheme = HTTPBearer()
+
+
+def bearer_credential(request: Request) -> str | None:
+    header = request.headers.get("authorization") or ""
+    scheme, _, value = header.partition(" ")
+    if scheme.lower() == "bearer" and value.strip():
+        return value.strip()
+    return None
+
 
 async def validate_token(request:  Request, creds: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
     token = creds.credentials 
@@ -48,11 +59,54 @@ async def RefreshTokenRequired(token_data=Depends(validate_token)):
     return token_data
 
 
+async def ensure_session_alive(token_data: dict, session: AsyncSession):
+    session_id = token_data.get("sid")
+    if not session_id:
+        return
+
+    row = (
+        await session.execute(
+            select(um.RefreshSession.revoked_at, um.RefreshSession.expires_at)
+            .where(um.RefreshSession.session_id == session_id)
+        )
+    ).first()
+
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session has been revoked",
+        )
+
+    revoked_at, expires_at = row
+    if revoked_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session has been revoked",
+        )
+
+    if expires_at is not None:
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at <= datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session has expired",
+            )
+
+
 async def get_current_user(
-    token_data=Depends(validate_token),
+    token_data=Depends(AccessTokenRequired),
     session: AsyncSession = Depends(get_db),
 ):
-    user_id = int(token_data["user"]["sub"])
+    await ensure_session_alive(token_data, session)
+
+    try:
+        user_id = int(token_data["user"]["sub"])
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token subject",
+        )
 
     result = await session.execute(
         select(

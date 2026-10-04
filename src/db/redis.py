@@ -29,10 +29,27 @@ async def block_jti(redis: airedis.Redis, jti: str, exp: int):
         logger.error("Failed to block jti in redis: %s", e)
         
 async def check_jti_blocked(redis: airedis.Redis, jti: str):
+    if redis is None:
+        return None
     try:
         return await redis.get(jti)
     except Exception as e:
         logger.error("Failed to check jti in redis: %s", e)
+        return None
+
+
+async def token_rate_limiter(redis: airedis.Redis, key: str, limit: int, expire: int):
+    if redis is None:
+        return False
+    try:
+        bucket = f"rl:tok:{key}"
+        count = await redis.incr(bucket)
+        if count == 1:
+            await redis.expire(bucket, expire)
+        return count > limit
+    except Exception as e:
+        logger.error("Failed to check token rate limit in redis: %s", e)
+        return False
 
 
 async def ip_rate_limiter(redis: airedis.Redis, ip: str, expire: int):

@@ -3,9 +3,6 @@ from typing import Optional
 from datetime import datetime
 
 class UserSignUp(BaseModel):
-    # Reject unknown fields outright. Without this, Pydantic's default
-    # "ignore" policy silently drops a smuggled role field, which hides
-    # privilege-escalation attempts instead of surfacing them.
     model_config = ConfigDict(extra="forbid")
 
     name: str

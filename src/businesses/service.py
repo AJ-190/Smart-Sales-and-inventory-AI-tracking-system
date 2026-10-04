@@ -316,9 +316,6 @@ async def send_approval(post, db: AsyncSession, current_user):
         existing_user = (await db.execute(stmt)).scalars().first()
 
         if existing_user and existing_user.status == bm.ApprovalStatus.approved:
-            # An approved request only blocks a new one while the person is
-            # still in the business. Someone who left afterwards is no longer
-            # a member and has to be approved again, so that request is spent.
             still_member = (
                 await db.execute(
                     select(um.BusinessMember)
@@ -484,8 +481,6 @@ async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSessio
             if existing_member:
                 existing_member.role = approval_user.role
                 existing_member.is_active = True
-                # Reinstating a previous member: clear the soft-delete flag so
-                # they show up in member lists again.
                 existing_member.leave_business = False
             else:
                 user = um.BusinessMember(role=approval_user.role, user_id=approval_user.requester_id,
@@ -583,11 +578,6 @@ async def leave_business(business_id, member_id, current_user: um.Users, session
     
     await business_authorized_access(current_user, business_id, session)
     
-    # Look the member up on its own. The old version inner-joined Approvals on
-    # `Approvals.requester_id == BusinessMember.member_id` and read the result
-    # with one_or_none(), which 404'd members who joined by creating the
-    # business (no approval row) and raised MultipleResultsFound for anyone
-    # with more than one. Approvals are handled separately below.
     member_ = (
         await session.execute(
             select(um.BusinessMember)
@@ -604,8 +594,7 @@ async def leave_business(business_id, member_id, current_user: um.Users, session
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, 
                             detail="Unauthorized to perform this action")
 
-    # Close out any request still in flight so the leaver is not resurrected by
-    # a later approval.
+
     pending_approvals = (
         await session.execute(
             select(bm.Approvals)

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends, status, HTTPException
+from fastapi import APIRouter, Body, Depends, Request, status, HTTPException
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from src.db.database import get_db
@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.database import get_db
 from src.users import service, models as um, schemas as us_schema
 from src.auth import dependencies as auth_deps
+from src.config import get_settings
+from src.db.redis import token_rate_limiter
 from sqlalchemy import select
 from src.auth.utils import verify
 
@@ -20,6 +22,20 @@ class EmailRequest(BaseModel):
 
 allowed_roles = {um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.viewer, um.RoleEnum.user}
 
+async def _guard_refresh_rate(request: Request, refresh_token: str):
+    settings = get_settings()
+    limited = await token_rate_limiter(
+        request.app.state.redis,
+        auth_service.hash_token(refresh_token or ""),
+        settings.REFRESH_RATE_LIMIT,
+        settings.REQUEST_LIMIT_EXPIRY,
+    )
+    if limited:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many refresh attempts, try again later",
+        )
+
 @router.post("/login", response_model=schemas.Token)
 async def login(
     user_credentials: OAuth2PasswordRequestForm = Depends(),
@@ -30,9 +46,11 @@ async def login(
 
 @router.post("/refresh", response_model=schemas.Token)
 async def refresh(
-    payload: schemas.Token,
+    request: Request,
+    payload: schemas.RefreshRequest,
     db = Depends(get_db)
 ):
+    await _guard_refresh_rate(request, payload.refresh_token)
     return await auth_service.refresh(payload, db)
 
 @router.post("/otp/get_code")
@@ -118,7 +136,9 @@ async def verify_otp_code(otp: schemas.OtpVerificationCode,
     
 @router.post("/logout")
 async def logout(
-    payload: schemas.Token,
+    request: Request,
+    payload: schemas.LogoutRequest | None = None,
     db = Depends(get_db)
 ):
-    return await auth_service.logout(payload, db)
+    bearer_token = auth_deps.bearer_credential(request)
+    return await auth_service.logout(payload or schemas.LogoutRequest(), db, bearer_token)

@@ -21,9 +21,6 @@ async def add_user(post: schemas.UserSignUp, db: AsyncSession):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already registered")
 
 
-    # Role is assigned server-side only. Excluding it from the dump means a
-    # caller-supplied role can never reach the constructor, even if
-    # UserSignUp later gains a role field.
     user = um.Users(
         **post.model_dump(exclude={"password", "role"}),
         password=auth_utils.hash(post.password),

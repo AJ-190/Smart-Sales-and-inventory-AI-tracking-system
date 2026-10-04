@@ -29,6 +29,7 @@ class Users(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     memberships = relationship("BusinessMember", back_populates="user", passive_deletes=True)
+    refresh_sessions = relationship("RefreshSession", back_populates="user", passive_deletes=True)
     sales = relationship("Sale", back_populates="user", passive_deletes=True)
     user_approvals = relationship("Approvals", foreign_keys="Approvals.requester_id", back_populates="requester")
     reviewer_approvals = relationship("Approvals", foreign_keys="Approvals.reviewer_id", back_populates="reviewer", passive_deletes=True)
@@ -36,6 +37,21 @@ class Users(Base):
     notifications = relationship("Notification", back_populates="user", passive_deletes=True)
 
         
+class RefreshSession(Base):
+    __tablename__ = "refresh_sessions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String(64), nullable=True, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("Users")
+
+
 class BusinessMember(Base):
     __tablename__ = "business_members"
 
@@ -55,11 +71,8 @@ class BusinessMember(Base):
     )
 
 
-# A member row is kept after someone leaves (soft delete) so their history
-# survives, which means every query that means "people currently in this
-# business" has to go through this predicate instead of matching on
-# business_id alone. NULL counts as still-here: the column is nullable and
-# rows written before the flag existed have no value for it.
+# Member rows are kept after someone leaves, so "still in this business" is
+# leave_business rather than a business_id match. NULL counts as still-here.
 ACTIVE_MEMBERSHIP = or_(
     BusinessMember.leave_business.is_(False),
     BusinessMember.leave_business.is_(None),

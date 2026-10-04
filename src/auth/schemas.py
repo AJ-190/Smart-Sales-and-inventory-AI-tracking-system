@@ -12,6 +12,19 @@ class Token(BaseModel):
     token_type: str
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+    access_token: Optional[str] = None
+    token_type: Optional[str] = None
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: Optional[str] = None
+    access_token: Optional[str] = None
+    token_type: Optional[str] = None
+    all_sessions: bool = False
+
+
 def _validate_otp(value):
     if not isinstance(value, str) or not value.isdigit() or len(value) != 6:
         raise ValueError("OTP must be exactly 6 digits")
