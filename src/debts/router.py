@@ -4,8 +4,6 @@ from src.debts import service as debt_service
 from src.auth import dependencies as auth_deps
 from src.debts import schemas
 from src.users import models as um
-from datetime import date
-from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/debts", tags=["Debts"])
@@ -71,14 +69,14 @@ async def get_customer_transactions(business_id: int,
 
 @router.post("/reminders/{business_id}", response_model=schemas.ReminderResponse)
 async def schedule_reminders(business_id: int,
-                             post: schemas.scheduleReminder,
+                             post: schemas.ScheduleReminder,
                              current_user: um.Users = Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin])),
                              session: AsyncSession = Depends(get_db)):
     return await debt_service.set_reminders(business_id,current_user, session, post)
 
 @router.get("/reminders/{business_id}", response_model=list[schemas.ReminderResponse])
 async def get_reminders(business_id: int,
-                        post: Optional[schemas.GetReminders] = None,
+                        post: schemas.GetReminders | None = None,
                         current_user: um.Users = Depends(auth_deps.role_checker([*roles])),
                         session: AsyncSession = Depends(get_db)):
     return await debt_service.get_reminders(business_id, current_user, session, post)

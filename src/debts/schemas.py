@@ -1,16 +1,15 @@
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
-from datetime import datetime
-from typing import Optional
-from datetime import date as date_type, time
+from datetime import date as date_type, datetime, time
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.debts.models import ReminderStatus
-
 
 
 class AddDebt(BaseModel):
     amount: float
     note: str
     due_date: datetime
+
 
 class DebtResponse(BaseModel):
     debt_id: int
@@ -23,15 +22,13 @@ class DebtResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-
 class CustomerDebt(BaseModel):
     debt: DebtResponse
     customer_name: str
-    customer_email: Optional[str] = None
-    customer_phone: Optional[str] = None
+    customer_email: str | None = None
+    customer_phone: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
-
 
 
 class UpdateDebt(BaseModel):
@@ -39,57 +36,53 @@ class UpdateDebt(BaseModel):
     amount: float | None = None
     note: str | None = None
     due_date: datetime | None = None
-    sale_id: Optional[int] = None
+    sale_id: int | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class Transactions(BaseModel):
     transaction_id: int
-    debt_id: int
-    performer_id: int
+    debt_id: int | None = None
+    performer_id: int | None = None
     business_id: int
-    customer_id: Optional[int] = None
+    customer_id: int | None = None
     amount_paid: float
-    note: Optional[str] = None
+    note: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class CustomerTransactions(BaseModel):
     transactions: Transactions
     customer_name: str
     customer_phone: str
-    customer_email: Optional[str] = None
-    customer_address: Optional[str] = None
+    customer_email: str | None = None
+    customer_address: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
-
-
-class scheduleReminder(BaseModel):
+class ScheduleReminder(BaseModel):
     debt_id: int
     customer_id: int
     date: date_type
-    time_of_day: Optional[time] = None
+    time_of_day: time | None = None
     note: str
 
 
 class ReminderResponse(BaseModel):
     reminder_id: int
-    debt_id: int
-    business_id: int
-    customer_id: int
+    debt_id: int | None = None
+    business_id: int | None = None
+    customer_id: int | None = None
     date: date_type
-    time_of_day: Optional[time] = None
-    note: str
+    time_of_day: time | None = None
+    note: str | None = None
     is_active: bool
-    sent_at: Optional[datetime] = None
-    status: ReminderStatus = Field(
-        default=ReminderStatus.PENDING,
-        validation_alias="status",
-    )
+    sent_at: datetime | None = None
+    status: ReminderStatus = Field(default=ReminderStatus.PENDING)
     attempts: int = 0
     created_at: datetime
     updated_at: datetime
@@ -106,19 +99,19 @@ class ReminderResponse(BaseModel):
         except ValueError:
             return ReminderStatus.PENDING
 
-class UpdateReminder(BaseModel):
-    date: Optional[date_type] = None
-    time_of_day: Optional[time] = None
-    note: Optional[str] = None
-    is_active: Optional[bool] = None
 
+class UpdateReminder(BaseModel):
+    date: date_type | None = None
+    time_of_day: time | None = None
+    note: str | None = None
+    is_active: bool | None = None
 
 
 class GetReminders(BaseModel):
-    debt_id: Optional[int] = None
-    customer_id: Optional[int] = None
-    date: Optional[date_type] = None
-    time_of_day: Optional[time] = None
-    note: Optional[str] = None
-    is_active: Optional[bool] = None
-    status: Optional[ReminderStatus] = None
+    debt_id: int | None = None
+    customer_id: int | None = None
+    date: date_type | None = None
+    time_of_day: time | None = None
+    note: str | None = None
+    is_active: bool | None = None
+    status: ReminderStatus | None = None

@@ -1,8 +1,10 @@
+from decimal import Decimal
+
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 from src.users import models as um
-from src.customers import models as cm, service as cv
+from src.customers import models as cm
 from src.debts import models as dm
 from src.businesses import service, models as bm
 from src.debts import schemas
@@ -93,7 +95,7 @@ async def get_debts(business_id, db: AsyncSession, current_user):
 async def get_customers_with_debt(business_id,
                                   db: AsyncSession,
                                   current_user, limit:int,
-                                  skip: int, search: str,
+                                  skip: int, search: str | None,
                                   amount_gre: float | None = None,
                                   amount_les: float | None = None):
     await service.business_authorized_access(current_user, business_id, db)
@@ -201,7 +203,7 @@ async def update_customer_with_debt(post:schemas.UpdateDebt , business_id, custo
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No outstanding debt found for this customer")
 
     original_amount = debt.amount
-    paid_amount = 0
+    paid_amount = Decimal(0)
 
     sale_to_update = None
     sale_id = post.sale_id or debt.sale_id
@@ -211,21 +213,23 @@ async def update_customer_with_debt(post:schemas.UpdateDebt , business_id, custo
         )
         sale_to_update = sale_result.scalar_one_or_none()
 
-    if post.amount:
-        if post.amount <= 0:
+    if post.amount is not None:
+        requested = Decimal(str(post.amount))
+
+        if requested <= 0:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Amount cannot be less than or equal to zero(0)")
 
-        if post.amount >= debt.amount:
+        if requested >= debt.amount:
             paid_amount = debt.amount
-            debt.amount = 0
+            debt.amount = Decimal(0)
             debt.is_paid = True
         else:
-            paid_amount = post.amount
-            debt.amount = debt.amount - post.amount
+            paid_amount = requested
+            debt.amount = debt.amount - requested
 
     if post.fully_paid:
         paid_amount = debt.amount
-        debt.amount = 0
+        debt.amount = Decimal(0)
         debt.is_paid = True
 
     if paid_amount > 0:
@@ -326,7 +330,7 @@ async def get_transactions(business_id, customer_id, current_user: um.Users, ses
 
 
 
-async def set_reminders(business_id, current_user: um.Users, session: AsyncSession, post: schemas.scheduleReminder):
+async def set_reminders(business_id, current_user: um.Users, session: AsyncSession, post: schemas.ScheduleReminder):
     await service.business_authorized_access(current_user, business_id, session)
 
     customer_with_debt = (

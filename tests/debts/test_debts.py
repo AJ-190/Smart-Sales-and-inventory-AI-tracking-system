@@ -1,5 +1,6 @@
 import asyncio
 from datetime import date, datetime, timedelta, timezone
+import pytest
 from sqlalchemy import select, update
 from src.businesses import models as bm
 from src.users import models as um
@@ -266,5 +267,211 @@ def test_get_reminders_filters(session):
     assert len(get({"time_of_day": "17:30:00"})) == 0
 
     assert len(get({"customer_id": 99999})) == 0
+
+    app.dependency_overrides.clear()
+
+
+def test_reminders_survive_deleted_debt_and_customer(session):
+    """reminders.debt_id and customer_id are ON DELETE SET NULL and note is
+    nullable, so a reminder outlives the debt it points at. The listing is
+    scoped by business_id, which is what keeps the row reachable once its
+    siblings are gone.
+
+    Regression: the response schema declared debt_id, customer_id and note as
+    required, so serializing an orphaned reminder raised and the endpoint 500d.
+    """
+    client = _client(session)
+
+    _, business_id, customer_id, debt_id = _setup_business_with_debt(client, session)
+
+    res = client.post(f"/debts/reminders/{business_id}", json={
+        "debt_id": debt_id,
+        "customer_id": customer_id,
+        "date": (date.today() + timedelta(days=1)).isoformat(),
+        "note": "will be orphaned",
+    })
+    assert res.status_code == 200, res.text
+    reminder_id = res.json()["reminder_id"]
+
+    async def _orphan():
+        await session.execute(
+            update(dm.Reminders)
+            .where(dm.Reminders.reminder_id == reminder_id)
+            .values(debt_id=None, customer_id=None, note=None)
+        )
+        await session.commit()
+
+    asyncio.run(_orphan())
+
+    res = client.get(f"/debts/reminders/{business_id}")
+    assert res.status_code == 200, res.text
+    orphaned = [r for r in res.json() if r["reminder_id"] == reminder_id]
+    assert len(orphaned) == 1
+    assert orphaned[0]["business_id"] == business_id
+    assert orphaned[0]["debt_id"] is None
+    assert orphaned[0]["customer_id"] is None
+    assert orphaned[0]["note"] is None
+    assert orphaned[0]["status"] == "pending"
+
+    app.dependency_overrides.clear()
+
+
+def test_transactions_survive_deleted_debt_and_performer(session):
+    """transactions.debt_id and performer_id are ON DELETE SET NULL. Deleting a
+    sale nulls the debt_id of every transaction on it, so the customer
+    transaction feed has to keep rendering those rows (regression: required int
+    fields raised on read)."""
+    client = _client(session)
+
+    _, business_id, customer_id, debt_id = _setup_business_with_debt(client, session)
+
+    res = client.put(f"/debts/update_customer_debt/{business_id}/{customer_id}", json={
+        "amount": 100.0,
+        "note": "part payment",
+    })
+    assert res.status_code == 200, res.text
+
+    res = client.get(f"/debts/customer_transactions/{business_id}/{customer_id}")
+    assert res.status_code == 200, res.text
+    rows = res.json()
+    assert len(rows) == 2
+    paid = next(
+        r["transactions"] for r in rows if float(r["transactions"]["amount_paid"]) == 100.0
+    )
+    assert paid["debt_id"] is not None
+    assert paid["performer_id"] is not None
+
+    async def _orphan():
+        await session.execute(
+            update(dm.Transactions).values(debt_id=None, performer_id=None)
+        )
+        await session.commit()
+
+    asyncio.run(_orphan())
+
+    res = client.get(f"/debts/customer_transactions/{business_id}/{customer_id}")
+    assert res.status_code == 200, res.text
+    rows = res.json()
+    assert len(rows) == 2
+    for row in rows:
+        assert row["transactions"]["debt_id"] is None
+        assert row["transactions"]["performer_id"] is None
+
+
+def test_partial_payment_reduces_debt_exactly(session):
+    """debts.amount is Numeric(12, 2) and reads back as Decimal, while
+    UpdateDebt.amount arrives as a float. Mixing them raised TypeError, so every
+    partial payment 500d and a customer could only ever be settled in full."""
+    client = _client(session)
+
+    _, business_id, customer_id, debt_id = _setup_business_with_debt(client, session)
+
+    async def _outstanding():
+        return (await session.execute(
+            select(dm.Debt).where(dm.Debt.debt_id == debt_id)
+        )).scalar_one()
+
+    res = client.put(f"/debts/update_customer_debt/{business_id}/{customer_id}", json={
+        "amount": 100.25,
+        "note": "part payment",
+    })
+    assert res.status_code == 200, res.text
+
+    debt = asyncio.run(_outstanding())
+    assert debt.is_paid is False
+    assert float(debt.amount) == 149.75
+    assert float(debt.amount) == pytest.approx(250.0 - 100.25)
+
+    res = client.put(f"/debts/update_customer_debt/{business_id}/{customer_id}", json={
+        "amount": 49.75,
+    })
+    assert res.status_code == 200, res.text
+
+    debt = asyncio.run(_outstanding())
+    assert debt.is_paid is False
+    assert float(debt.amount) == pytest.approx(100.0)
+
+    res = client.put(f"/debts/update_customer_debt/{business_id}/{customer_id}", json={
+        "amount": 100.0,
+    })
+    assert res.status_code == 200, res.text
+
+    debt = asyncio.run(_outstanding())
+    assert debt.is_paid is True
+    assert float(debt.amount) == 0.0
+
+    res = client.get(f"/debts/customer_transactions/{business_id}/{customer_id}")
+    assert res.status_code == 200, res.text
+    total_paid = sum(float(r["transactions"]["amount_paid"]) for r in res.json())
+    assert total_paid == pytest.approx(250.0)
+
+    app.dependency_overrides.clear()
+
+
+def test_payment_larger_than_debt_settles_without_overshoot(session):
+    """Paying more than the outstanding balance must clamp to the balance rather
+    than drive the column negative or add a phantom overpayment."""
+    client = _client(session)
+
+    _, business_id, customer_id, debt_id = _setup_business_with_debt(client, session)
+
+    async def _outstanding():
+        return (await session.execute(
+            select(dm.Debt).where(dm.Debt.debt_id == debt_id)
+        )).scalar_one()
+
+    res = client.put(f"/debts/update_customer_debt/{business_id}/{customer_id}", json={
+        "amount": 9999.0,
+    })
+    assert res.status_code == 200, res.text
+
+    debt = asyncio.run(_outstanding())
+    assert debt.is_paid is True
+    assert float(debt.amount) == 0.0
+
+    res = client.get(f"/debts/customer_transactions/{business_id}/{customer_id}")
+    assert res.status_code == 200, res.text
+    total_paid = sum(float(r["transactions"]["amount_paid"]) for r in res.json())
+    assert total_paid == pytest.approx(250.0)
+
+    app.dependency_overrides.clear()
+
+
+def test_fully_paid_flag_settles_the_balance(session):
+    client = _client(session)
+
+    _, business_id, customer_id, debt_id = _setup_business_with_debt(client, session)
+
+    async def _outstanding():
+        return (await session.execute(
+            select(dm.Debt).where(dm.Debt.debt_id == debt_id)
+        )).scalar_one()
+
+    res = client.put(f"/debts/update_customer_debt/{business_id}/{customer_id}", json={
+        "fully_paid": True,
+    })
+    assert res.status_code == 200, res.text
+
+    debt = asyncio.run(_outstanding())
+    assert debt.is_paid is True
+    assert float(debt.amount) == 0.0
+
+    app.dependency_overrides.clear()
+
+
+def test_non_positive_payment_is_rejected(session):
+    client = _client(session)
+
+    _, business_id, customer_id, debt_id = _setup_business_with_debt(client, session)
+
+    res = client.put(f"/debts/update_customer_debt/{business_id}/{customer_id}", json={
+        "amount": 0,
+    })
+    assert res.status_code == 403, res.text
+
+    res = client.put(f"/debts/update_customer_debt/{business_id}/{customer_id}", json={
+        "amount": -50.0,
+    })
+    assert res.status_code == 403, res.text
 
     app.dependency_overrides.clear()
