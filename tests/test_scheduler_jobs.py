@@ -3,7 +3,7 @@ import pickle
 
 import pytest
 
-from src.tasks import jobs
+from src.tasks import debt_reminders, jobs
 from src.tasks.scheduler import scheduler
 
 
@@ -104,3 +104,63 @@ def test_scheduler_executor_runs_the_wrapper(monkeypatch):
     probe.shutdown(wait=False)
 
     assert ran, "executor did not run the wrapped coroutine"
+
+
+def test_jobs_do_not_borrow_the_request_pool():
+    """Jobs run on their own loop, so they must not use the pooled engine.
+
+    Every wrapper calls asyncio.run(), which builds a fresh event loop. A
+    pooled asyncpg connection belongs to the loop that opened it, so handing
+    one to a job raises "got Future attached to a different loop". This is the
+    bug that made every scheduled job fail in production while the admin
+    endpoint still returned 200.
+    """
+    from sqlalchemy.pool import NullPool
+
+    from src.db.database import engine, job_engine
+
+    assert isinstance(job_engine.pool, NullPool), (
+        "job_engine must use NullPool; a shared pool leaks connections across "
+        "the loops asyncio.run() creates"
+    )
+    assert job_engine is not engine, "jobs must not share the request engine"
+
+    for module in (jobs, debt_reminders):
+        shared = [
+            name
+            for name, value in vars(module).items()
+            if getattr(value, "bind", None) is engine
+        ]
+        assert not shared, (
+            f"{module.__name__} still references the pooled request engine "
+            f"as {shared}"
+        )
+
+
+COROUTINE_BY_WRAPPER = {
+    "run_daily_report": "daily_report_task",
+    "run_weekly_report": "weekly_report_task",
+    "run_monthly_report": "monthly_report_task",
+    "run_debt_reminders": "process_due_reminders",
+}
+
+
+@pytest.mark.parametrize("wrapper", list(COROUTINE_BY_WRAPPER))
+def test_wrapper_disposes_the_job_engine(monkeypatch, wrapper):
+    """The loop dies with the job, so its connections must not outlive it."""
+    disposed = []
+
+    class _StubEngine:
+        """AsyncEngine.dispose is read-only, so swap the whole engine out."""
+
+        async def dispose(self):
+            disposed.append(True)
+
+    async def spy(*args, **kwargs):
+        return "done"
+
+    monkeypatch.setattr(jobs, "job_engine", _StubEngine())
+    monkeypatch.setattr(jobs, COROUTINE_BY_WRAPPER[wrapper], spy)
+
+    getattr(jobs, wrapper)()
+    assert disposed, f"{wrapper} left the job engine undisposed"

@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy import select
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
-from src.db.database import get_async_session_maker
+from src.db.database import job_engine, job_session_maker
 from src.users import models as um
 from src.tasks.scheduler import scheduler
 from src.tasks.reciept import RecieptReportGenerator
@@ -59,7 +59,7 @@ async def get_business_members(session):
 
 async def process_report_data(start_date, end_date, title: str = "Sales Summary"):
     """Generates and dispatches receipt reports for all target admin/manager users."""
-    async with get_async_session_maker() as session:
+    async with job_session_maker() as session:
         members = await get_business_members(session)
 
         if not members:
@@ -115,20 +115,31 @@ async def monthly_report_task():
 
 
 
+def _run_job(coro):
+
+    async def _drive():
+        try:
+            return await coro
+        finally:
+            await job_engine.dispose()
+
+    return asyncio.run(_drive())
+
+
 def run_daily_report():
-    asyncio.run(daily_report_task())
+    _run_job(daily_report_task())
 
 
 def run_weekly_report():
-    asyncio.run(weekly_report_task())
+    _run_job(weekly_report_task())
 
 
 def run_monthly_report():
-    asyncio.run(monthly_report_task())
+    _run_job(monthly_report_task())
 
 
 def run_debt_reminders():
-    asyncio.run(process_due_reminders())
+    _run_job(process_due_reminders())
 
 
 JOB_METADATA = {

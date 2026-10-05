@@ -678,3 +678,155 @@ def test_report_sms_swallows_an_analytics_failure(session):
         assert asyncio.run(gen.send_report_smss()) is False
 
     send_sms.assert_not_awaited()
+
+
+# --- frontend/server date alignment ----------------------------------------
+
+
+@pytest.fixture
+def ahead_of_utc_tz():
+    """Puts the process clock in a timezone whose date is ahead of UTC."""
+    import os
+    import time as _time
+    previous = os.environ.get("TZ")
+    os.environ["TZ"] = "Pacific/Kiritimati"
+    _time.tzset()
+    yield
+    if previous is None:
+        os.environ.pop("TZ", None)
+    else:
+        os.environ["TZ"] = previous
+    _time.tzset()
+
+
+def test_today_in_utc_is_accepted_even_when_local_date_is_ahead(client, session, ahead_of_utc_tz):
+    """The frontend sends the UTC day, so local-date skew must not reject it."""
+    from src.debts import models as dm_models
+    from src.debts import schemas as dm_schemas
+    from src.debts import service as debt_service
+
+    _setup_business_with_debt(client, session)
+    client.headers.pop("Authorization", None)
+
+    utc_today = datetime.now(timezone.utc).date()
+    if date.today() == utc_today:
+        pytest.skip("host timezone is not ahead of UTC")
+
+    from src.users import models as um_models
+
+    async def _seed():
+        debt = (await session.execute(select(dm_models.Debt))).scalars().first()
+        reminder = dm_models.Reminders(
+            debt_id=debt.debt_id,
+            business_id=debt.business_id,
+            customer_id=debt.customer_id,
+            date=datetime.combine(utc_today, time.min, tzinfo=timezone.utc),
+            note="",
+        )
+        session.add(reminder)
+        await session.commit()
+        admin = (await session.execute(select(um_models.Users))).scalars().first()
+        return debt, admin
+
+    debt, admin = asyncio.run(_seed())
+
+    payload = dm_schemas.ScheduleReminder(
+        debt_id=debt.debt_id,
+        customer_id=debt.customer_id,
+        date=utc_today,
+        time_of_day=time(9, 0),
+        note="",
+    )
+
+    async def _call():
+        return await debt_service.set_reminders(
+            debt.business_id, admin, session, payload
+        )
+
+    reminder = asyncio.run(_call())
+    assert reminder.date.date() == utc_today
+
+
+# --- time_of_day is honoured -----------------------------------------------
+
+
+def add_reminder_at(session, debt_id, customer_id, business_id, on, time_of_day, note="please pay"):
+    async def _add():
+        reminder = dm.Reminders(
+            debt_id=debt_id,
+            customer_id=customer_id,
+            business_id=business_id,
+            date=datetime.combine(on, time.min, tzinfo=timezone.utc),
+            time_of_day=time_of_day,
+            note=note,
+            is_active=True,
+            status="pending",
+            attempts=0,
+        )
+        session.add(reminder)
+        await session.commit()
+        await session.refresh(reminder)
+        return reminder.reminder_id
+
+    return asyncio.run(_add())
+
+
+def test_reminder_due_later_today_is_not_claimed_yet(session):
+    """time_of_day is chosen in the UI, so it must gate the send."""
+    now = datetime.now(timezone.utc)
+    if now.time() >= time(23, 59):
+        pytest.skip("no time left in the UTC day")
+    business_id, customer_id, debt_id = setup_debt(session)
+    reminder_id = add_reminder_at(session, debt_id, customer_id, business_id, _DUE_TODAY, time(23, 59))
+
+    assert claim(session) == []
+    assert status_of(session, reminder_id) == ("pending", 0)
+
+
+def test_reminder_whose_time_has_passed_is_claimed(session):
+    now = datetime.now(timezone.utc)
+    if now.time() <= time(0, 2):
+        pytest.skip("start of the UTC day")
+    business_id, customer_id, debt_id = setup_debt(session)
+    reminder_id = add_reminder_at(session, debt_id, customer_id, business_id, _DUE_TODAY, time(0, 1))
+
+    assert [r.reminder_id for r in claim(session)] == [reminder_id]
+    assert status_of(session, reminder_id) == ("sending", 1)
+
+
+def test_yesterday_with_a_future_time_is_still_due(session):
+    """Only today is gated by time_of_day; a past day always sends."""
+    business_id, customer_id, debt_id = setup_debt(session)
+    reminder_id = add_reminder_at(session, debt_id, customer_id, business_id, _DUE, time(23, 59))
+
+    assert [r.reminder_id for r in claim(session)] == [reminder_id]
+    assert status_of(session, reminder_id) == ("sending", 1)
+
+
+def test_missing_time_of_day_defaults_to_nine_in_the_morning(session):
+    business_id, customer_id, debt_id = setup_debt(session)
+
+    async def _add_null():
+        reminder = dm.Reminders(
+            debt_id=debt_id,
+            customer_id=customer_id,
+            business_id=business_id,
+            date=datetime.combine(_DUE_TODAY, time.min, tzinfo=timezone.utc),
+            time_of_day=None,
+            note="please pay",
+            is_active=True,
+            status="pending",
+            attempts=0,
+        )
+        session.add(reminder)
+        await session.commit()
+        await session.refresh(reminder)
+        return reminder.reminder_id
+
+    reminder_id = asyncio.run(_add_null())
+
+    assert debt_reminders.DEFAULT_TIME_OF_DAY == time(9, 0)
+    now = datetime.now(timezone.utc)
+    expected_due = now.time() >= debt_reminders.DEFAULT_TIME_OF_DAY
+    claimed = [r.reminder_id for r in claim(session)]
+    assert claimed == ([reminder_id] if expected_due else [])

@@ -1,11 +1,11 @@
 
 import asyncio
 import logging
-from datetime import datetime, time
+from datetime import datetime, time, timezone
 from decimal import Decimal
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.db.database import get_async_session_maker
+from src.db.database import job_session_maker as get_async_session_maker
 import httpx
 from sqlalchemy import select, update, func
 
@@ -23,11 +23,19 @@ SEND_ATTEMPTS = 3
 
 
 
+def due_instant(reminder_date, time_of_day) -> datetime:
+    return datetime.combine(
+        reminder_date.date(), time_of_day or DEFAULT_TIME_OF_DAY, tzinfo=timezone.utc
+    )
+
+
 async def claim_due_reminders(session:AsyncSession, limit: int = 100):
 
-    due_ids = (
+    now = datetime.now(timezone.utc)
+
+    candidates = (
         await session.execute(
-            select(dm.Reminders.reminder_id)
+            select(dm.Reminders.reminder_id, dm.Reminders.date, dm.Reminders.time_of_day)
             .join(dm.Debt, dm.Reminders.debt_id == dm.Debt.debt_id)
             .where(
                 dm.Reminders.is_active == True,
@@ -35,7 +43,7 @@ async def claim_due_reminders(session:AsyncSession, limit: int = 100):
                     [dm.ReminderStatus.PENDING, dm.ReminderStatus.FAILED]
                 ),
                 dm.Reminders.attempts < SEND_ATTEMPTS,
-                dm.Reminders.date <= func.now(),
+                dm.Reminders.date <= now,
                 dm.Debt.is_paid == False
             )
 
@@ -43,9 +51,13 @@ async def claim_due_reminders(session:AsyncSession, limit: int = 100):
             .limit(limit)
             .with_for_update(skip_locked=True)
         )
-    )
+    ).all()
 
-    claimed_ids = due_ids.scalars().all()
+    claimed_ids = [
+        row.reminder_id
+        for row in candidates
+        if due_instant(row.date, row.time_of_day) <= now
+    ]
     if not claimed_ids:
         return []
 

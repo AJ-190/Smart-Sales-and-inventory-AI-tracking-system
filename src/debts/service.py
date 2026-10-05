@@ -16,6 +16,11 @@ from src.notifications import service as notification_service, schemas as notifi
 manager = socket_manager.manager
 
 
+def utc_today() -> date:
+    return datetime.now(timezone.utc).date()
+
+
+
 async def add_debt(post: schemas.AddDebt, business_id: int, customer_id: int, session: AsyncSession, current_user: um.Users):
     await service.business_authorized_access(current_user, business_id, session)
 
@@ -353,7 +358,7 @@ async def set_reminders(business_id, current_user: um.Users, session: AsyncSessi
             detail="Cannot schedule a reminder for a debt that is already paid",
         )
 
-    if post.date < date.today():
+    if post.date < utc_today():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Reminder date cannot be in the past",
@@ -442,7 +447,7 @@ async def edit_reminder(business_id, reminder_id, current_user: um.Users, sessio
     updates = post.model_dump(exclude_unset=True)
 
 
-    if updates.get("date") is not None and updates["date"] < date.today():
+    if updates.get("date") is not None and updates["date"] < utc_today():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Reminder date cannot be in the past",

@@ -1,6 +1,6 @@
 from datetime import date as date_type, datetime, time
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from src.debts.models import ReminderStatus
 
@@ -82,7 +82,7 @@ class ReminderResponse(BaseModel):
     note: str | None = None
     is_active: bool
     sent_at: datetime | None = None
-    status: ReminderStatus = Field(default=ReminderStatus.PENDING)
+    status: ReminderStatus = ReminderStatus.PENDING
     attempts: int = 0
     created_at: datetime
     updated_at: datetime
