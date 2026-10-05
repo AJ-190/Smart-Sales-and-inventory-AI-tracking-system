@@ -43,7 +43,7 @@ def upgrade() -> None:
     op.execute(
         sa.text(
             "INSERT INTO refresh_sessions (user_id, token_hash, created_at) "
-            "SELECT user_id, refresh_token, NOW() FROM users "
+            "SELECT user_id, refresh_token, CURRENT_TIMESTAMP FROM users "
             "WHERE refresh_token IS NOT NULL"
         )
     )

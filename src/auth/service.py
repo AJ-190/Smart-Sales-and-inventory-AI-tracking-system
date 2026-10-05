@@ -1,9 +1,9 @@
 import secrets
 import hashlib
 from datetime import datetime, timezone
-from fastapi import status, HTTPException, Request
+from fastapi import status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update
 from src.users import models as um
 from src.auth import schemas, utils as auth_utils
 from src.config import get_settings
@@ -28,7 +28,6 @@ def _now() -> datetime:
 
 
 def _issue_pair(user: um.Users, session_id: str) -> tuple[str, str, datetime]:
-
     claims = {"sub": str(user.user_id), "role": user.role}
     access_token = auth_utils.AccessToken(claims, sid=session_id)
     refresh_token = auth_utils.AccessToken(

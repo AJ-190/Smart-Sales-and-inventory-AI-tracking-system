@@ -48,4 +48,5 @@ scheduler = BackgroundScheduler(
     jobstores=_build_jobstore(),
     executors=executors,
     job_defaults=job_defaults,
+    timezone="Africa/Accra",
 )

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select
@@ -113,32 +114,49 @@ async def monthly_report_task():
 
 
 
+
+def run_daily_report():
+    asyncio.run(daily_report_task())
+
+
+def run_weekly_report():
+    asyncio.run(weekly_report_task())
+
+
+def run_monthly_report():
+    asyncio.run(monthly_report_task())
+
+
+def run_debt_reminders():
+    asyncio.run(process_due_reminders())
+
+
 def start_report_schedulers():
     """Schedules daily, weekly, and monthly jobs in APScheduler."""
     scheduler.add_job(
-        daily_report_task,
+        run_daily_report,
         CronTrigger(hour=19, minute=0, second=0, timezone="UTC"),
         id="daily-report-job",
         replace_existing=True,
     )
     scheduler.add_job(
-        weekly_report_task,
+        run_weekly_report,
         CronTrigger(day_of_week="sun", hour=19, minute=0, second=0, timezone="UTC"),
         id="weekly-report-job",
         replace_existing=True,
     )
     scheduler.add_job(
-        monthly_report_task,
+        run_monthly_report,
         CronTrigger(day=1, hour=19, minute=0, second=0, timezone="UTC"),
         id="monthly-report-job",
         replace_existing=True,
     )
-    
+
     scheduler.add_job(
-        process_due_reminders,
+        run_debt_reminders,
         IntervalTrigger(minutes=60),
         id="hourly-debt-reminder-job",
         replace_existing=True,
     )
-    
+
     return scheduler
