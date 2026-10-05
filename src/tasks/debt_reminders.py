@@ -24,24 +24,27 @@ SEND_ATTEMPTS = 3
 
 
 async def claim_due_reminders(session:AsyncSession, limit: int = 100):
-        
+
     due_ids = (
         await session.execute(
             select(dm.Reminders.reminder_id)
             .join(dm.Debt, dm.Reminders.debt_id == dm.Debt.debt_id)
             .where(
                 dm.Reminders.is_active == True,
-                dm.Reminders.status == "pending",
+                dm.Reminders.status.in_(
+                    [dm.ReminderStatus.PENDING, dm.ReminderStatus.FAILED]
+                ),
+                dm.Reminders.attempts < SEND_ATTEMPTS,
                 dm.Reminders.date <= func.now(),
                 dm.Debt.is_paid == False
             )
-            
+
             .order_by(dm.Reminders.date.asc())
             .limit(limit)
             .with_for_update(skip_locked=True)
         )
     )
-    
+
     claimed_ids = due_ids.scalars().all()
     if not claimed_ids:
         return []
@@ -51,18 +54,18 @@ async def claim_due_reminders(session:AsyncSession, limit: int = 100):
         await session.execute(
             update(dm.Reminders)
             .where(dm.Reminders.reminder_id.in_(claimed_ids))
-            .values(status="sending", attempts= dm.Reminders.attempts +1)
+            .values(status=dm.ReminderStatus.SENDING, attempts= dm.Reminders.attempts +1)
             .returning(dm.Reminders)
             .execution_options(synchronize_session=False)
         )
     )
-    
-    await session.commit()  
+
+    await session.commit()
     return result.scalars().all()
 
 
-    
-    
+
+
 
 def to_international(phone: str | None) -> str | None:
     digits = "".join(char for char in phone or "" if char.isdigit())
@@ -89,7 +92,7 @@ def build_message(customer_name: str, amount: Decimal, due_date, note: str | Non
 
 async def _send_sms_sailup(client: httpx.AsyncClient, settings, phone: str, message: str) -> bool:
 
-    
+
     if not settings.SAILUP_SENDER_ID:
         logger.error(
             "Sailup needs SAILUP_SENDER_ID to be set in the environment to send SMS messages"
@@ -152,7 +155,7 @@ async def process_due_reminders():
 
     async with get_async_session_maker() as session:
         due_reminders = await claim_due_reminders(session)
-        
+
         if not due_reminders:
             logger.info("No due reminders found.")
             return
@@ -175,7 +178,7 @@ async def process_due_reminders():
             .join(cm.Customer, dm.Reminders.customer_id == cm.Customer.customer_id)
             .where(dm.Reminders.reminder_id.in_(reminder_ids))
         )
-        
+
         result = await session.execute(query)
         records = result.mappings().all()
 
@@ -220,14 +223,18 @@ async def process_due_reminders():
             await session.execute(
                 update(dm.Reminders)
                 .where(dm.Reminders.reminder_id.in_(successful_ids))
-                .values(status="sent", sent_at=func.now())
+                .values(
+                    status=dm.ReminderStatus.SENT,
+                    sent_at=func.now(),
+                    updated_at=func.now(),
+                )
             )
 
         if failed_ids:
             await session.execute(
                 update(dm.Reminders)
                 .where(dm.Reminders.reminder_id.in_(failed_ids))
-                .values(status="failed")
+                .values(status=dm.ReminderStatus.FAILED, updated_at=func.now())
             )
 
         await session.commit()

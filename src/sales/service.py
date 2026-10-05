@@ -211,15 +211,15 @@ async def delete_sale(business_id, id, db: AsyncSession, current_user):
 
     if not sale:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Sale with the ID: {id} not found")
-    
+
     sale_itmes = (
         await db.execute(
             select(bm_models.SalesItem)
             .where(bm_models.SalesItem.sale_id == sale.sale_id)
-            
+
         )
     ).scalars().all()
-    
+
     for item in sale_itmes:
         product = (
             await db.execute(
@@ -227,7 +227,7 @@ async def delete_sale(business_id, id, db: AsyncSession, current_user):
                 .where(bm_models.Product.product_id == item.product_id)
                 )
         ).scalar_one_or_none()
-        
+
         if not product:
             continue
         product.quantity = product.quantity + item.quantity
@@ -240,10 +240,10 @@ async def delete_sale(business_id, id, db: AsyncSession, current_user):
         await db.execute(
             delete(dm.Transactions).where(dm.Transactions.debt_id == linked_debt.debt_id)
         )
-    
+
     await db.delete(sale)
     await db.commit()
-    
+
     await manager.broadcast(business_id, f"Sale with ID: {id} has been deleted")
     await notification_service.send_notification(
         notification_schemas.SendNotification(
@@ -396,5 +396,4 @@ async def update_sale(business_id, sale_id, sale_data: schemas.SaleUpdate, curre
         current_user
     )
     return sale_
-        
-        
+

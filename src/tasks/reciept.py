@@ -5,7 +5,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 from src.tasks.debt_reminders import send_sms
-from src.analytics.service import get_summary 
+from src.analytics.service import get_summary
 from src.config import get_settings
 from datetime import datetime
 
@@ -27,18 +27,18 @@ class RecieptReportGenerator:
         self.phone = phone
         self.current_user = current_user
         self.session = session
-        self.start_date = start_date    
+        self.start_date = start_date
         self.end_date = end_date
         self.title = title
-        
+
     async def build_analytics_message(self) -> str:
         """Render the analytics summary as an SMS business report."""
 
         summary = await get_summary(
-            self.current_user.business_id, 
-            self.session, 
-            self.current_user, 
-            date=self.start_date.date(), 
+            self.current_user.business_id,
+            self.session,
+            self.current_user,
+            date=self.start_date.date(),
             end_date=self.end_date.date()
         )
 
@@ -83,7 +83,7 @@ class RecieptReportGenerator:
             f"\n"
             f"This is an automated report from your Business Bot GH."
         )
-        
+
     async def send_report_smss(self) -> bool:
 
         settings = get_settings()
@@ -97,11 +97,11 @@ class RecieptReportGenerator:
         try:
             message = await self.build_analytics_message()
             success = await send_sms(self.phone, message)
-            
+
             if success:
                 logger.info(f"SMS report sent successfully to {self.phone}.")
                 return True
-            
+
             logger.error(f"Failed to send SMS report to {self.phone}.")
             return False
 
@@ -126,14 +126,14 @@ class RecieptReportGenerator:
 
         c.setFont("Helvetica", 9.5)
         for item in items:
-            y -= 7 * mm  # you track this cursor yourself — nothing flows automatically
+            y -= 7 * mm
             c.drawString(20 * mm, y, item["name"])
             c.drawRightString(width - 20 * mm, y, f"GHS {item['qty'] * item['unit_price']:.2f}")
 
         y -= 12 * mm
         c.setFont("Helvetica-Bold", 12)
         c.drawRightString(width - 20 * mm, y, f"Total: GHS {total:.2f}")
-        
+
         c.setFont("Helvetica", 7)
         c.drawCentredString(width / 2, 15 * mm, f"{business['name']} · generated via Business Bot")
         c.save()

@@ -27,7 +27,7 @@ def bearer_credential(request: Request) -> str | None:
 
 
 async def validate_token(request:  Request, creds: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
-    token = creds.credentials 
+    token = creds.credentials
 
     token_data = verify_token(token)
 
@@ -138,7 +138,7 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Account not registered",
         )
-        
+
     if row.email == get_settings().SUPER_ADMIN_EMAIL:
         effective_role = um.RoleEnum.super_admin.value
     elif row.user_role == um.RoleEnum.super_admin:

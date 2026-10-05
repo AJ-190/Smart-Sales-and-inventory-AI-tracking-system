@@ -111,7 +111,7 @@ def test_reports_profit(authorized_user_client, authorized_user_client_cre_bus, 
     assert res.status_code == 200
     profit = schemas.ProfitResponse(**res.json())
     print(profit.revenue)
-    
+
 def test_reports_profit_404(authorized_user_client, authorized_user_client_cre_bus, test_create_sale_cli):
     res = authorized_user_client.get(
         "/reports/profit?date=2026-05-14&end_date=2026-05-15"

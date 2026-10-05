@@ -18,7 +18,7 @@ roles = ALL_ROLES
 async def add_sale(business_id: int, post: schemas.SaleCreate,
              db=Depends(get_db),
              current_user=Depends(auth_deps.role_checker([*roles]))):
-    return await sale_service.add_sale(business_id, post, db, current_user)    
+    return await sale_service.add_sale(business_id, post, db, current_user)
 
 @router.get("/sales/{business_id}", response_model=list[schemas.SaleResponse])
 async def get_sales(
@@ -43,7 +43,7 @@ async def delete_sale(business_id: int, id: int, db=Depends(get_db), current_use
 
 
 @router.put("/sales/{business_id}/{sale_id}", response_model=schemas.SaleResponse)
-async def update_sale(business_id: int, sale_id: int, 
+async def update_sale(business_id: int, sale_id: int,
                       sale_data: schemas.SaleUpdate,
                       current_user = Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager, um.RoleEnum.cashier])),
                       session: AsyncSession = Depends(get_db)

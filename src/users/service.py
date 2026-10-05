@@ -192,7 +192,7 @@ async def update_user(id: int, post: schemas.UserUpdate, db: AsyncSession, curre
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admin can change roles",
             )
-            
+
         if post.role == um.RoleEnum.super_admin:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to perform this action.")
         try:

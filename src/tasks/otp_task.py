@@ -116,7 +116,7 @@ async def send_otp(email: str, forgot_pass):
 
     otp = f"{secrets.randbelow(1_000_000):06d}"
     from src.auth.service import digest
-    
+
     await otp_verification(app.state.redis, email, forgot_pass=forgot_pass, otp=digest(email,otp), store=True)
 
     try:

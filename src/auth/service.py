@@ -180,33 +180,33 @@ async def refresh(payload: schemas.RefreshRequest, db: AsyncSession):
         "refresh_token": new_refresh_token,
         "token_type": "Bearer",
     }
-    
-    
+
+
 async def verify_change_password_otp(current_user, otp: str):
     if not await verify_otp(current_user.email, otp, forgot_pass=False, consume=False):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Incorrect OTP-Verification Code")
-    
+
     return {"message": "OTP verified successfully"}
 
 
 async def change_password(current_user: um.Users, session: AsyncSession, passwords: schemas.Passwords):
     user = (await session.execute(select(um.Users).where(um.Users.user_id == current_user.user_id))).scalar_one_or_none()
-    
+
     if passwords.new_password.get_secret_value() != passwords.conf_password.get_secret_value():
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Passwords do not match")
-    
+
     if not auth_utils.verify(passwords.old_password.get_secret_value(), user.password):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Incorrect password")
-    
+
     if not await verify_otp(user.email, passwords.otp, forgot_pass=False):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Incorrect OTP-Verification Code")
-    
-    
+
+
     user.password = auth_utils.hash(passwords.new_password.get_secret_value())
     await session.commit()
     return "Password changed successfully"
-    
-    
+
+
 
 async def logout(payload: schemas.LogoutRequest, db: AsyncSession, bearer_token: str | None = None):
     presented = payload.refresh_token or payload.access_token or bearer_token

@@ -49,7 +49,7 @@ class Business(Base):
     reminders = relationship("Reminders", back_populates="business", passive_deletes=True)
     transactions = relationship("Transactions", back_populates="business", passive_deletes=True)
     notifications = relationship("Notification", back_populates="business", passive_deletes=True)
-    
+
 class Product(Base):
     __tablename__ = "products"
 

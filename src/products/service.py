@@ -1,5 +1,5 @@
 from fastapi import status, HTTPException, UploadFile
-from sqlalchemy import select, inspect 
+from sqlalchemy import select, inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.users import models as um
 from src.businesses import models as bm, service as business_service
@@ -25,7 +25,7 @@ def _as_int(business_id):
     except (TypeError, ValueError):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="business_id must be an integer")
-        
+
 
 async def product_validity(post):
     if post.price is not None and post.price <= 0:
@@ -75,61 +75,61 @@ async def add_product(business_id, post: schemas.Productcreate, db: AsyncSession
 async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSession, business_id):
     await business_service.business_authorized_access(current_user, business_id, session)
     business_id = _as_int(business_id)
-    
+
     if not file.filename.endswith((".csv", ".xls", ".xlsx")):
         raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail="Only csv and excel is acceptable now")
-    
+
     contents = await file.read()
     try:
-        
+
         if file.filename.endswith(".csv"):
             df = pd.read_csv(io.BytesIO(contents))
         else:
             df = pd.read_excel(io.BytesIO(contents))
-        
+
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not parse file")
 
     df = df.where(pd.notnull(df), None)
-    
+
     with open(Path(__file__).resolve().parent / "column_aliases.json", "r") as file:
         column_alliases: dict = json.load(file)
-        
+
     def validate_columns(frame: pd.DataFrame):
         cleand_cols = [ str(col).lower().strip() for col in frame.columns]
         if not cleand_cols or any (not column for column in cleand_cols):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="File must contains appropriate columns")
-        
+
         if len(set(cleand_cols)) != len(cleand_cols):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="File must not contain duplicate columns")
-        
+
     validate_columns(df)
-        
+
     cononical_to_alias = {}
     for col, allias in column_alliases.items():
         for als in allias:
             cononical_to_alias[als] = col
-            
+
     df.rename(columns=cononical_to_alias, inplace=True)
     total_rows = len(df)
-    
+
     df["quantity"] = df["quantity"].fillna(0).astype(int)
     df.dropna(subset=['price', 'name'], inplace=True)
     dropped_missing = total_rows - len(df)
-    
+
     rows_before_dedup = len(df)
     df = df.drop_duplicates(subset=['name'], keep="first")
     skipped_duplicates = rows_before_dedup - len(df)
-    
-    
+
+
     required_cols = ['name', "price"]
     check_req = [c for c in required_cols if c not in df.columns]
-    
+
     if check_req:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Price and product name are required columns")
-    
-    cols =  {c.name for c in bm.Product.__table__.columns}   
-    
+
+    cols =  {c.name for c in bm.Product.__table__.columns}
+
     created = 0
     skipped_existing = 0
     for _, row in df.iterrows():
@@ -138,16 +138,16 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
                                   .where(bm.Product.business_id == business_id)
                                   .where(bm.Product.name == row['name']))
         ).scalar()
-        
+
         if product_ext is not None:
             skipped_existing += 1
             continue
         data = {k:x for k, x in row.to_dict().items() if k in cols}
-        
+
         data['business_id'] = business_id
         session.add(bm.Product(**data))
         created += 1
-        
+
     await session.commit()
     return {
         "message": "Product stored successfully",
@@ -164,45 +164,45 @@ async def export_products(current_user: um.Users, session: AsyncSession, busines
         await session.execute(
             select(bm.Product)
             .where(bm.Product.business_id == business_id)
-            
+
         )
     ).scalars().all()
-    
-    
+
+
     if not products:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No product found to be exported")
     products_dicts = [
         {c.key: getattr(p, c.key) for c in inspect(p).mapper.column_attrs}
         for p in products
     ]
-    
+
 
     df = pd.DataFrame(products_dicts)
-    
+
     for col in df.select_dtypes(include=['datetimetz']).columns:
         if df[col].dt.tz is not None:
             df[col] = df[col].dt.tz_convert("UTC").dt.tz_localize(None)
-    
+
     buffer = io.BytesIO()
     if file_format == bm.FileFormat.csv:
         df.to_csv(buffer, index=False)
         filename = "products.csv"
         media_type = "text/csv"
-        
+
     else:
         df.to_excel(buffer, index=False)
 
         filename = "products.xlsx"
         media_type =  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        
+
     buffer.seek(0)
-    
+
     return StreamingResponse(
         buffer,
         media_type=media_type,
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
-        
+
 async def get_Products(business_id, db: AsyncSession, current_user, limit, skip, search):
     business_id = _as_int(business_id)
     products = (
@@ -242,7 +242,7 @@ async def update_product(business_id, id, post: schemas.ProductUpdate, db: Async
     await get_member(db, current_user)
     business_id = _as_int(business_id)
     await product_validity(post)
-    
+
     product = (
         (await db.execute(
             select(bm.Product)

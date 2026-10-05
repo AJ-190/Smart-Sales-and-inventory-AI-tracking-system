@@ -36,7 +36,7 @@ class Users(Base):
     transactions = relationship("Transactions", back_populates="performer", passive_deletes=True)
     notifications = relationship("Notification", back_populates="user", passive_deletes=True)
 
-        
+
 class RefreshSession(Base):
     __tablename__ = "refresh_sessions"
 

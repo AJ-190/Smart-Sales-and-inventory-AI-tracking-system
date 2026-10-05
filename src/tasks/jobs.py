@@ -61,7 +61,7 @@ async def process_report_data(start_date, end_date, title: str = "Sales Summary"
     """Generates and dispatches receipt reports for all target admin/manager users."""
     async with get_async_session_maker() as session:
         members = await get_business_members(session)
-        
+
         if not members:
             logger.info("No eligible business members found for report generation.")
             return
@@ -69,7 +69,7 @@ async def process_report_data(start_date, end_date, title: str = "Sales Summary"
         for user, member in members:
             raw_phone = getattr(user, "phone", None)
             formatted_phone = to_international(raw_phone) if isinstance(raw_phone, str) else None
-            
+
             if not formatted_phone:
                 logger.error(f"Invalid or missing phone number for user ID {user.user_id}: {raw_phone}")
                 continue
@@ -85,7 +85,7 @@ async def process_report_data(start_date, end_date, title: str = "Sales Summary"
                 )
 
                 sent = await report_generator.send_report_smss()
-                
+
                 if not sent:
                     logger.error(f"Failed to send report SMS to {formatted_phone}")
                 else:
@@ -129,6 +129,42 @@ def run_monthly_report():
 
 def run_debt_reminders():
     asyncio.run(process_due_reminders())
+
+
+JOB_METADATA = {
+    "daily-report-job": {
+        "name": "daily_summary",
+        "label": "Daily Summary",
+        "description": "Daily sales and revenue summary, texted to every admin and manager.",
+        "schedule": "Every day at 19:00",
+        "trigger": "cron",
+        "timezone": "UTC",
+    },
+    "weekly-report-job": {
+        "name": "weekly_summary",
+        "label": "Weekly Summary",
+        "description": "Seven-day performance overview for the week just ended.",
+        "schedule": "Every Sunday at 19:00",
+        "trigger": "cron",
+        "timezone": "UTC",
+    },
+    "monthly-report-job": {
+        "name": "monthly_summary",
+        "label": "Monthly Summary",
+        "description": "Month-to-date revenue report, covering the 1st onwards.",
+        "schedule": "1st of each month at 19:00",
+        "trigger": "cron",
+        "timezone": "UTC",
+    },
+    "hourly-debt-reminder-job": {
+        "name": "debt_reminders",
+        "label": "Debt Reminders",
+        "description": "Sends any reminder SMS that has reached its scheduled day.",
+        "schedule": "Every 60 minutes",
+        "trigger": "interval",
+        "timezone": "Africa/Accra",
+    },
+}
 
 
 def start_report_schedulers():

@@ -65,5 +65,5 @@ async def get_user_by_id(user_id: int,session: AsyncSession):
             .where(um.Users.user_id == user_id)
                                ))
     ).scalar_one_or_none()
-    
+
     return user

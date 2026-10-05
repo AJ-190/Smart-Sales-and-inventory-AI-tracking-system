@@ -1,14 +1,3 @@
-"""Tests for the debt reminder dispatcher - the code that actually sends SMS.
-
-Covers the three layers that matter, and nothing else:
-
-  * the pure text helpers (``to_international`` / ``build_message``)
-  * the Sailup transport (``_send_sms_sailup`` / ``send_sms``)
-  * the dispatcher itself (``claim_due_reminders`` / ``process_due_reminders``)
-
-The Sailup API is never contacted: every transport test drives a
-``httpx.MockTransport`` and asserts on the request that would have gone out.
-"""
 
 import asyncio
 import json
@@ -28,8 +17,7 @@ from src.main import app
 
 from .test_debts import _client, _setup_business_with_debt
 
-# Relative to the real clock, because claim_due_reminders filters on func.now()
-# rather than an injected timestamp.
+
 _DUE = date.today() - timedelta(days=1)
 _DUE_TODAY = date.today()
 _NOT_DUE = date.today() + timedelta(days=1)
@@ -217,7 +205,6 @@ def test_sailup_failure_returns_false_after_retries():
 
 
 def test_sailup_without_sender_id_does_not_call_the_api():
-    """An unregistered `from` is rejected, so fail before spending a request."""
 
     def handler(request):
         pytest.fail("should not reach the API without a sender ID")
@@ -229,7 +216,6 @@ def test_sailup_without_sender_id_does_not_call_the_api():
 
 
 def test_send_sms_is_skipped_when_credentials_are_blank():
-    """With no API key there is nothing to authenticate with, so never call out."""
     result, seen = run_sailup_send(
         lambda request: pytest.fail("should not reach the API without an API key"),
         SAILUP_API_KEY="",
@@ -240,14 +226,12 @@ def test_send_sms_is_skipped_when_credentials_are_blank():
 
 
 def test_sms_configured_requires_both_key_and_sender_id():
-    """Sailup needs a key AND a registered sender; either one missing is off."""
     assert sailup_settings().sms_configured is True
     assert sailup_settings(SAILUP_API_KEY="").sms_configured is False
     assert sailup_settings(SAILUP_SENDER_ID="").sms_configured is False
     assert sailup_settings(SAILUP_API_KEY="  ").sms_configured is False
 
 
-# --- claim_due_reminders ---------------------------------------------------
 
 
 def setup_debt(session):
@@ -337,20 +321,68 @@ def test_ignores_reminders_for_paid_debts(session):
     assert claim(session) == []
 
 
-def test_ignores_reminders_that_are_not_pending(session):
-    """A reminder already marked sent/failed must never be picked up again."""
+def test_ignores_reminders_that_were_already_sent(session):
+    """A delivered reminder is terminal and must never fire again."""
     business_id, customer_id, debt_id = setup_debt(session)
     reminder_id = add_reminder(session, debt_id, customer_id, business_id)
 
-    for terminal in ("sent", "failed"):
-        async def _mark(value=terminal):
-            await session.execute(
-                update(dm.Reminders).where(dm.Reminders.reminder_id == reminder_id).values(status=value)
-            )
-            await session.commit()
+    async def _mark():
+        await session.execute(
+            update(dm.Reminders).where(dm.Reminders.reminder_id == reminder_id).values(status="sent")
+        )
+        await session.commit()
 
-        asyncio.run(_mark())
-        assert claim(session) == []
+    asyncio.run(_mark())
+    assert claim(session) == []
+
+
+def test_retries_a_failed_reminder(session):
+    """A failed send stays unstamped, so the next tick must try it again."""
+    business_id, customer_id, debt_id = setup_debt(session)
+    reminder_id = add_reminder(session, debt_id, customer_id, business_id)
+
+    async def _mark():
+        await session.execute(
+            update(dm.Reminders).where(dm.Reminders.reminder_id == reminder_id).values(status="failed")
+        )
+        await session.commit()
+
+    asyncio.run(_mark())
+    assert [r.reminder_id for r in claim(session)] == [reminder_id]
+
+
+def test_stops_retrying_once_attempts_are_exhausted(session):
+    business_id, customer_id, debt_id = setup_debt(session)
+    reminder_id = add_reminder(session, debt_id, customer_id, business_id)
+
+    async def _mark():
+        await session.execute(
+            update(dm.Reminders)
+            .where(dm.Reminders.reminder_id == reminder_id)
+            .values(status="failed", attempts=debt_reminders.SEND_ATTEMPTS)
+        )
+        await session.commit()
+
+    asyncio.run(_mark())
+    assert claim(session) == []
+
+
+def test_a_failed_reminder_is_claimed_and_reset_to_sending(session):
+    business_id, customer_id, debt_id = setup_debt(session)
+    reminder_id = add_reminder(session, debt_id, customer_id, business_id)
+
+    async def _mark():
+        await session.execute(
+            update(dm.Reminders)
+            .where(dm.Reminders.reminder_id == reminder_id)
+            .values(status="failed", attempts=1)
+        )
+        await session.commit()
+
+    asyncio.run(_mark())
+    assert [r.reminder_id for r in claim(session)] == [reminder_id]
+    status, attempts = status_of(session, reminder_id)
+    assert (status, attempts) == ("sending", 2)
 
 
 def test_respects_the_limit(session):

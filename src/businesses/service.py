@@ -201,7 +201,7 @@ async def update_business(id, post, db: AsyncSession, current_user):
         business.business_id,
         db,
         current_user
-    ) 
+    )
     await socket_manager.manager.broadcast(business.business_id, f"Business '{business.name}' with ID {business.business_id} has been updated")
     return business
 
@@ -309,10 +309,10 @@ async def send_approval(post, db: AsyncSession, current_user):
             .join(bm.Business, bm.Business.business_id == bm.Approvals.business_id)
             .where(bm.Approvals.business_id == check_business_.business_id)
             .where(bm.Approvals.requester_id == current_user.user_id)
-        
+
         )
-        
-        
+
+
         existing_user = (await db.execute(stmt)).scalars().first()
 
         if existing_user and existing_user.status == bm.ApprovalStatus.approved:
@@ -465,7 +465,7 @@ async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSessio
             if approval_user.status == bm.ApprovalStatus.rejected:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approval already rejected")
             approval_user.status = bm.ApprovalStatus.rejected
-            
+
 
         elif post.dir == 1:
             if approval_user.status == bm.ApprovalStatus.approved:
@@ -490,14 +490,14 @@ async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSessio
 
         else:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid request")
-        
+
         await db.commit()
         await db.refresh(approval_user)
         await notification_service.send_notification(
             notification_schemas.SendNotification(
                 user_id=current_user.user_id,
                 business_id=business.business_id,
-                title="Approval Request Processed",     
+                title="Approval Request Processed",
                 message=f"Your request to join the business '{business.name}' with ID {business.business_id} has been {'approved' if post.dir == 1 else 'rejected'}.",
             ),
             business.business_id,
@@ -514,8 +514,8 @@ async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSessio
             "status": str(approval_user.status.value) if hasattr(approval_user.status, 'value') else str(approval_user.status),
             "requester": requester,
         }
-        
-        
+
+
 async def delete_approval(business_id, approval_id, session: AsyncSession, current_user):
     with session.no_autoflush:
         business = (
@@ -525,10 +525,10 @@ async def delete_approval(business_id, approval_id, session: AsyncSession, curre
         ).scalars().first()
         if not business:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
-        
+
         if current_user.role != um.RoleEnum.super_admin:
             await business_authorized_access(current_user, business_id, session)
-        
+
         approval = (
             await session.execute(
                 select(bm.Approvals)
@@ -538,8 +538,8 @@ async def delete_approval(business_id, approval_id, session: AsyncSession, curre
         ).scalars().first()
         if not approval:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval not found")
-        
-        
+
+
         await session.delete(approval)
         await session.commit()
         await notification_service.send_notification(
@@ -552,14 +552,14 @@ async def delete_approval(business_id, approval_id, session: AsyncSession, curre
             business.business_id,
             session,
             current_user
-        )   
-        
+        )
+
         await socket_manager.manager.broadcast(business.business_id, f"Approval request with ID {approval.approval_id} has been deleted by user ID {current_user.user_id} for business '{business.name}' with ID {business.business_id}")
         return {"detail": "Approval deleted successfully"}
 
 async def business_authorized_access(current_user, business_id, db: AsyncSession):
     if current_user.role != um.RoleEnum.super_admin:
-        
+
         user_access = (
             (await db.execute(
                 select(um.BusinessMember)
@@ -568,16 +568,16 @@ async def business_authorized_access(current_user, business_id, db: AsyncSession
                 .where(um.ACTIVE_MEMBERSHIP)
             )).scalars().first()
         )
-        
+
         if not user_access:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This action is forbidden")
-    
 
-    
+
+
 async def leave_business(business_id, member_id, current_user: um.Users, session: AsyncSession):
-    
+
     await business_authorized_access(current_user, business_id, session)
-    
+
     member_ = (
         await session.execute(
             select(um.BusinessMember)
@@ -591,7 +591,7 @@ async def leave_business(business_id, member_id, current_user: um.Users, session
                          detail="User not found in the business")
 
     if not (current_user.user_id == member_.user_id or current_user.role in [um.RoleEnum.super_admin, um.RoleEnum.admin ]):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, 
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="Unauthorized to perform this action")
 
 
@@ -679,7 +679,7 @@ async def update_business_member(business_id: int, member_id: int, post: schemas
         current_user
     )
     await socket_manager.manager.broadcast(business_id, f"Member with ID {member.user_id} has been updated in the business with ID {business_id}")
-   
+
 
     user = (
         await db.execute(
@@ -697,5 +697,5 @@ async def update_business_member(business_id: int, member_id: int, post: schemas
         "name": user.name if user else None,
         "email": user.email if user else None,
     }
-    
-    
+
+

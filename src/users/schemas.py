@@ -20,7 +20,7 @@ class UserSignUp(BaseModel):
         if not any(char.isupper() for char in value):
             raise ValueError("Password must contain at least one uppercase letter")
         return value
-    
+
     @field_validator("email")
     @classmethod
     def validate_email(cls, email):
@@ -29,7 +29,7 @@ class UserSignUp(BaseModel):
         if not email.split("@")[-1] or "." not in email.split("@")[-1]:
             raise ValueError("Email domain is invalid")
         return email
-        
+
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
@@ -74,7 +74,7 @@ class UserSignUpResponse(BaseModel):
     role: str
     is_active: bool = True
     is_verified: bool = False
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 

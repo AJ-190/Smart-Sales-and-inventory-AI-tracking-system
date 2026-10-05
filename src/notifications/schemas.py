@@ -11,8 +11,8 @@ class SendNotification(BaseModel):
     business_id: int
 
     model_config = ConfigDict(from_attributes=True)
-    
-    
+
+
 class ReadNotification(BaseModel):
     notification_id: int
     user_id: int

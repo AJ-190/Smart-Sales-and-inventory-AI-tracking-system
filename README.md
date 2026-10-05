@@ -525,7 +525,7 @@ deploy:
 ## Author
 
 **Addy Samuel**  
-Backend Engineer — The Unfathomable Builder 🫥  
+Backend Engineer  
 [GitHub](https://github.com/AJ-190) · [LinkedIn](https://www.linkedin.com/in/addy-samuel-010302378/)
 
 ---

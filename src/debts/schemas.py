@@ -1,14 +1,16 @@
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from datetime import datetime
 from typing import Optional
 from datetime import date as date_type, time
+
+from src.debts.models import ReminderStatus
 
 
 
 class AddDebt(BaseModel):
     amount: float
-    note: str 
-    due_date: datetime 
+    note: str
+    due_date: datetime
 
 class DebtResponse(BaseModel):
     debt_id: int
@@ -29,19 +31,19 @@ class CustomerDebt(BaseModel):
     customer_phone: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
-    
 
-    
+
+
 class UpdateDebt(BaseModel):
     fully_paid: bool | None = None
     amount: float | None = None
     note: str | None = None
     due_date: datetime | None = None
     sale_id: Optional[int] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
-    
-    
+
+
 class Transactions(BaseModel):
     transaction_id: int
     debt_id: int
@@ -51,7 +53,7 @@ class Transactions(BaseModel):
     amount_paid: float
     note: Optional[str] = None
     created_at: datetime
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 class CustomerTransactions(BaseModel):
@@ -60,19 +62,19 @@ class CustomerTransactions(BaseModel):
     customer_phone: str
     customer_email: Optional[str] = None
     customer_address: Optional[str] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
-    
-    
-    
-    
+
+
+
+
 class scheduleReminder(BaseModel):
     debt_id: int
     customer_id: int
     date: date_type
     time_of_day: Optional[time] = None
     note: str
-    
+
 
 class ReminderResponse(BaseModel):
     reminder_id: int
@@ -84,19 +86,34 @@ class ReminderResponse(BaseModel):
     note: str
     is_active: bool
     sent_at: Optional[datetime] = None
+    status: ReminderStatus = Field(
+        default=ReminderStatus.PENDING,
+        validation_alias="status",
+    )
+    attempts: int = 0
     created_at: datetime
     updated_at: datetime
-    
+
     model_config = ConfigDict(from_attributes=True)
-    
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _coerce_unknown_status(cls, value):
+        if value is None:
+            return ReminderStatus.PENDING
+        try:
+            return ReminderStatus(value)
+        except ValueError:
+            return ReminderStatus.PENDING
+
 class UpdateReminder(BaseModel):
     date: Optional[date_type] = None
     time_of_day: Optional[time] = None
     note: Optional[str] = None
     is_active: Optional[bool] = None
 
-    
-    
+
+
 class GetReminders(BaseModel):
     debt_id: Optional[int] = None
     customer_id: Optional[int] = None
@@ -104,3 +121,4 @@ class GetReminders(BaseModel):
     time_of_day: Optional[time] = None
     note: Optional[str] = None
     is_active: Optional[bool] = None
+    status: Optional[ReminderStatus] = None

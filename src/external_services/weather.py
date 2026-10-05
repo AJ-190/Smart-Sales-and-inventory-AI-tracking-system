@@ -11,8 +11,8 @@ async def fetch_weather_data(
         "longitude": 13.41,
         "current_weather": True
     }
-    
+
     response = await client.get(base_url, params=params)
     response.raise_for_status()
-    
+
     return response.json()

@@ -40,7 +40,7 @@ async def add_debt(post: schemas.AddDebt, business_id: int, customer_id: int, se
         due_date=post.due_date,
         is_paid=False
     )
-    
+
     await manager.broadcast(business_id, f"New debt of {post.amount} added for customer {customer.name} (ID: {customer_id})")
     await notification_service.send_notification(
         notification_schemas.SendNotification(
@@ -53,7 +53,7 @@ async def add_debt(post: schemas.AddDebt, business_id: int, customer_id: int, se
         session,
         current_user
     )
-    
+
     session.add(new_debt)
     await session.flush()
 
@@ -66,7 +66,7 @@ async def add_debt(post: schemas.AddDebt, business_id: int, customer_id: int, se
         note=post.note
     )
     session.add(transaction)
-    
+
 
     await session.commit()
     await session.refresh(new_debt)
@@ -75,7 +75,7 @@ async def add_debt(post: schemas.AddDebt, business_id: int, customer_id: int, se
 
 async def get_debts(business_id, db: AsyncSession, current_user):
     await service.business_authorized_access(current_user, business_id, db)
-    
+
     result = await db.execute(
         select(func.sum(dm.Debt.amount).label("total_debt"))
         .where(dm.Debt.business_id == business_id)
@@ -91,13 +91,13 @@ async def get_debts(business_id, db: AsyncSession, current_user):
 
 
 async def get_customers_with_debt(business_id,
-                                  db: AsyncSession, 
-                                  current_user, limit:int, 
+                                  db: AsyncSession,
+                                  current_user, limit:int,
                                   skip: int, search: str,
                                   amount_gre: float | None = None,
                                   amount_les: float | None = None):
     await service.business_authorized_access(current_user, business_id, db)
-    
+
     base_query = (
         select(
             dm.Debt,
@@ -125,7 +125,7 @@ async def get_customers_with_debt(business_id,
         base_query = base_query.where(dm.Debt.amount >= amount_gre)
     if amount_les is not None:
         base_query = base_query.where(dm.Debt.amount <= amount_les)
-        
+
     result = await db.execute(
         base_query
         .order_by(dm.Debt.created_at.desc())
@@ -137,7 +137,7 @@ async def get_customers_with_debt(business_id,
     if not rows:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="No customer with an outstanding debt.")
-    
+
     return [
         {
             "debt": row[0],
@@ -153,7 +153,7 @@ async def get_customers_with_debt(business_id,
 
 async def get_customer_with_debt(business_id,customer_id, session: AsyncSession, current_user):
     await service.business_authorized_access(current_user, business_id, session)
-    
+
     customer = (await session.execute(
         select(
             dm.Debt,
@@ -169,8 +169,8 @@ async def get_customer_with_debt(business_id,customer_id, session: AsyncSession,
         .limit(1)
     )
     ).one_or_none()
-    
-    
+
+
     if not customer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
     return {
@@ -183,7 +183,7 @@ async def get_customer_with_debt(business_id,customer_id, session: AsyncSession,
 
 async def update_customer_with_debt(post:schemas.UpdateDebt , business_id, customer_id, session:AsyncSession, current_user):
     await service.business_authorized_access(current_user, business_id, session)
-    
+
     debt = (
         await (
             session.execute(
@@ -196,13 +196,13 @@ async def update_customer_with_debt(post:schemas.UpdateDebt , business_id, custo
                 .limit(1))
         )
     ).scalar_one_or_none()
-    
+
     if not debt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No outstanding debt found for this customer")
-    
+
     original_amount = debt.amount
     paid_amount = 0
-    
+
     sale_to_update = None
     sale_id = post.sale_id or debt.sale_id
     if sale_id:
@@ -210,11 +210,11 @@ async def update_customer_with_debt(post:schemas.UpdateDebt , business_id, custo
             select(bm.Sale).where(bm.Sale.business_id == business_id).where(bm.Sale.sale_id == sale_id)
         )
         sale_to_update = sale_result.scalar_one_or_none()
-    
+
     if post.amount:
         if post.amount <= 0:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Amount cannot be less than or equal to zero(0)")
-        
+
         if post.amount >= debt.amount:
             paid_amount = debt.amount
             debt.amount = 0
@@ -222,24 +222,24 @@ async def update_customer_with_debt(post:schemas.UpdateDebt , business_id, custo
         else:
             paid_amount = post.amount
             debt.amount = debt.amount - post.amount
-            
+
     if post.fully_paid:
         paid_amount = debt.amount
         debt.amount = 0
         debt.is_paid = True
-        
+
     if paid_amount > 0:
         if sale_to_update:
             sale_to_update.amount_paid = sale_to_update.amount_paid + paid_amount
-        
-        transaction = dm.Transactions(business_id=business_id, 
+
+        transaction = dm.Transactions(business_id=business_id,
                                 customer_id=customer_id,
                                 debt_id=debt.debt_id,
                                 performer_id=current_user.user_id,
                                 amount_paid=paid_amount,
                                 note=post.note if post.note else None)
         session.add(transaction)
-   
+
     await session.commit()
     await manager.broadcast(business_id, f"Debt for customer ID {customer_id} updated. Original amount: {original_amount}, Paid amount: {paid_amount}, Remaining amount: {debt.amount}")
     await notification_service.send_notification(
@@ -293,12 +293,12 @@ async def update_customer_with_debt(post:schemas.UpdateDebt , business_id, custo
         "customer_email": customer.email,
         "customer_phone": customer.phone,
     }
-    
-    
-    
+
+
+
 async def get_transactions(business_id, customer_id, current_user: um.Users, session: AsyncSession):
     await service.business_authorized_access(current_user, business_id, session)
-    
+
     customer_transaction = (
        await session.execute(
            select(dm.Transactions,
@@ -312,7 +312,7 @@ async def get_transactions(business_id, customer_id, current_user: um.Users, ses
            .order_by(dm.Transactions.created_at.desc())
        )
    ).all()
-    
+
     return [
         {
             "transactions": t[0],
@@ -323,12 +323,12 @@ async def get_transactions(business_id, customer_id, current_user: um.Users, ses
         }
         for t in customer_transaction
     ]
-            
-    
+
+
 
 async def set_reminders(business_id, current_user: um.Users, session: AsyncSession, post: schemas.scheduleReminder):
     await service.business_authorized_access(current_user, business_id, session)
-    
+
     customer_with_debt = (
         await session.execute(
             select(dm.Debt)
@@ -337,9 +337,9 @@ async def set_reminders(business_id, current_user: um.Users, session: AsyncSessi
             .where(dm.Debt.debt_id == post.debt_id)
         )
     ).scalar_one_or_none()
-    
-    
-    
+
+
+
     if not customer_with_debt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No debt found for this customer")
 
@@ -364,7 +364,7 @@ async def set_reminders(business_id, current_user: um.Users, session: AsyncSessi
         data.pop("time_of_day", None)
 
     reminder = dm.Reminders(**data)
-    
+
     session.add(reminder)
     await session.commit()
     await session.refresh(reminder)
@@ -387,40 +387,43 @@ async def set_reminders(business_id, current_user: um.Users, session: AsyncSessi
 
 async def get_reminders(business_id, current_user: um.Users, session: AsyncSession, post: schemas.GetReminders | None = None):
     await service.business_authorized_access(current_user, business_id, session)
-    
+
     post = post or schemas.GetReminders()
-    
+
     reminders = (
         select(dm.Reminders)
         .where(dm.Reminders.business_id == business_id)
     )
-    
+
     if post.debt_id:
         reminders = reminders.where(dm.Reminders.debt_id == post.debt_id)
-    
+
     if post.customer_id:
         reminders = reminders.where(dm.Reminders.customer_id == post.customer_id)
 
     if post.date:
         reminders = reminders.where(func.date(dm.Reminders.date) >= post.date)
-    
+
     if post.time_of_day:
         reminders = reminders.where(dm.Reminders.time_of_day == post.time_of_day)
-    
+
     if post.note:
         reminders = reminders.where(dm.Reminders.note == post.note)
-    
+
     if post.is_active is not None:
         reminders = reminders.where(dm.Reminders.is_active.is_(post.is_active))
-        
+
+    if post.status is not None:
+        reminders = reminders.where(dm.Reminders.status == post.status.value)
+
     result = await session.execute(reminders.order_by(dm.Reminders.created_at.desc()))
     reminders_list = result.scalars().all()
-    
+
     return reminders_list
 
 async def edit_reminder(business_id, reminder_id, current_user: um.Users, session: AsyncSession, post: schemas.UpdateReminder):
     await service.business_authorized_access(current_user, business_id, session)
-    
+
     reminder = (
         await session.execute(
             select(dm.Reminders)
@@ -428,28 +431,30 @@ async def edit_reminder(business_id, reminder_id, current_user: um.Users, sessio
             .where(dm.Reminders.reminder_id == reminder_id)
         )
     ).scalar_one_or_none()
-    
+
     if not reminder:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No reminder found for this customer")
-    
+
     updates = post.model_dump(exclude_unset=True)
-    
+
 
     if updates.get("date") is not None and updates["date"] < date.today():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Reminder date cannot be in the past",
         )
-    
+
     for key, value in updates.items():
         if key == "date":
             value = datetime.combine(value, time.min, tzinfo=timezone.utc)
             reminder.sent_at = None
+            reminder.status = dm.ReminderStatus.PENDING
+            reminder.attempts = 0
         setattr(reminder, key, value)
-        
+
     await session.commit()
     await session.refresh(reminder)
-    
+
     await manager.broadcast(business_id, f"Reminder with ID {reminder_id} for customer ID {reminder.customer_id} has been updated")
     await notification_service.send_notification(
         notification_schemas.SendNotification(
@@ -467,7 +472,7 @@ async def edit_reminder(business_id, reminder_id, current_user: um.Users, sessio
 
 async def delete_reminder(business_id, reminder_id, current_user: um.Users, session: AsyncSession):
     await service.business_authorized_access(current_user, business_id, session)
-    
+
     reminder = (
         await session.execute(
             select(dm.Reminders)
@@ -475,10 +480,10 @@ async def delete_reminder(business_id, reminder_id, current_user: um.Users, sess
             .where(dm.Reminders.reminder_id == reminder_id)
         )
     ).scalar_one_or_none()
-    
+
     if not reminder:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No reminder found for this customer")
-    
+
     await session.delete(reminder)
     await session.commit()
     await manager.broadcast(business_id, f"Reminder with ID {reminder_id} for customer ID {reminder.customer_id} has been deleted")

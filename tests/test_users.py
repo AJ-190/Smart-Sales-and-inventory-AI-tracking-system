@@ -3,18 +3,18 @@ from src.auth import schemas as auth_schemas
 import pytest
 
 def test_endpoint(client):
-    res = client.get("/")  
+    res = client.get("/")
     assert res.status_code == 200
-    
+
 def test_user_create(client):
     data ={
          "name": "Addy",
          "email": "adysamuel68@gmail.com",
          "password": "passwordY123",
          "phone": "0257524704"}
-    
+
     res = client.post(
-        "/users/sign_up", 
+        "/users/sign_up",
         json=data
     )
     user = schemas.UserSignUpResponse(**res.json())
@@ -30,9 +30,9 @@ def test_user_create_custom_domain_email(client):
          "email": "user@example.com",
          "password": "passwordY123",
          "phone": "0257524799"}
-    
+
     res = client.post(
-        "/users/sign_up", 
+        "/users/sign_up",
         json=data
     )
     assert res.status_code == 201, res.text
@@ -46,9 +46,9 @@ def test_user_create_weak_password(client):
          "email": "weak@example.com",
          "password": "short",
          "phone": "0257524798"}
-    
+
     res = client.post(
-        "/users/sign_up", 
+        "/users/sign_up",
         json=data
     )
     assert res.status_code == 422
@@ -60,13 +60,13 @@ def test_user_create_invalid_email(client):
          "email": "invalid@nodot",
          "password": "passwordY123",
          "phone": "0257524797"}
-    
+
     res = client.post(
-        "/users/sign_up", 
+        "/users/sign_up",
         json=data
     )
     assert res.status_code == 422
-    
+
 def test_create_user_duplicate_email(client, test_user):
     data ={
          "name": "Addy",
@@ -75,18 +75,18 @@ def test_create_user_duplicate_email(client, test_user):
          "phone": "0257524704"}
 
     res = client.post(
-        "/users/sign_up", 
+        "/users/sign_up",
         json=data
     )
-    
+
     assert res.status_code == 409
-    
+
 def test_login_user(client, test_user):
     res = client.post(
         "/auth/login",
         data={"username": "adysamuel68@gmail.com",
               "password": "passwordY123"})
-    
+
     post = auth_schemas.Token(**res.json())
     assert post.token_type == "Bearer"
     assert res.status_code == 200
@@ -97,7 +97,7 @@ def test_login_inc_email(client, test_user):
         data={"username": "adysamuel67@gmail.com",
               "password": "passwordY123"}
     )
-    
+
     assert res.status_code == 404
 
 @pytest.mark.parametrize("email , password, status_code", [
@@ -113,20 +113,20 @@ def test_login_inc_password(client, test_user, email, password, status_code):
         data={"username": email, "password": password}
     )
     assert res.status_code == status_code
-    
+
 def test_get_users(authorized_sup_client, test_user):
     res = authorized_sup_client.get("/users/all_users")
 
     assert res.status_code == 200
     users = [schemas.UsersOutUsers(**user) for user in res.json()]
     print(users)
-    
+
 def test_get_users_no_sup(client, test_user):
     res = client.get(
         "/users/all_users"
     )
     assert res.status_code == 401
-    
 
-    
-    
+
+
+

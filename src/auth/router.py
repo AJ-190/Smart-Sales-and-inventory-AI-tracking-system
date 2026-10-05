@@ -77,24 +77,24 @@ async def verify_user(email: schemas.Email, current_user=Depends(auth_deps.get_c
 @router.post("/forgot_password")
 async def forgot_password(useremail: schemas.Email, session: AsyncSession = Depends(get_db)):
     if not await auth_service.get_user_by_email(useremail.email, session):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="User not registered")
-        
+
     return await send_otp(useremail.email, forgot_pass=True)
 
 
 @router.post("/verify/forgot_password", response_model=us_schema.UserSignUpResponse)
 async def verify_forgot_password(otp: schemas.OtpVerificationCode,
-                                 
+
                                  session: AsyncSession = Depends(get_db)):
     if otp.password is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No password entered")
-    
+
     user = await auth_service.get_user_by_email(otp.email, session)
     if not await verify_otp(otp.email,otp=otp.otp, forgot_pass=True):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Incorrect OTP-verification code")
-    
-    
+
+
     user.password = utils.hash(otp.password.get_secret_value())
     await session.commit()
     await session.refresh(user)
@@ -109,31 +109,31 @@ async def verify_password(payload: schemas.PasswordVerify, current_user: um.User
     user = (await session.execute(select(um.Users).where(um.Users.user_id == current_user.user_id))).scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    
+
     if not verify(payload.password.get_secret_value(), user.password):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="incorrect password")
-    return 
+    return
 
 @router.post("/otp/verify_change_password", status_code=200)
 async def verify_change_password_otp(payload: schemas.OtpCode, current_user = Depends(auth_deps.role_checker(allowed_roles))):
     return await auth_service.verify_change_password_otp(current_user, payload.otp)
-    
+
 @router.post("/otp/verification", response_model=UserSignUpResponse)
-async def verify_otp_code(otp: schemas.OtpVerificationCode, 
+async def verify_otp_code(otp: schemas.OtpVerificationCode,
                           db: AsyncSession = Depends(get_db),):
     verify = await verify_otp(otp.email, otp.otp, forgot_pass=True)
     if not verify:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, 
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
                             detail="Incorrect OTP-verification code")
     user = await auth_service.get_user_by_email(otp.email, db)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not registered")
-    
+
     user.is_verified = True
     await db.commit()
     await db.refresh(user)
     return user
-    
+
 @router.post("/logout")
 async def logout(
     request: Request,

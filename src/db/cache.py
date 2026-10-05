@@ -33,32 +33,32 @@ def build_keys(base: CacheKey, **kwargs):
 class CacheManager:
     def __init__(self, redis_client: Redis) -> Optional[Any]:
         self.redis = redis_client
-        
-        
+
+
     async def get(self, key: str) -> Optional[Any]:
         data =  await self.redis.get(key)
         return json.loads(data) if data else None
-    
+
     async def set(self,key: str, data: Any, expire: int = 3600) -> json.loads:
         await self.redis.set(key, json.dumps(data), ex=expire)
         return data
-    
+
     async def delete(self, key: str) -> None:
         await self.redis.delete(key)
 
     async def delete_by_pattern(self, pattern: str) -> None:
         async for key in self.redis.scan_iter(f"{pattern}*"):
             await self.redis.delete(key)
-        
-        
-        
+
+
+
 def cache(key_builder: Callable[..., Awaitable[Any]], ttl: Optional[int]= 300) -> None:
     def decorator(func: Callable[..., Awaitable[Any]]):
         @wraps(func)
         async def wrapper(*args, **kwargs):
             cache_service: CacheManager = kwargs.get("cache")
-            
-            
+
+
             key = key_builder(*args, **kwargs)
             if key is None:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cache key could not be built")
@@ -70,7 +70,6 @@ def cache(key_builder: Callable[..., Awaitable[Any]], ttl: Optional[int]= 300) -
             return data
         return wrapper
     return decorator
-            
-             
-                
-        
+
+
+

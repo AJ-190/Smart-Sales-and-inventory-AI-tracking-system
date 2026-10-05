@@ -48,8 +48,8 @@ def session(async_engine):
 @pytest.fixture(autouse=True)
 def setup_redis():
     async def _no_keys(*args, **kwargs):
-        if False:
-            yield
+        for key in ():
+            yield key
     app.state.redis = AsyncMock()
     app.state.redis.get.return_value = None
     app.state.redis.incr.return_value = 1

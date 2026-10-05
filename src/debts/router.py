@@ -31,7 +31,7 @@ async def get_debts(
 
 @router.get("/customers/{business_id}", response_model=list[schemas.CustomerDebt])
 async def get_customers_with_debt(
-    business_id: int, 
+    business_id: int,
     db=Depends(get_db),
     current_user=Depends(auth_deps.role_checker([*roles])),
     limit:int = 100,
@@ -39,22 +39,22 @@ async def get_customers_with_debt(
     amount_gre: float | None = None,
     amount_les: float | None =  None,
     search: str | None = None):
-    
-    return await debt_service.get_customers_with_debt(business_id, db, current_user, limit, skip, search, amount_gre, amount_les) 
+
+    return await debt_service.get_customers_with_debt(business_id, db, current_user, limit, skip, search, amount_gre, amount_les)
 
 
 @router.get("/customers/{business_id}/{customer_id}", response_model=schemas.CustomerDebt)
 async def get_customer_with_debt(business_id: int,
-                                 customer_id: int, 
+                                 customer_id: int,
                                  session: AsyncSession = Depends(get_db),
                                  current_user=Depends(auth_deps.role_checker([*roles])),
                                  ):
-                                 
+
     return await debt_service.get_customer_with_debt(business_id, customer_id, session, current_user)
 
 @router.put("/update_customer_debt/{business_id}/{customer_id}", response_model=schemas.CustomerDebt)
 async def update_customer_debt(post: schemas.UpdateDebt,
-                     business_id: int, 
+                     business_id: int,
                      customer_id: int,
                      current_user: um.Users = Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin])),
                      session:AsyncSession = Depends(get_db)):
@@ -67,10 +67,10 @@ async def get_customer_transactions(business_id: int,
                                     current_user: um.Users = Depends(auth_deps.role_checker([*roles])),
                                     session: AsyncSession = Depends(get_db)):
     return await debt_service.get_transactions(business_id, customer_id, current_user, session)
-    
-    
+
+
 @router.post("/reminders/{business_id}", response_model=schemas.ReminderResponse)
-async def schedule_reminders(business_id: int, 
+async def schedule_reminders(business_id: int,
                              post: schemas.scheduleReminder,
                              current_user: um.Users = Depends(auth_deps.role_checker([um.RoleEnum.admin, um.RoleEnum.cashier, um.RoleEnum.manager, um.RoleEnum.super_admin])),
                              session: AsyncSession = Depends(get_db)):

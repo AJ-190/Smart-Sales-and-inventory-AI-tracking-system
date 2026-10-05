@@ -20,6 +20,7 @@ from src.debts.router import router as debts_router
 from src.customers.router import router as customers_router
 from src.chat.router import router as chat_router
 from src.external_services.weather_api import router as weather_router
+from src.tasks.router import router as crons_router
 from src.auth import dependencies as auth_deps
 from src.config import get_settings
 from src.users import models as um
@@ -70,6 +71,7 @@ app.include_router(debts_router)
 app.include_router(customers_router)
 app.include_router(chat_router)
 app.include_router(weather_router)
+app.include_router(crons_router)
 
 from src.chat.storage import MEDIA_ROOT
 os.makedirs(MEDIA_ROOT, exist_ok=True)
