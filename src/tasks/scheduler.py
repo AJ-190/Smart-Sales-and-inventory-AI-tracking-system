@@ -38,10 +38,15 @@ def _build_jobstore() -> dict:
 
 executors = {"default": ThreadPoolExecutor(max_workers=29)}
 
+# How long a run that came due while the app was down stays owed. Shared with
+# start_report_schedulers() so a job carried across a restart expires under
+# exactly the same rule APScheduler would have applied to it.
+MISFIRE_GRACE_TIME = 3 * 3600
+
 job_defaults = {
     "coalesce": True,
     "max_instances": 3,
-    "misfire_grace_time": 3 * 3600,
+    "misfire_grace_time": MISFIRE_GRACE_TIME,
 }
 
 scheduler = BackgroundScheduler(

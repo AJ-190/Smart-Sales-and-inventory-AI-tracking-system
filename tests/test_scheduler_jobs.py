@@ -1,7 +1,11 @@
 import inspect
 import pickle
+from datetime import datetime, timedelta, timezone
 
 import pytest
+from apscheduler.job import Job
+from apscheduler.jobstores.memory import MemoryJobStore
+from apscheduler.triggers.interval import IntervalTrigger
 
 from src.tasks import debt_reminders, jobs
 from src.tasks.scheduler import scheduler
@@ -164,3 +168,91 @@ def test_wrapper_disposes_the_job_engine(monkeypatch, wrapper):
 
     getattr(jobs, wrapper)()
     assert disposed, f"{wrapper} left the job engine undisposed"
+
+
+def _stopped_scheduler(monkeypatch):
+    """A scheduler over its own store that is never started, like a cold boot."""
+    from apscheduler.schedulers.background import BackgroundScheduler
+
+    store = MemoryJobStore()
+    probe = BackgroundScheduler(
+        jobstores={"default": store},
+        timezone="Africa/Accra",
+    )
+    monkeypatch.setattr(jobs, "scheduler", probe)
+    return probe, store
+
+
+def _seed(probe, store, next_run_time):
+    """Write one job row into the store without starting a scheduler."""
+    job = Job(
+        scheduler=probe,
+        id="hourly-debt-reminder-job",
+        trigger=IntervalTrigger(minutes=60),
+        executor="default",
+        func=jobs.run_debt_reminders,
+        next_run_time=next_run_time,
+        name="hourly debt reminders",
+        args=(),
+        kwargs={},
+        misfire_grace_time=jobs.GRACE_PERIOD,
+        coalesce=True,
+        max_instances=3,
+    )
+    store.add_job(job)
+
+
+def _registered_next_run(probe):
+    """The time start() would hand to the executor for the seeded job."""
+    for job, _store, _replace in probe._pending_jobs:
+        if job.id == "hourly-debt-reminder-job":
+            return getattr(job, "next_run_time", None)
+    return None
+
+
+def test_restart_keeps_a_run_that_came_due_while_the_app_was_down(monkeypatch):
+    """A restart five minutes after the hour must not throw the run away.
+
+    replace_existing recomputes next_run_time from now, so the stored time was
+    silently replaced by the next occurrence and misfire_grace_time never came
+    into play. The job looked scheduled and simply never fired.
+    """
+    probe, store = _stopped_scheduler(monkeypatch)
+    owed = datetime.now(timezone.utc) - timedelta(minutes=5)
+    _seed(probe, store, owed)
+
+    jobs.start_report_schedulers()
+
+    assert _registered_next_run(probe) == owed
+
+
+def test_restart_drops_a_run_older_than_the_misfire_grace(monkeypatch):
+    """A run left too late would fail anyway, so the trigger takes over."""
+    probe, store = _stopped_scheduler(monkeypatch)
+    _seed(probe, store, datetime.now(timezone.utc) - timedelta(hours=4))
+
+    jobs.start_report_schedulers()
+
+    assert _registered_next_run(probe) is None
+
+
+def test_restart_keeps_a_run_that_is_not_due_yet(monkeypatch):
+    """Recomputing from now pushed every future time a full period back.
+
+    For the hourly job that reset its phase on every restart: restarting more
+    often than once an hour meant it never fired at all.
+    """
+    probe, store = _stopped_scheduler(monkeypatch)
+    soon = datetime.now(timezone.utc) + timedelta(minutes=10)
+    _seed(probe, store, soon)
+
+    jobs.start_report_schedulers()
+
+    assert _registered_next_run(probe) == soon
+
+
+def test_misfire_grace_matches_the_scheduler_default():
+    """The two must agree or a carried run expires under a different rule."""
+    from src.tasks.scheduler import job_defaults
+
+    assert jobs.GRACE_PERIOD == job_defaults["misfire_grace_time"]
