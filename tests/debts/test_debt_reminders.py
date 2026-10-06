@@ -148,6 +148,29 @@ def test_to_international():
     assert debt_reminders.to_international(None) is None
 
 
+def test_to_international_rejects_unusable_numbers():
+    """Length is checked so Sailup is not billed for numbers it cannot deliver.
+
+    Two records in production reached this function as "+23355881981" (one
+    digit short) and "+536414730" (both the trunk zero and the country code
+    missing). Concatenating +233 onto anything produced numbers the carrier
+    silently drops.
+    """
+    # One digit short of a full Ghanaian number.
+    assert debt_reminders.to_international("+23355881981") is None
+    # Lost the trunk zero and never had a country code, but nine digits is
+    # still a recoverable Ghanaian subscriber number.
+    assert debt_reminders.to_international("+536414730") == "+233536414730"
+    assert debt_reminders.to_international("0536414730") == "+233536414730"
+    # Eight digits is one short even after that repair.
+    assert debt_reminders.to_international("+53641473") is None
+    # Too long to be a subscriber number.
+    assert debt_reminders.to_international("0555555555555") is None
+    assert debt_reminders.to_international("2335555555555") is None
+    # A real international number for another country is left alone.
+    assert debt_reminders.to_international("+14386196073") == "+14386196073"
+
+
 def test_build_message():
     """A missing note must not leak into the text the customer reads."""
     due = datetime(2026, 10, 5, tzinfo=timezone.utc)
@@ -386,9 +409,16 @@ def test_a_failed_reminder_is_claimed_and_reset_to_sending(session):
 
 
 def test_respects_the_limit(session):
+    """Only the limit is under test, so make every row unambiguously due.
+
+    Mixed in a ``_DUE_TODAY`` row this fails between 00:00 and 09:00 UTC,
+    because today's reminders fall back to DEFAULT_TIME_OF_DAY (09:00) and
+    nothing is claimable before then. Use three past days instead so the clock
+    cannot decide the outcome.
+    """
     business_id, customer_id, debt_id = setup_debt(session)
-    for day in (_DUE, _DUE_TODAY, _DUE_TODAY):
-        add_reminder(session, debt_id, customer_id, business_id, on=day)
+    for _ in range(3):
+        add_reminder(session, debt_id, customer_id, business_id, on=_DUE)
 
     assert len(claim(session, limit=2)) == 2
 

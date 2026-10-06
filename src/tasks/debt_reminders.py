@@ -1,13 +1,13 @@
 
 import asyncio
 import logging
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.database import job_session_maker as get_async_session_maker
 import httpx
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, func, and_, or_
 
 from src.config import get_settings
 from src.customers import models as cm
@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_TIME_OF_DAY = time(9, 0)
 
 GHANA_COUNTRY_CODE = "233"
+
+
+GHANA_NSN_LENGTH = 9
 SEND_ATTEMPTS = 3
 
 
@@ -32,6 +35,8 @@ def due_instant(reminder_date, time_of_day) -> datetime:
 async def claim_due_reminders(session:AsyncSession, limit: int = 100):
 
     now = datetime.now(timezone.utc)
+    utc_day_start = datetime.combine(now.date(), time.min, tzinfo=timezone.utc)
+    utc_day_end = utc_day_start + timedelta(days=1)
 
     candidates = (
         await session.execute(
@@ -44,7 +49,18 @@ async def claim_due_reminders(session:AsyncSession, limit: int = 100):
                 ),
                 dm.Reminders.attempts < SEND_ATTEMPTS,
                 dm.Reminders.date <= now,
-                dm.Debt.is_paid == False
+                dm.Debt.is_paid == False,
+                or_(
+
+                    dm.Reminders.date < utc_day_start,
+                    and_(
+             
+                        dm.Reminders.date < utc_day_end,
+                        func.coalesce(
+                            dm.Reminders.time_of_day, DEFAULT_TIME_OF_DAY
+                        ) <= now.time(),
+                    ),
+                ),
             )
 
             .order_by(dm.Reminders.date.asc())
@@ -53,11 +69,7 @@ async def claim_due_reminders(session:AsyncSession, limit: int = 100):
         )
     ).all()
 
-    claimed_ids = [
-        row.reminder_id
-        for row in candidates
-        if due_instant(row.date, row.time_of_day) <= now
-    ]
+    claimed_ids = [row.reminder_id for row in candidates]
     if not claimed_ids:
         return []
 
@@ -80,14 +92,35 @@ async def claim_due_reminders(session:AsyncSession, limit: int = 100):
 
 
 def to_international(phone: str | None) -> str | None:
-    digits = "".join(char for char in phone or "" if char.isdigit())
+
+    raw = phone or ""
+    digits = "".join(char for char in raw if char.isdigit())
     if not digits:
         return None
+
+    if digits.startswith("00"):
+        digits = digits[2:]
+
     if digits.startswith(GHANA_COUNTRY_CODE):
-        return f"+{digits}"
+        national = digits[len(GHANA_COUNTRY_CODE) :]
+        if len(national) != GHANA_NSN_LENGTH:
+            return None
+        return f"+{GHANA_COUNTRY_CODE}{national}"
+
     if digits.startswith("0"):
-        return f"+{GHANA_COUNTRY_CODE}{digits[1:]}"
-    return f"+{digits}"
+        national = digits[1:]
+        if len(national) != GHANA_NSN_LENGTH:
+            return None
+        return f"+{GHANA_COUNTRY_CODE}{national}"
+
+    if raw.strip().startswith("+") and len(digits) >= 10:
+        return f"+{digits}"
+
+
+    if len(digits) == GHANA_NSN_LENGTH:
+        return f"+{GHANA_COUNTRY_CODE}{digits}"
+
+    return None
 
 
 def build_message(customer_name: str, amount: Decimal, due_date, note: str | None) -> str:
