@@ -213,7 +213,7 @@ async def delete_business(id, db: AsyncSession, current_user):
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Business with the ID: {id} not found")
 
-    if current_user.role != um.RoleEnum.super_admin:
+    if current_user.role != um.RoleEnum.super_admin or current_user.role != um.RoleEnum.admin:
         is_member = (await db.execute(
             select(um.BusinessMember).where(
                 um.BusinessMember.business_id == id,
