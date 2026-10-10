@@ -52,7 +52,7 @@ class RecieptReportGenerator:
         card_total = summary.get("card_total", 0)
         best_product = summary.get("best_selling_product") or "N/A"
 
-        if total_sales == 0:
+        if total_sales == 0 and total_profit == 0:
             return (
                 f"AUTOMATED REPORT\n"
                 f"{self.title} | {self.start_date.strftime('%b %d')} - {self.end_date.strftime('%b %d, %Y')}\n"

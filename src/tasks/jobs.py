@@ -179,8 +179,6 @@ JOB_METADATA = {
 }
 
 
-# Same window APScheduler itself allows a late run to fire in, so an overdue
-# job carried across a restart is honoured only while that grace still holds.
 GRACE_PERIOD = MISFIRE_GRACE_TIME
 
 
@@ -203,20 +201,13 @@ JOB_SPECS = [
     (
         "hourly-debt-reminder-job",
         run_debt_reminders,
-        IntervalTrigger(minutes=60),
+        IntervalTrigger(minutes=2),
     ),
 ]
 
 
 def _stored_next_run(job_id):
-    """Next run time recorded for ``job_id``, read before registration overwrites it.
 
-    While the scheduler is stopped, ``get_job`` only searches jobs this process
-    has added so far and ignores the persisted job store. Lifespan registers jobs
-    *before* calling ``start()``, so on a cold boot it would otherwise see
-    nothing and a run that came due while the app was down would be lost without
-    ever being noticed.
-    """
     try:
         if scheduler.state == STATE_STOPPED:
             for job, _store, _replace in scheduler._pending_jobs:
@@ -237,20 +228,7 @@ def _stored_next_run(job_id):
 
 
 def start_report_schedulers():
-    """Register the report and reminder jobs, keeping the schedule already owed.
 
-    ``replace_existing`` recomputes ``next_run_time`` from the current moment, so
-    two things were lost on every restart. A run that came due while the app was
-    down was dropped and re-queued for the next occurrence -- a restart at 19:05
-    discarded the 19:00 report even though ``misfire_grace_time`` was three hours.
-    And a future time was pushed back to now plus the full period, so the hourly
-    debt reminders drifted an hour on each restart and never fired at all if the
-    app cycled more often than that.
-
-    Read the stored time first and hand it back to ``add_job``. Only a run older
-    than the grace window is given up on: that one would fail anyway, so the
-    trigger's next occurrence takes over.
-    """
     now = datetime.now(timezone.utc)
 
     for job_id, func, trigger in JOB_SPECS:

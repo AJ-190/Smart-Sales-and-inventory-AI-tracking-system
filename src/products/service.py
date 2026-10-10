@@ -59,8 +59,20 @@ async def add_product(business_id, post: schemas.Productcreate, db: AsyncSession
         )).scalars().first()
     )
 
-    if existing:
+    if existing and existing.deleted_at is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Product '{post.name}' already exists")
+
+    if existing is not None:
+        existing.deleted_at = None
+        existing.is_active = True
+        existing.price = post.price
+        existing.cost_price = post.cost_price
+        existing.quantity = post.quantity
+        existing.low_stock_threshold = post.low_stock_threshold
+        db.add(existing)
+        await db.commit()
+        await db.refresh(existing)
+        return existing
 
     product = bm.Product(
         **post.model_dump(),

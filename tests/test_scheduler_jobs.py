@@ -21,7 +21,6 @@ JOB_IDS = [
 
 @pytest.fixture
 def registered(monkeypatch):
-    """Register the jobs against an in-memory store and return them by id."""
     from apscheduler.jobstores.memory import MemoryJobStore
 
     store = MemoryJobStore()
@@ -37,11 +36,7 @@ def test_every_scheduled_job_is_registered(registered, job_id):
 
 @pytest.mark.parametrize("job_id", JOB_IDS)
 def test_job_targets_are_synchronous(registered, job_id):
-    """A coroutine passed to add_job never runs under ThreadPoolExecutor.
 
-    APScheduler calls the function, gets a coroutine object back and discards
-    it, so the job reports a successful run while doing nothing.
-    """
     job = next(j for j in registered if j.id == job_id)
 
     assert not inspect.iscoroutinefunction(job.func), (
@@ -51,7 +46,6 @@ def test_job_targets_are_synchronous(registered, job_id):
 
 @pytest.mark.parametrize("job_id", JOB_IDS)
 def test_job_targets_are_importable_by_name(registered, job_id):
-    """SQLAlchemyJobStore pickles the job, so lambdas and closures are out."""
     job = next(j for j in registered if j.id == job_id)
 
     assert job.func.__module__ == jobs.__name__
@@ -68,7 +62,7 @@ def test_job_targets_are_importable_by_name(registered, job_id):
     ],
 )
 def test_wrapper_actually_drives_the_coroutine(monkeypatch, wrapper, coroutine):
-    """The sync wrapper must run the coroutine body, not just return one."""
+
     ran = []
 
     async def spy(*args, **kwargs):
