@@ -1,9 +1,7 @@
 name: Keep Alive
 
-
 on:
   schedule:
-
     - cron: "*/10 * * * *"
   workflow_dispatch:
 
@@ -20,17 +18,35 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Ping the API
+      - name: Ping the API with Retry
         run: |
-          status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 240 "$PING_URL/")
-          echo "HTTP $status"
-
-          if [ "$status" != "200" ]; then
-            echo "::error::Keep-alive ping failed with HTTP $status"
-            exit 1
-          fi
-
-          echo "Server is awake."
+          PING_URL="${PING_URL}/"
+          MAX_RETRIES=3
+          RETRY_DELAY=5
+          ATTEMPT=1
+          
+          while [ $ATTEMPT -le $MAX_RETRIES ]; do
+            echo "Attempt $ATTEMPT of $MAX_RETRIES..."
+            
+            status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 240 "$PING_URL")
+            echo "HTTP Status: $status"
+            
+            if [ "$status" = "200" ]; then
+              echo "✓ Server is awake and responding."
+              exit 0
+            fi
+            
+            if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+              echo "✗ Failed with HTTP $status. Retrying in ${RETRY_DELAY}s..."
+              sleep $RETRY_DELAY
+              RETRY_DELAY=$((RETRY_DELAY * 2))  # Exponential backoff
+            fi
+            
+            ATTEMPT=$((ATTEMPT + 1))
+          done
+          
+          echo "::error::Keep-alive ping failed after $MAX_RETRIES attempts with HTTP $status"
+          exit 1
 
     env:
       PING_URL: https://smart-sales-and-inventory-ai-tracking.onrender.com
