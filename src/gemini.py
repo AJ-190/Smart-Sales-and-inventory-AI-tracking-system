@@ -8,14 +8,21 @@ from src.products.schemas import Products
 load_dotenv()
 
 
-client = genai.Client(
-    api_key=get_settings().GEMINI_API_KEY
-)
+_client = None
+
+
+def _get_client():
+    global _client
+    if _client is None:
+        _client = genai.Client(
+            api_key=get_settings().GEMINI_API_KEY
+        )
+    return _client
 
 def structure_products(prompt: str) -> Union[Products, str]:
     for attempt in range(5):
         try:
-            response = client.models.generate_content(
+            response = _get_client().models.generate_content(
                 model="gemini-flash-latest",
                 contents=f"""
                 Extract product listings from this text.
