@@ -12,8 +12,8 @@ A production-ready REST API for small businesses to manage inventory, track sale
 
 ## Live API
 
-**Base URL:** `https://smart-sales-inventory.onrender.com`  
-**Interactive Docs:** `https://smart-sales-inventory.onrender.com/docs`
+**Base URL:** `https://smart-sales-inventory-bmbn.onrender.com`  
+**Interactive Docs:** `https://smart-sales-inventory-bmbn.onrender.com/docs`
 
 ---
 
@@ -436,7 +436,7 @@ Render's free plan spins down the web service after 15 minutes without inbound t
 | Setting | Value |
 |---|---|
 | Schedule | `*/10 * * * *` (every 10 minutes) |
-| Target | `https://smart-sales-and-inventory-ai-tracking.onrender.com/` |
+| Target | `https://smart-sales-inventory-bmbn.onrender.com/` |
 | Auth | None — `GET /` is public |
 | Failure behaviour | Exits non-zero and logs a GitHub Actions error annotation |
 

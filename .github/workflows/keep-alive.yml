@@ -49,4 +49,4 @@ jobs:
           exit 1
 
     env:
-      PING_URL: https://smart-sales-and-inventory-ai-tracking.onrender.com
+      PING_URL: https://smart-sales-inventory-bmbn.onrender.com
