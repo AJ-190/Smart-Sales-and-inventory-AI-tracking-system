@@ -129,20 +129,23 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
     df.rename(columns=cononical_to_alias, inplace=True)
     total_rows = len(df)
 
-    df["quantity"] = df["quantity"].fillna(0).astype(int)
+    required_cols = ['name', "price"]
+    check_req = [c for c in required_cols if c not in df.columns]
+
+    if check_req:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Price and product name are required columns")
+
+    if "quantity" in df.columns:
+        try:
+            df["quantity"] = df["quantity"].fillna(0).astype(int)
+        except (TypeError, ValueError):
+            pass
     df.dropna(subset=['price', 'name'], inplace=True)
     dropped_missing = total_rows - len(df)
 
     rows_before_dedup = len(df)
     df = df.drop_duplicates(subset=['name'], keep="first")
     skipped_duplicates = rows_before_dedup - len(df)
-
-
-    required_cols = ['name', "price"]
-    check_req = [c for c in required_cols if c not in df.columns]
-
-    if check_req:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Price and product name are required columns")
 
     cols =  {c.name for c in bm.Product.__table__.columns}
 
@@ -166,12 +169,19 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
             data['business_id'] = business_id
             session.add(bm.Product(**data))
             created += 1
-    
-        
+
+        await session.flush()
+
     except Exception as e:
-        result = structure_products(gen_df)
+        await session.rollback()
+        created = 0
+        try:
+            result = structure_products(gen_df)
+        except Exception as gemini_err:
+            logging.error("Product import fallback failed", extra={"error": str(gemini_err)})
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Could not read the file. Please check that it contains product data and try again.")
         if isinstance(result, str):
-            print(gen_df)
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
         for product in result.products:
             session.add(bm.Product(**product.model_dump(), business_id=business_id))
