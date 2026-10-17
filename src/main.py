@@ -50,12 +50,12 @@ app = FastAPI(lifespan=lifespan)
 _cors = get_settings().cors_origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors,
-    allow_origin_regex=".*" if _cors == ["*"] else None,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False, 
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 app.middleware("http")(auth_middleware)
 app.add_middleware(LoggingMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)

@@ -8,8 +8,10 @@ DOCS_PATHS = {"/docs", "/redoc", "/docs/oauth2-redirect", "/openapi.json"}
 API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 DOCS_CSP = (
     "default-src 'self'; frame-ancestors 'self'; base-uri 'self'; "
-    "script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
-    "img-src 'self' data: https://fastapi.tiangolo.com"
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
+    "img-src 'self' data: https://fastapi.tiangolo.com; "
+    "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net"
 )
 
 BASE_HEADERS = {

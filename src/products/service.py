@@ -7,12 +7,14 @@ from src.products import schemas
 from fastapi.responses import FileResponse, StreamingResponse
 from src.businesses.service import get_member
 import pandas as pd
-
+from src.middleware.logging import logger
 import io
 import json
 from datetime import datetime
 from pathlib import Path
+from src.gemini import structure_products
 
+logging = logger("Products")
 
 def _ensure_business_id(product, business_id):
     if product.business_id is None:
@@ -101,8 +103,10 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
 
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not parse file")
-
+    
+    gen_df = df
     df = df.where(pd.notnull(df), None)
+    
 
     with open(Path(__file__).resolve().parent / "column_aliases.json", "r") as file:
         column_alliases: dict = json.load(file)
@@ -144,22 +148,34 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
 
     created = 0
     skipped_existing = 0
-    for _, row in df.iterrows():
-        product_ext = (
-            await session.execute(select(bm.Product)
-                                  .where(bm.Product.business_id == business_id)
-                                  .where(bm.Product.name == row['name']))
-        ).scalar()
+    
+    try:
+        
+        for _, row in df.iterrows():
+            product_ext = (
+                await session.execute(select(bm.Product)
+                                    .where(bm.Product.business_id == business_id)
+                                    .where(bm.Product.name == row['name']))
+            ).scalar()
 
-        if product_ext is not None:
-            skipped_existing += 1
-            continue
-        data = {k:x for k, x in row.to_dict().items() if k in cols}
+            if product_ext is not None:
+                skipped_existing += 1
+                continue
+            data = {k:x for k, x in row.to_dict().items() if k in cols}
 
-        data['business_id'] = business_id
-        session.add(bm.Product(**data))
-        created += 1
-
+            data['business_id'] = business_id
+            session.add(bm.Product(**data))
+            created += 1
+    
+        
+    except Exception as e:
+        result = structure_products(gen_df)
+        if isinstance(result, str):
+            print(gen_df)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
+        for product in result.products:
+            session.add(bm.Product(**product.model_dump(), business_id=business_id))
+            created += 1
     await session.commit()
     return {
         "message": "Product stored successfully",

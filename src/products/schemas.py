@@ -54,3 +54,16 @@ class LowStockResponse(BaseModel):
     low_stock_threshold: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+class ProductImport(BaseModel):
+    name: str
+    price: float
+    cost_price: float
+    quantity: int
+    sku: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    low_stock_threshold: Optional[int] = None
+
+class Products(BaseModel):
+    products: list[ProductImport]

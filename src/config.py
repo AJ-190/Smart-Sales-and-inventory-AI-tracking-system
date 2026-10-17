@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     SUPER_ADMIN_APP_PASSWORD: str = os.getenv("SUPER_ADMIN_APP_PASSWORD", "")
     SUPER_ADMIN_NAME: str = os.getenv("SUPER_ADMIN_NAME", "")
     REFRESH_TOKEN_TIME: int = 7 * 24 * 60
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     API_AUTH_KEY: Optional[str] = os.getenv("API_AUTH_KEY") or os.getenv("API_auth_key", "")
     model_config = {
         "env_file": ".env",
@@ -49,6 +50,7 @@ class Settings(BaseSettings):
     MAX_REFRESH_SESSIONS: int = 10
     REFRESH_RATE_LIMIT: int = 30
     CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "")
+    
 
     @property
     def cors_origins(self) -> list[str]:
