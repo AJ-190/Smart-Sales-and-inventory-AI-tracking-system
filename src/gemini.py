@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Union
 import time
 from google import genai
 from google.genai import errors
@@ -29,12 +29,13 @@ def structure_products(prompt: str) -> Union[Products, str]:
 
                 Rules:
                 - Return one record per product.
+                - remove columns: business_id, prouct_id or any ids if existing.
                 - Never invent missing prices or quantities.
                 - Interpret abbreviations only when reasonably clear.
                 - Mark ambiguous or uncertain records for review.
                 - Do not calculate a unit price unless the source clearly provides enough information.
                 - Preserve the original product meaning.
-                - Required columns: name, price, cost_price, quantity.
+                - Required columns: name, price, cost_price
                 - If None of the required columns is given in query, return a graceful error message.
                 - Never input in a missing required column, return a gracefull error message instead
                 Raw text:

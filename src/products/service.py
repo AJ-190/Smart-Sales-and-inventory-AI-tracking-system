@@ -104,8 +104,9 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not parse file")
     
-    gen_df = df
+
     df = df.where(pd.notnull(df), None)
+    gen_df = df
     
 
     with open(Path(__file__).resolve().parent / "column_aliases.json", "r") as file:
@@ -129,7 +130,7 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
     df.rename(columns=cononical_to_alias, inplace=True)
     total_rows = len(df)
 
-    required_cols = ['name', "price"]
+    required_cols = ['name', "price", "cost_price"]
     check_req = [c for c in required_cols if c not in df.columns]
 
     if check_req:
@@ -140,7 +141,8 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
             df["quantity"] = df["quantity"].fillna(0).astype(int)
         except (TypeError, ValueError):
             pass
-    df.dropna(subset=['price', 'name'], inplace=True)
+    df.dropna(subset=['price', 'name', "cost_price"], inplace=True)
+    df.drop(columns=['business_id', 'product_id'], errors='ignore')
     dropped_missing = total_rows - len(df)
 
     rows_before_dedup = len(df)
