@@ -178,19 +178,19 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
 
     except Exception as e:
         await session.rollback()
-        return e
-        # created = 0
-        # try:
-        #     result = structure_products(gen_df)
-        # except Exception as gemini_err:
-        #     logging.error("Product import fallback failed", extra={"error": str(gemini_err)})
-        #     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-        #                         detail="Could not read the file. Please check that it contains product data and try again.")
-        # if isinstance(result, str):
-        #     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
-        # for product in result.products:
-        #     session.add(bm.Product(**product.model_dump(), business_id=business_id))
-        #     created += 1
+
+        created = 0
+        try:
+            result = structure_products(gen_df)
+        except Exception as gemini_err:
+            logging.error("Product import fallback failed", extra={"error": str(gemini_err)})
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Could not read the file. Please check that it contains product data and try again.")
+        if isinstance(result, str):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
+        for product in result.products:
+            session.add(bm.Product(**product.model_dump(), business_id=business_id))
+            created += 1
     await session.commit()
     return {
         "message": "Product stored successfully",
