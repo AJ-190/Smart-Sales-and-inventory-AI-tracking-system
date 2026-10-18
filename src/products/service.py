@@ -105,7 +105,8 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not parse file")
     
 
-    df = df.where(pd.notnull(df), None)
+    df = df.astype(object).where(pd.notna(df), None)
+
     gen_df = df
     
 
@@ -142,7 +143,8 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
         except (TypeError, ValueError):
             pass
     df.dropna(subset=['price', 'name', "cost_price"], inplace=True)
-    df.drop(columns=['business_id', 'product_id'], errors='ignore')
+    df = df.drop(columns=['business_id', 'product_id', "updated_at", "created_at", "is_active"], errors='ignore')
+    print(df.columns)
     dropped_missing = total_rows - len(df)
 
     rows_before_dedup = len(df)
@@ -160,7 +162,7 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
             product_ext = (
                 await session.execute(select(bm.Product)
                                     .where(bm.Product.business_id == business_id)
-                                    .where(bm.Product.name == row['name']))
+                                    .where((bm.Product.name == row['name']) | (bm.Product.sku == row['sku'])))
             ).scalar()
 
             if product_ext is not None:
@@ -176,18 +178,19 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
 
     except Exception as e:
         await session.rollback()
-        created = 0
-        try:
-            result = structure_products(gen_df)
-        except Exception as gemini_err:
-            logging.error("Product import fallback failed", extra={"error": str(gemini_err)})
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                                detail="Could not read the file. Please check that it contains product data and try again.")
-        if isinstance(result, str):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
-        for product in result.products:
-            session.add(bm.Product(**product.model_dump(), business_id=business_id))
-            created += 1
+        return e
+        # created = 0
+        # try:
+        #     result = structure_products(gen_df)
+        # except Exception as gemini_err:
+        #     logging.error("Product import fallback failed", extra={"error": str(gemini_err)})
+        #     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+        #                         detail="Could not read the file. Please check that it contains product data and try again.")
+        # if isinstance(result, str):
+        #     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
+        # for product in result.products:
+        #     session.add(bm.Product(**product.model_dump(), business_id=business_id))
+        #     created += 1
     await session.commit()
     return {
         "message": "Product stored successfully",

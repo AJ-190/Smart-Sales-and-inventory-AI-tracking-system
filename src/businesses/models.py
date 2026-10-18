@@ -59,7 +59,7 @@ class Product(Base):
     price = Column(Numeric(10, 2), nullable=False)
     cost_price = Column(Numeric(10, 2), nullable=True)
     description = Column(String, nullable=True)
-    sku = Column(String, unique=True, nullable=True)
+    sku = Column(String, nullable=True)
     category = Column(String, nullable=True)
     quantity = Column(Integer, default=0)
     low_stock_threshold = Column(Integer, default=10)
