@@ -180,7 +180,7 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
         except Exception as gemini_err:
             logging.error("Product import fallback failed", extra={"error": str(gemini_err)})
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                                detail="Could not read the file. Please check that it contains product data and try again.")
+                                detail=gemini_err)
         if isinstance(result, str):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
         for product in result.products:
