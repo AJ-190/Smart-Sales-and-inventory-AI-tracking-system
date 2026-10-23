@@ -508,4 +508,3 @@ async def delete_reminder(business_id, reminder_id, current_user: um.Users, sess
         current_user
     )
     return reminder
-

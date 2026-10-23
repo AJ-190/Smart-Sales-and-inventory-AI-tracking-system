@@ -71,3 +71,4 @@ class Reminders(Base):
     debt = relationship("Debt", back_populates="reminders")
     business = relationship("Business", back_populates="reminders")
     customer = relationship("Customer", back_populates="reminders")
+

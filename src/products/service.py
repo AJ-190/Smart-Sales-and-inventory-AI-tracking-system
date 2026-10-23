@@ -131,7 +131,7 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
     df.rename(columns=cononical_to_alias, inplace=True)
     total_rows = len(df)
 
-    required_cols = ['name', "price", "cost_price"]
+    required_cols = ['name', "price"]
     check_req = [c for c in required_cols if c not in df.columns]
 
     if check_req:
@@ -142,7 +142,7 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
             df["quantity"] = df["quantity"].fillna(0).astype(int)
         except (TypeError, ValueError):
             pass
-    df.dropna(subset=['price', 'name', "cost_price"], inplace=True)
+    df.dropna(subset=['price', 'name'], inplace=True)
     df = df.drop(columns=['business_id', 'product_id', "updated_at", "created_at", "is_active"], errors='ignore')
     print(df.columns)
     dropped_missing = total_rows - len(df)
@@ -159,10 +159,14 @@ async def upload_file(file: UploadFile,current_user: um.Users, session: AsyncSes
     try:
         
         for _, row in df.iterrows():
+            sku = row.get('sku')
+            duplicate_filter = bm.Product.name == row['name']
+            if sku is not None:
+                duplicate_filter = duplicate_filter | (bm.Product.sku == sku)
             product_ext = (
                 await session.execute(select(bm.Product)
                                     .where(bm.Product.business_id == business_id)
-                                    .where((bm.Product.name == row['name']) | (bm.Product.sku == row['sku'])))
+                                    .where(duplicate_filter))
             ).scalar()
 
             if product_ext is not None:

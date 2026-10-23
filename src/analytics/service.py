@@ -296,3 +296,4 @@ async def get_dashboard(business_id,
         "total_active_products": total_active_products,
         "total_customers": total_customers,
     }
+

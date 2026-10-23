@@ -4,7 +4,7 @@ from src.businesses import schemas, service as biz_service
 from src.auth import dependencies as auth_deps
 from src.users import models as um
 from src.auth.roles import ALL_ROLES
-
+from typing import Annotated
 
 router = APIRouter(prefix="/businesses", tags=['Business'])
 
@@ -85,3 +85,29 @@ async def update_business_member(business_id: int, member_id: int, post: schemas
                                  db=Depends(get_db),
                                  current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]))):
     return await biz_service.update_business_member(business_id, member_id, post, db, current_user)
+
+
+@router.post(
+    "/block_report/{business_id}/{business_member_id}",
+    response_model=schemas.BusinessMemberResponse
+)
+async def block_report(
+    business_id: int,
+    business_member_id: int,
+    dir: int | None = None,
+    current_user=Depends(
+        auth_deps.role_checker([
+            um.RoleEnum.super_admin,
+            um.RoleEnum.admin,
+            um.RoleEnum.manager,
+        ])
+    ),
+    session=Depends(get_db),
+):
+    return await biz_service.block_report(
+        current_user,
+        business_id,
+        session,
+        dir,
+        business_member_id,
+    )

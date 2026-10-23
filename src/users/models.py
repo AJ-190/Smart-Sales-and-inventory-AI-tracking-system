@@ -60,6 +60,7 @@ class BusinessMember(Base):
     business_id = Column(Integer, ForeignKey("businesses.business_id", ondelete="SET NULL"), nullable=True)
     role = Column(SAEnum(RoleEnum), nullable=False, default=RoleEnum.cashier)
     is_active = Column(Boolean, default=True)
+    get_report = Column(Boolean, default=False, nullable=False)
     leave_business = Column(Boolean, default=False)
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -70,9 +71,6 @@ class BusinessMember(Base):
         UniqueConstraint("user_id", "business_id", name="uq_user_business"),
     )
 
-
-# Member rows are kept after someone leaves, so "still in this business" is
-# leave_business rather than a business_id match. NULL counts as still-here.
 ACTIVE_MEMBERSHIP = or_(
     BusinessMember.leave_business.is_(False),
     BusinessMember.leave_business.is_(None),

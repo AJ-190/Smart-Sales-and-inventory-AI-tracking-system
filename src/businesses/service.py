@@ -10,6 +10,7 @@ from src.users import schemas as user_schemas
 from src.users.service import update_user
 from src.websocket import socket_manager
 from src.notifications import service as notification_service, schemas as notification_schemas
+from typing import Annotated
 
 
 async def get_member(db, current_user):
@@ -50,6 +51,7 @@ async def add_business(post, db: AsyncSession, current_user):
         user_id=current_user.user_id,
         role=um.RoleEnum.admin,
         business_id=business.business_id,
+        get_report=True
     )
     db.add(business_member)
     await db.commit()
@@ -484,7 +486,7 @@ async def con_del_approval(post: schemas.Direction, business_id, db: AsyncSessio
                 existing_member.leave_business = False
             else:
                 user = um.BusinessMember(role=approval_user.role, user_id=approval_user.requester_id,
-                    business_id=approval_user.business_id)
+                    business_id=approval_user.business_id, get_report=True if approval_user.role in [um.RoleEnum.super_admin, um.RoleEnum.manager] else False)
                 db.add(user)
 
 
@@ -692,6 +694,7 @@ async def update_business_member(business_id: int, member_id: int, post: schemas
         "user_id": member.user_id,
         "business_id": member.business_id,
         "role": member.role.value if isinstance(member.role, um.RoleEnum) else member.role,
+        "get_report": member.get_report,
         "is_active": member.is_active,
         "joined_at": member.joined_at.isoformat() if member.joined_at else None,
         "name": user.name if user else None,
@@ -699,3 +702,51 @@ async def update_business_member(business_id: int, member_id: int, post: schemas
     }
 
 
+async def block_report(current_user: um.Users, business_id: int, session: AsyncSession, dir: int, business_member_id):
+    await business_authorized_access(current_user, business_id, session)
+    
+    if business_member_id is None:
+        user =( await session.execute(
+            select(um.BusinessMember)
+            .where(um.BusinessMember.business_id == business_id)
+            .where(um.BusinessMember.user_id == current_user.user_id)
+   
+        )
+        ).scalar_one_or_none()
+
+        if dir == 1:
+            if user.get_report == True:
+                return HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already used to get business reports")
+            user.get_report = True
+            
+        elif dir == 0:
+            if user.get_report == False:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already used to get business reports")
+            user.get_report = False
+        
+    elif business_member_id:
+        if current_user.role not in [um.RoleEnum.super_admin, um.RoleEnum.admin]:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Only business amdin is authorized to perform this action")
+        
+        user =( await session.execute(
+            select(um.BusinessMember)
+            .where(um.BusinessMember.business_id == business_id)
+            .where(um.BusinessMember.member_id == business_member_id)
+        
+        )
+               ).scalar_one_or_none()
+        
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found in the business")
+        if dir == 1:
+            if user.get_report == True:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User. already used to get business reports")
+            user.get_report = True
+        elif dir == 0:
+            if user.get_report == False:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User. already used to get business reports")
+            user.get_report = False
+            
+            
+    await session.commit()
+    return user

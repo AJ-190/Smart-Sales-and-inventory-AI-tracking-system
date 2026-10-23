@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Annotated
 from src.users.schemas import UsersOut
-
+from datetime import datetime
 
 class BusinessResponse(BaseModel):
     business_id: int
@@ -80,8 +80,9 @@ class BusinessMemberResponse(BaseModel):
     user_id: int
     business_id: int
     role: str
+    get_report: bool
     is_active: bool = True
-    joined_at: Optional[str] = None
+    joined_at: Optional[datetime] = None
     name: Optional[str] = None
     email: Optional[str] = None
 
