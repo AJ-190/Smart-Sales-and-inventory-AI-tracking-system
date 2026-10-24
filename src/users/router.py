@@ -17,9 +17,11 @@ async def get_users(db=Depends(get_db), current_user=Depends(auth_deps.role_chec
     return await users_service.get_users(db, current_user)
 
 
-@router.get("/members", response_model=list[schemas.UsersOutUsers])
-async def get_members(db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]))):
-    return await users_service.get_members(db, current_user)
+@router.get("/members")
+async def get_members(db=Depends(get_db), current_user=Depends(auth_deps.get_current_user)):
+    if current_user.role in [um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]:
+        return await users_service.get_members(db, current_user)
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
 
 @router.get("/members/{member_id}", response_model=schemas.MemberOut)

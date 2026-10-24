@@ -129,7 +129,35 @@ async def update_business_member(business_id: int, member_id: int, post: schemas
 )
 async def block_report(
     business_id: int,
-    business_member_id: int,
+    business_member_id: int | None = None,
+    dir: int | None = None,
+    current_user=Depends(
+        auth_deps.role_checker([
+            um.RoleEnum.super_admin,
+            um.RoleEnum.admin,
+            um.RoleEnum.manager,
+        ])
+    ),
+    session=Depends(get_db),
+):
+    bm_id = business_member_id
+    if bm_id == 0:
+        bm_id = None
+    return await biz_service.block_report(
+        current_user,
+        business_id,
+        session,
+        dir,
+        bm_id,
+    )
+
+
+@router.post(
+    "/block_report/{business_id}",
+    response_model=schemas.BusinessMemberResponse
+)
+async def block_report_self(
+    business_id: int,
     dir: int | None = None,
     current_user=Depends(
         auth_deps.role_checker([
@@ -145,5 +173,5 @@ async def block_report(
         business_id,
         session,
         dir,
-        business_member_id,
+        None,
     )

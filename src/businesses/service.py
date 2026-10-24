@@ -706,46 +706,63 @@ async def block_report(current_user: um.Users, business_id: int, session: AsyncS
     await business_authorized_access(current_user, business_id, session)
     
     if business_member_id is None:
-        user =( await session.execute(
-            select(um.BusinessMember)
-            .where(um.BusinessMember.business_id == business_id)
-            .where(um.BusinessMember.user_id == current_user.user_id)
-   
-        )
+        user = (
+            await session.execute(
+                select(um.BusinessMember)
+                .where(um.BusinessMember.business_id == business_id)
+                .where(um.BusinessMember.user_id == current_user.user_id)
+            )
         ).scalar_one_or_none()
 
-        if dir == 1:
-            if user.get_report == True:
-                return HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already used to get business reports")
-            user.get_report = True
-            
-        elif dir == 0:
-            if user.get_report == False:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already used to get business reports")
-            user.get_report = False
-        
-    elif business_member_id:
-        if current_user.role not in [um.RoleEnum.super_admin, um.RoleEnum.admin]:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Only business amdin is authorized to perform this action")
-        
-        user =( await session.execute(
-            select(um.BusinessMember)
-            .where(um.BusinessMember.business_id == business_id)
-            .where(um.BusinessMember.member_id == business_member_id)
-        
-        )
-               ).scalar_one_or_none()
-        
         if user is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found in the business")
+
         if dir == 1:
-            if user.get_report == True:
+            if user.get_report is True:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already used to get business reports")
             user.get_report = True
         elif dir == 0:
-            if user.get_report == False:
+            if user.get_report is False:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already used to get business reports")
             user.get_report = False
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="dir must be 0 or 1")
+    elif business_member_id:
+        user = (
+            await session.execute(
+                select(um.BusinessMember)
+                .where(um.BusinessMember.business_id == business_id)
+                .where(um.BusinessMember.member_id == business_member_id)
+            )
+        ).scalar_one_or_none()
+
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found in the business")
+
+        if user.user_id == current_user.user_id:
+            if dir == 1:
+                if user.get_report is True:
+                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already used to get business reports")
+                user.get_report = True
+            elif dir == 0:
+                if user.get_report is False:
+                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already used to get business reports")
+                user.get_report = False
+            else:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="dir must be 0 or 1")
+        elif current_user.role not in [um.RoleEnum.super_admin, um.RoleEnum.admin]:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Only business admin is authorized to perform this action")
+        else:
+            if dir == 1:
+                if user.get_report is True:
+                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already used to get business reports")
+                user.get_report = True
+            elif dir == 0:
+                if user.get_report is False:
+                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already used to get business reports")
+                user.get_report = False
+            else:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="dir must be 0 or 1")
             
             
     await session.commit()
