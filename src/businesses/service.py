@@ -746,7 +746,7 @@ async def block_report(current_user: um.Users, business_id: int, session: AsyncS
                 user.get_report = True
             elif dir == 0:
                 if user.get_report is False:
-                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already used to get business reports")
+                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already does not to get business reports")
                 user.get_report = False
             else:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="dir must be 0 or 1")
@@ -759,7 +759,7 @@ async def block_report(current_user: um.Users, business_id: int, session: AsyncS
                 user.get_report = True
             elif dir == 0:
                 if user.get_report is False:
-                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already used to get business reports")
+                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already does not to get business reports")
                 user.get_report = False
             else:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="dir must be 0 or 1")

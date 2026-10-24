@@ -55,11 +55,3 @@ async def get_low_stock(
     return await analytics_service.check_stock(db, current_user)
 
 
-# @router.get("/reports/analytics/debts/{business_id}", response_model=list[DebtResponse])
-# async def get_debts(
-#     business_id: int,
-#     db=Depends(get_db),
-#     current_user=Depends(auth_deps.role_checker([*roles]))
-# ):
-#     return await analytics_service.get_debts(business_id, db, current_user)
-
