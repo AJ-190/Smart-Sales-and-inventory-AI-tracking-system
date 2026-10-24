@@ -740,11 +740,11 @@ async def block_report(current_user: um.Users, business_id: int, session: AsyncS
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found in the business")
         if dir == 1:
             if user.get_report == True:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User. already used to get business reports")
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already used to get business reports")
             user.get_report = True
         elif dir == 0:
             if user.get_report == False:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User. already used to get business reports")
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already used to get business reports")
             user.get_report = False
             
             

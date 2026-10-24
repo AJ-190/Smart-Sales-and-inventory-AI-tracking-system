@@ -50,7 +50,6 @@ async def get_business_members(session):
         select(um.Users, um.BusinessMember)
         .join(um.BusinessMember, um.Users.user_id == um.BusinessMember.user_id)
         .where(um.ACTIVE_MEMBERSHIP)
-        .where(um.BusinessMember.role.in_(["admin", "manager"]))
         .where(um.BusinessMember.get_report == True)
         .where(um.Users.is_verified == True)
         .where(um.Users.is_active == True)

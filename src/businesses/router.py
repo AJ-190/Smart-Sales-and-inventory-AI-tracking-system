@@ -80,6 +80,38 @@ async def leave_business(business_id: int,
     return await biz_service.leave_business(business_id, member_id, current_user, session)
 
 
+@router.get("/{business_id}/members")
+async def get_business_members_list(business_id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]))):
+    from src.users import models as um
+    from sqlalchemy import select
+    result = await db.execute(
+        select(um.BusinessMember.member_id,
+               um.BusinessMember.user_id,
+               um.BusinessMember.business_id,
+               um.BusinessMember.role,
+               um.BusinessMember.get_report,
+               um.BusinessMember.is_active,
+               um.Users.name,
+               um.Users.email)
+        .join(um.Users, um.Users.user_id == um.BusinessMember.user_id)
+        .where(um.BusinessMember.business_id == business_id)
+        .where(um.ACTIVE_MEMBERSHIP)
+    )
+    members = []
+    for row in result.all():
+        members.append({
+            "member_id": row.member_id,
+            "user_id": row.user_id,
+            "business_id": row.business_id,
+            "role": row.role.value if hasattr(row.role, 'value') else row.role,
+            "get_report": row.get_report,
+            "is_active": row.is_active,
+            "name": row.name,
+            "email": row.email,
+        })
+    return members
+
+
 @router.put("/{business_id}/members/{member_id}", response_model=schemas.BusinessMemberResponse)
 async def update_business_member(business_id: int, member_id: int, post: schemas.BusinessMemberUpdate,
                                  db=Depends(get_db),
