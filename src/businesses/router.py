@@ -81,9 +81,13 @@ async def leave_business(business_id: int,
 
 
 @router.get("/{business_id}/members")
-async def get_business_members_list(business_id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([um.RoleEnum.super_admin, um.RoleEnum.admin, um.RoleEnum.manager]))):
+async def get_business_members_list(business_id: int, db=Depends(get_db), current_user=Depends(auth_deps.get_current_user)):
     from src.users import models as um
     from sqlalchemy import select
+    # allow if super admin or manager/admin of business
+    if current_user.role != um.RoleEnum.super_admin:
+        from src.businesses import service as biz_service
+        await biz_service.business_authorized_access(current_user, business_id, db)
     result = await db.execute(
         select(um.BusinessMember.member_id,
                um.BusinessMember.user_id,
