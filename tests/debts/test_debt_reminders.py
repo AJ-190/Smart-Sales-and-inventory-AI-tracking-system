@@ -175,12 +175,13 @@ def test_build_message():
     """A missing note must not leak into the text the customer reads."""
     due = datetime(2026, 10, 5, tzinfo=timezone.utc)
 
-    message = debt_reminders.build_message("Debtor", Decimal("250.00"), due, None)
+    message = debt_reminders.build_message("Debtor", Decimal("250.00"), "Rem Shop", due, None)
     assert "GHS 250.00" in message
     assert "2026-10-05" in message
+    assert "Rem Shop" in message
     assert "None" not in message
 
-    with_note = debt_reminders.build_message("Debtor", Decimal("250.00"), due, "Pay today")
+    with_note = debt_reminders.build_message("Debtor", Decimal("250.00"), "Rem Shop", due, "Pay today")
     assert with_note.endswith("Pay today")
 
 

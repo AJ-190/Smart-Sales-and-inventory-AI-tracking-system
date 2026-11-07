@@ -10,7 +10,7 @@ logger = logging.getLogger("scheduler")
 
 
 def _build_jobstore() -> dict:
-    """Return the persistent job store, or memory if SYNC_DATABASE_URL is unset."""
+
     sync_url = (get_settings().SYNC_DATABASE_URL or "").strip()
     if not sync_url:
         logger.warning(

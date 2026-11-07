@@ -5,6 +5,9 @@ from google.genai import errors
 from dotenv import load_dotenv
 from src.config import get_settings
 from src.products.schemas import Products
+from src.middleware.logging import logger
+
+logging = logger("Gemini")
 load_dotenv()
 
 
@@ -63,12 +66,26 @@ def structure_products(prompt: str) -> Union[Products, str]:
 
         except errors.ServerError as e:
             if attempt == 2:
-                print("Gemini is temporarily unavailable. Try again later.")
+                logging.info("Gemini is temporarily unavailable. Try again later.")
                 return "Gemini is temporarily down, please try again later"
 
             wait = 2 ** (attempt + 1)
-            print(f"Server unavailable. Retrying in {wait} seconds...")
+            logging.info(f"Server unavailable. Retrying in {wait} seconds...")
             time.sleep(wait)
             
     return "Failed after multiple attempts."
             
+
+def message_gemini(prompt: str):
+    for attempt in range(5):
+        try:
+            
+            response = _get_client().models.generate_content(
+                model="gemini-flash-latest",
+                contents=prompt
+            )
+            return response
+        except errors.ServerError as e:
+            if attempt == 3:
+                logging.info("Gemini is temporarily unavailable. Try again later.")
+                return "Gemini is temporarily down, please try again later"

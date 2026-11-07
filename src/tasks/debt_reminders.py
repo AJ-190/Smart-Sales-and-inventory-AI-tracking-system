@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.database import job_session_maker as get_async_session_maker
 import httpx
 from sqlalchemy import select, update, func, and_, or_
-
+from src.businesses import models as bm
 from src.config import get_settings
 from src.customers import models as cm
 from src.debts import models as dm
@@ -123,12 +123,15 @@ def to_international(phone: str | None) -> str | None:
     return None
 
 
-def build_message(customer_name: str, amount: Decimal, due_date, note: str | None) -> str:
+def build_message(customer_name: str, amount: Decimal, business_name: str, due_date, note: str | None) -> str:
     """Write the text the customer receives."""
     due = due_date.date() if isinstance(due_date, datetime) else due_date
     message = (
         f"Hello {customer_name}, this is a friendly reminder about your outstanding "
-        f"balance of GHS {amount:.2f}, due on {due}."
+        f"balance of GHS {amount:.2f}, due on {due} from {business_name}."
+         "visit: www.businessbotgh.com for smart business tools"
+         
+        
     )
     if note:
         message += f" {note}"
@@ -216,11 +219,13 @@ async def process_due_reminders():
                 dm.Reminders.customer_id,
                 dm.Debt.amount,
                 dm.Debt.due_date,
+                bm.Business.name.label("business_name"),
                 cm.Customer.name.label("customer_name"),
                 cm.Customer.phone.label("customer_phone"),
             )
             .join(dm.Debt, dm.Reminders.debt_id == dm.Debt.debt_id)
             .join(cm.Customer, dm.Reminders.customer_id == cm.Customer.customer_id)
+            .join(bm.Business, bm.Business.business_id == cm.Customer.business_id)
             .where(dm.Reminders.reminder_id.in_(reminder_ids))
         )
 
@@ -248,6 +253,7 @@ async def process_due_reminders():
             msg = build_message(
                 customer_name=record["customer_name"],
                 amount=record["amount"],
+                business_name=record.business_name,
                 due_date=record["due_date"],
                 note=record["note"],
             )

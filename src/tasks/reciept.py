@@ -60,6 +60,7 @@ class RecieptReportGenerator:
                 f"No sales data available for this period.\n"
                 f"\n"
                 f"This is an automated report from your Business Bot GH."
+                f"www.businessbotgh.com"
             )
 
         start_str = self.start_date.strftime("%b %d")
@@ -82,6 +83,7 @@ class RecieptReportGenerator:
             f"Best selling product: {best_product}\n"
             f"\n"
             f"This is an automated report from your Business Bot GH."
+            f"www.businessbotgh.com"
         )
 
     async def send_report_smss(self) -> bool:

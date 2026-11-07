@@ -18,7 +18,7 @@ async def add_user(post: schemas.UserSignUp, db: AsyncSession):
     ).scalar_one_or_none()
 
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already registered")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already registred")
 
 
     user = um.Users(
