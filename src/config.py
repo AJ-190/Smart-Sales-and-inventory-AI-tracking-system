@@ -1,7 +1,6 @@
 import os
 from typing import Optional
 from dotenv import load_dotenv
-from pydantic import Field
 from pydantic_settings import BaseSettings
 
 load_dotenv()
@@ -47,8 +46,6 @@ class Settings(BaseSettings):
     REQUEST_LIMIT_EXPIRY: int = 60
     REQUEST_LIMIT: int = 5
     WS_TICKET_TTL: int = 300
-    MAX_REFRESH_SESSIONS: int = 10
-    REFRESH_RATE_LIMIT: int = 30
     CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "")
     
 

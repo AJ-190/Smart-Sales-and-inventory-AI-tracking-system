@@ -24,32 +24,15 @@ class Users(Base):
     phone = Column(String, nullable=True)
     password = Column(String, nullable=False)
     role = Column(SAEnum(RoleEnum), default=RoleEnum.user, nullable=False)
-    refresh_token = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     memberships = relationship("BusinessMember", back_populates="user", passive_deletes=True)
-    refresh_sessions = relationship("RefreshSession", back_populates="user", passive_deletes=True)
     sales = relationship("Sale", back_populates="user", passive_deletes=True)
     user_approvals = relationship("Approvals", foreign_keys="Approvals.requester_id", back_populates="requester")
     reviewer_approvals = relationship("Approvals", foreign_keys="Approvals.reviewer_id", back_populates="reviewer", passive_deletes=True)
     transactions = relationship("Transactions", back_populates="performer", passive_deletes=True)
     notifications = relationship("Notification", back_populates="user", passive_deletes=True)
-
-
-class RefreshSession(Base):
-    __tablename__ = "refresh_sessions"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    session_id = Column(String(64), nullable=True, unique=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
-    token_hash = Column(String(64), nullable=False, unique=True, index=True)
-    expires_at = Column(DateTime(timezone=True), nullable=True)
-    revoked_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    last_used_at = Column(DateTime(timezone=True), nullable=True)
-
-    user = relationship("Users")
 
 
 class BusinessMember(Base):
