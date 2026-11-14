@@ -226,37 +226,9 @@ async def delete_business(id, db: AsyncSession, current_user):
         if not is_member:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized to delete this business")
 
-    await db.execute(
-        dm.Transactions.__table__.delete().where(dm.Transactions.business_id == id)
-    )
-    await db.execute(
-        dm.Reminders.__table__.delete().where(
-            (dm.Reminders.business_id == id) |
-            (dm.Reminders.debt_id.in_(
-                select(dm.Debt.debt_id).where(dm.Debt.business_id == id)
-            ))
-        )
-    )
-    await db.execute(
-        dm.Debt.__table__.delete().where(dm.Debt.business_id == id)
-    )
-    sales_items_stmt = bm.SalesItem.__table__.delete().where(
-        bm.SalesItem.sale_id.in_(
-            select(bm.Sale.sale_id).where(bm.Sale.business_id == id)
-        )
-    )
-    await db.execute(sales_items_stmt)
-    await db.execute(
-        bm.Sale.__table__.delete().where(bm.Sale.business_id == id)
-    )
-    await db.execute(
-        cm.Customer.__table__.delete().where(cm.Customer.business_id == id)
-    )
-    await db.execute(
-        um.BusinessMember.__table__.delete().where(um.BusinessMember.business_id == id)
-    )
-
-    await db.delete(business)
+    business.is_deleted = True
+    business.deleted_at = func.now()
+    business.is_active = False
     await db.commit()
     await notification_service.send_notification(
         notification_schemas.SendNotification(
@@ -280,6 +252,7 @@ async def get_business_key(business_id, db: AsyncSession, current_user):
                 select(bm.Business.business_key)
                 .join(um.BusinessMember, um.BusinessMember.business_id == bm.Business.business_id)
                 .where(bm.Business.business_id == business_id)
+                .where(bm.Business.is_active == True)
                 .where(um.BusinessMember.user_id == current_user.user_id)
                 .where(um.ACTIVE_MEMBERSHIP)
             )
@@ -311,7 +284,7 @@ async def send_approval(post, db: AsyncSession, current_user):
             .join(bm.Business, bm.Business.business_id == bm.Approvals.business_id)
             .where(bm.Approvals.business_id == check_business_.business_id)
             .where(bm.Approvals.requester_id == current_user.user_id)
-
+            .where(bm.Business.is_active == True)
         )
 
 
@@ -567,6 +540,7 @@ async def business_authorized_access(current_user, business_id, db: AsyncSession
                 select(um.BusinessMember)
                 .where(um.BusinessMember.user_id == int(current_user.user_id))
                 .where(um.BusinessMember.business_id == business_id)
+                .where(bm.Business.is_active == True)
                 .where(um.ACTIVE_MEMBERSHIP)
             )).scalars().first()
         )
@@ -634,6 +608,7 @@ async def update_business_member(business_id: int, member_id: int, post: schemas
             await db.execute(
                 select(um.BusinessMember)
                 .where(um.BusinessMember.business_id == business_id)
+                .where(bm.Business.is_active == True)
                 .where(um.BusinessMember.user_id == current_user.user_id)
                 .where(um.ACTIVE_MEMBERSHIP)
             )
@@ -646,6 +621,7 @@ async def update_business_member(business_id: int, member_id: int, post: schemas
             select(um.BusinessMember)
             .where(um.BusinessMember.member_id == member_id)
             .where(um.BusinessMember.business_id == business_id)
+            .where(bm.Business.is_active == True)
             .where(um.ACTIVE_MEMBERSHIP)
         )
     ).scalars().first()

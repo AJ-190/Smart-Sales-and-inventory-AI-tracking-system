@@ -1,5 +1,6 @@
 from fastapi import status, HTTPException, UploadFile
 from sqlalchemy import select, inspect
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.users import models as um
 from src.businesses import models as bm, service as business_service
@@ -9,8 +10,10 @@ from src.businesses.service import get_member
 import pandas as pd
 from src.middleware.logging import logger
 import io
+import httpx
+from src.config import get_settings
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from src.gemini import structure_products
 
@@ -27,6 +30,30 @@ def _as_int(business_id):
     except (TypeError, ValueError):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="business_id must be an integer")
+
+
+def _normalize_barcode(barcode):
+    if barcode is None:
+        return None
+    normalized = str(barcode).strip()
+    return normalized or None
+
+
+async def _ensure_barcode_available(db, business_id, barcode, exclude_id=None):
+    if not barcode:
+        return
+    query = select(bm.Product).where(
+        bm.Product.business_id == business_id,
+        bm.Product.barcode == barcode,
+    )
+    if exclude_id is not None:
+        query = query.where(bm.Product.product_id != exclude_id)
+    duplicate = (await db.execute(query)).scalars().first()
+    if duplicate is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Barcode '{barcode}' already exists for this business",
+        )
 
 
 async def product_validity(post):
@@ -48,10 +75,106 @@ async def product_validity(post):
 
 
 
+async def _fetch_external_product(bar_code: str):
+    API_URL = get_settings().OPENFOOD_API_URL.format(bar_code=bar_code)
+
+    headers = {
+        "User-Agent": "BusinessBotGH/1.0 (businessbotgh.com)"
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.get(API_URL, headers=headers)
+
+            if response.status_code == status.HTTP_404_NOT_FOUND:
+                return None
+
+            response.raise_for_status()
+            data = response.json()
+
+            if not isinstance(data, dict) or data.get("status") == 0:
+                return None
+
+            product = data.get("product") or {}
+            product_name = product.get("product_name")
+            if not isinstance(product_name, str) or not product_name.strip():
+                return None
+
+            return product_name.strip()
+
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Open Food Facts returned HTTP {e.response.status_code}"
+        )
+
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to connect to Open Food Facts"
+        )
+
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Invalid response from Open Food Facts"
+        )
+
+
+async def get_product_by_barcode(business_id, bar_code: str, db: AsyncSession, current_user):
+    business_id = _as_int(business_id)
+    normalized = _normalize_barcode(bar_code)
+
+    if normalized is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Barcode must not be empty"
+        )
+
+    await business_service.business_authorized_access(current_user, business_id, db)
+
+    product = (
+        (await db.execute(
+            select(bm.Product)
+            .where(bm.Product.business_id == business_id)
+            .where(bm.Product.barcode == normalized)
+            .where(bm.Product.is_active == True)
+            .where(bm.Product.is_deleted == False)
+        )).scalars().first()
+    )
+
+    if product is not None:
+        return {
+            "found_locally": True,
+            "source": "inventory",
+            "product": product,
+            "suggested_name": None,
+        }
+
+    suggestion = await _fetch_external_product(normalized)
+
+    if suggestion is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No product found for barcode '{normalized}'"
+        )
+
+    return {
+        "found_locally": False,
+        "source": "openfoodfacts",
+        "product": None,
+        "suggested_name": suggestion,
+    }
+
+
 async def add_product(business_id, post: schemas.Productcreate, db: AsyncSession, current_user):
     await business_service.business_authorized_access(current_user, business_id, db)
     business_id = _as_int(business_id)
+
     await product_validity(post)
+    data = post.model_dump()
+    data["barcode"] = _normalize_barcode(data.get("barcode"))
+
     existing = (
         (await db.execute(
             select(bm.Product).where(
@@ -65,23 +188,48 @@ async def add_product(business_id, post: schemas.Productcreate, db: AsyncSession
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Product '{post.name}' already exists")
 
     if existing is not None:
+        await _ensure_barcode_available(
+            db, business_id, data.get("barcode"), exclude_id=existing.product_id
+        )
         existing.deleted_at = None
         existing.is_active = True
         existing.price = post.price
         existing.cost_price = post.cost_price
         existing.quantity = post.quantity
         existing.low_stock_threshold = post.low_stock_threshold
+        existing.barcode = data.get("barcode")
         db.add(existing)
-        await db.commit()
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Barcode '{data.get('barcode')}' already exists for this business"
+            )
         await db.refresh(existing)
         return existing
 
+    await _ensure_barcode_available(db, business_id, data.get("barcode"))
+
     product = bm.Product(
-        **post.model_dump(),
+        **data,
         business_id=business_id
     )
     db.add(product)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        if data.get("barcode"):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Barcode '{data.get('barcode')}' already exists for this business"
+            )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Product conflicts with an existing record"
+        )
     await db.refresh(product)
     return product
 
@@ -255,7 +403,9 @@ async def get_Products(business_id, db: AsyncSession, current_user, limit, skip,
     products = (
         (await db.execute(
             select(bm.Product)
+            .join(bm.Business, bm.Business.business_id == bm.Product.business_id)
             .where(bm.Product.business_id == business_id)
+            .where(bm.Business.is_active == True)
             .where(bm.Product.is_active == True)
             .where(bm.Product.name.contains(search))
             .limit(limit).offset(skip)
@@ -301,36 +451,74 @@ async def update_product(business_id, id, post: schemas.ProductUpdate, db: Async
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Product with the ID:{id} not found")
     _ensure_business_id(product, business_id)
-    for key, value in post.model_dump(exclude_unset=True).items():
+
+    updates = post.model_dump(exclude_unset=True)
+    if "barcode" in updates:
+        updates["barcode"] = _normalize_barcode(updates["barcode"])
+        await _ensure_barcode_available(
+            db, business_id, updates["barcode"], exclude_id=product.product_id
+        )
+
+    for key, value in updates.items():
         setattr(product, key, value)
 
     try:
         await db.commit()
         await db.refresh(product)
+    except IntegrityError:
+        await db.rollback()
+        if "barcode" in updates:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Barcode '{updates.get('barcode')}' already exists for this business"
+            )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Product conflicts with an existing record"
+        )
     except Exception:
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error occurred while updating product")
     return product
 
 
-async def delete_product(business_id, id, db: AsyncSession, current_user):
+async def delete_product(
+    business_id,
+    id,
+    db: AsyncSession,
+    current_user
+):
     await get_member(db, current_user)
+    
+
     business_id = _as_int(business_id)
-    product = (
-        (await db.execute(
-            select(bm.Product).where(
-                bm.Product.product_id == id,
-                bm.Product.business_id == business_id
-            )
-        )).scalars().first()
+    
+
+    result = await db.execute(
+        select(bm.Product).where(
+            bm.Product.product_id == id,
+            bm.Product.business_id == business_id,
+            bm.Product.is_deleted == False
+        )
     )
 
-    if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    await db.delete(product)
-    await db.commit()
-    return {"status": "success", "message": f"Successfully deleted the product with the ID:{id}"}
+    product = result.scalars().first()
 
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found"
+        )
+
+    product.is_deleted = True
+    product.deleted_at = datetime.now(timezone.utc)
+    product.is_active = False
+    await db.commit()
+
+    return {
+        "status": "success",
+        "message": f"Successfully deleted product with ID: {id}"
+    }
 
 async def restock(business_id, id, post, db: AsyncSession, current_user):
     await get_member(db, current_user)
@@ -341,7 +529,9 @@ async def restock(business_id, id, post, db: AsyncSession, current_user):
     product = (
         (await db.execute(
             select(bm.Product)
+            .join(bm.Business, bm.Business.business_id == bm.Product.business_id)
             .where(bm.Product.business_id == business_id)
+            .where(bm.Business.is_active == True)
             .where(bm.Product.is_active == True)
             .where(bm.Product.product_id == id)
         )).scalars().first()

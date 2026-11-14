@@ -12,7 +12,11 @@ roles = ALL_ROLES
 
 
 @router.post("/products/{business_id}", response_model=schemas.ProductResponse, status_code=201)
-async def add_product(business_id: int, post: schemas.Productcreate, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([*roles]))):
+async def add_product(business_id: int,
+                      post: schemas.Productcreate,
+                      db=Depends(get_db),
+                      current_user=Depends(auth_deps.role_checker([*roles]))
+                      ):
     return await product_service.add_product(business_id, post, db, current_user)
 
 
@@ -26,6 +30,14 @@ async def export_products(business_id: int,
                           current_user = Depends(auth_deps.role_checker([*roles])),
                           session = Depends(get_db)):
     return await product_service.export_products(current_user, session, business_id, file_format)
+@router.get("/products/{business_id}/scan/{barcode}", response_model=schemas.BarCodeProductResponse)
+async def scan_barcode(business_id: int,
+                       barcode: str,
+                       db=Depends(get_db),
+                       current_user=Depends(auth_deps.role_checker([*roles]))):
+    return await product_service.get_product_by_barcode(business_id, barcode, db, current_user)
+
+
 @router.get("/products/{business_id}", response_model=list[schemas.ProductResponse])
 async def get_products(business_id: int, db=Depends(get_db), current_user=Depends(auth_deps.role_checker([*roles])),
                  limit: int = 10, skip: int = 0, search: Optional[str] = ""):

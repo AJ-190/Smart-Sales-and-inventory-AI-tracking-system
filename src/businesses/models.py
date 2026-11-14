@@ -1,6 +1,6 @@
 import uuid
 import enum
-from sqlalchemy import Column, String, Float, Boolean, Integer, DateTime, ForeignKey, Enum as SAEnum, Numeric
+from sqlalchemy import Column, String, Float, Boolean, Integer, DateTime, ForeignKey, Enum as SAEnum, Numeric, UniqueConstraint, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from src.db.database import Base
@@ -38,6 +38,8 @@ class Business(Base):
     business_key = Column(String, unique=True, default=lambda: str(uuid.uuid4()))
     bio = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
+    is_deleted = Column(Boolean, default=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     members = relationship("BusinessMember", back_populates="business", passive_deletes=True)
@@ -62,14 +64,21 @@ class Product(Base):
     sku = Column(String, nullable=True)
     category = Column(String, nullable=True)
     quantity = Column(Integer, default=0)
+    barcode = Column(String, nullable=True)
     low_stock_threshold = Column(Integer, default=10)
     is_active = Column(Boolean, default=True)
+    is_deleted = Column(Boolean, default=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     business = relationship("Business", back_populates="products", lazy="joined")
     sales_items = relationship("SalesItem", back_populates="product", passive_deletes=True)
+
+    __table_args__ = (
+        UniqueConstraint("business_id", "barcode", name="uq_products_business_barcode"),
+        Index("ix_products_business_barcode", "business_id", "barcode"),
+    )
 
 
 class Sale(Base):

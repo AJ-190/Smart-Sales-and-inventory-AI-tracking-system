@@ -11,6 +11,7 @@ class Productcreate(BaseModel):
     description: Optional[str] = None
     category: Optional[str] = None
     sku: Optional[str] = None
+    barcode: Optional[str] = None
     quantity: int
     low_stock_threshold: Optional[int] = None
 
@@ -21,6 +22,7 @@ class ProductResponse(BaseModel):
     price: float
     cost_price: float | None = None
     sku: str | None = None
+    barcode: str | None = None
     description: str | None = None
     category: str | None = None
     quantity: int
@@ -37,6 +39,7 @@ class ProductUpdate(BaseModel):
     cost_price: Optional[float] = None
     quantity: Optional[int] = None
     sku: Optional[str] = None
+    barcode: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
     low_stock_threshold: Optional[int] = None
@@ -61,9 +64,16 @@ class ProductImport(BaseModel):
     cost_price: float
     quantity: int
     sku: Optional[str] = None
+    barcode: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
     low_stock_threshold: Optional[int] = None
 
 class Products(BaseModel):
     products: list[ProductImport]
+
+class BarCodeProductResponse(BaseModel):
+    found_locally: bool
+    source: str
+    product: Optional[ProductResponse] = None
+    suggested_name: Optional[str] = None

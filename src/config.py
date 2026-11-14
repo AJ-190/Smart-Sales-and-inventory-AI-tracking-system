@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     SUPER_ADMIN_NAME: str = os.getenv("SUPER_ADMIN_NAME", "")
     REFRESH_TOKEN_TIME: int = 7 * 24 * 60
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    OPENFOOD_API_URL: str = os.getenv("OPENFOOD_API_URL", "https://world.openfoodfacts.org/api/v2/product/{bar_code}?fields=product_name")
     API_AUTH_KEY: Optional[str] = os.getenv("API_AUTH_KEY") or os.getenv("API_auth_key", "")
     model_config = {
         "env_file": ".env",
