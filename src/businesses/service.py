@@ -686,6 +686,7 @@ async def block_report(current_user: um.Users, business_id: int, session: AsyncS
             await session.execute(
                 select(um.BusinessMember)
                 .where(um.BusinessMember.business_id == business_id)
+                .where(bm.Business.is_active == True)
                 .where(um.BusinessMember.user_id == current_user.user_id)
             )
         ).scalar_one_or_none()
