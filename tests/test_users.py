@@ -21,7 +21,22 @@ def test_user_create(client):
     assert user.name == data['name']
     assert user.email == data['email']
     assert user.role == um.RoleEnum.user
+    assert user.country_code == "GH"
     assert res.status_code == 201
+
+
+def test_user_create_with_country_code(client):
+    data = {
+        "name": "Country User",
+        "email": "country@example.com",
+        "password": "passwordY123",
+        "phone": "0257524797",
+        "country_code": "ng",
+    }
+
+    res = client.post("/users/sign_up", json=data)
+    assert res.status_code == 201, res.text
+    assert res.json()["country_code"] == "NG"
 
 
 def test_user_create_custom_domain_email(client):

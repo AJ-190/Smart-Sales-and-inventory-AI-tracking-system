@@ -724,6 +724,8 @@ def test_left_member_loses_business_access(session):
     assert res.status_code == 200
     assert res.json()["business_id"] is None
     assert res.json()["member_id"] is None
+    assert res.json()["country_code"] == "GH"
+    assert res.json()["currency"] == "GHS"
     # The business role is gone too - it falls back to the plain user role.
     assert res.json()["role"] == "user"
 

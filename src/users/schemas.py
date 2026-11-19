@@ -1,6 +1,24 @@
-from pydantic import BaseModel, EmailStr, ConfigDict, field_validator
+from pydantic import BaseModel, EmailStr, ConfigDict, computed_field, field_validator
 from typing import Optional
 from datetime import datetime
+
+CURRENCY_BY_COUNTRY = {
+    "GH": "GHS",
+    "NG": "NGN",
+    "KE": "KES",
+    "UG": "UGX",
+    "TZ": "TZS",
+    "ZA": "ZAR",
+    "US": "USD",
+    "GB": "GBP",
+}
+
+
+def _clean_country_code(value):
+    if isinstance(value, str) and value.strip():
+        return value.strip().upper()[:2]
+    return "GH"
+
 
 class UserSignUp(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -9,6 +27,12 @@ class UserSignUp(BaseModel):
     email: EmailStr
     password: str
     phone: str
+    country_code: str = "GH"
+
+    @field_validator("country_code", mode="before")
+    @classmethod
+    def normalize_country_code(cls, value):
+        return _clean_country_code(value)
 
     @field_validator("password")
     @classmethod
@@ -37,12 +61,19 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     phone: Optional[str] = None
     role: Optional[str] = None
+    country_code: Optional[str] = None
+
+    @field_validator("country_code", mode="before")
+    @classmethod
+    def normalize_country_code(cls, value):
+        return _clean_country_code(value) if value is not None else None
 
 
 class UsersOut(BaseModel):
     user_id: int
     name: str
     email: str
+    country_code: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -55,8 +86,14 @@ class UsersOutUsers(BaseModel):
     role: str
     name: str
     email: str
+    country_code: Optional[str] = None
     is_verified: bool = False
     created_at: Optional[datetime] = None
+
+    @computed_field
+    @property
+    def currency(self) -> str:
+        return CURRENCY_BY_COUNTRY.get((self.country_code or "").upper(), "GHS")
 
     @field_validator("is_verified", mode="before")
     @classmethod
@@ -72,6 +109,7 @@ class UserSignUpResponse(BaseModel):
     name: str
     email: str
     role: str
+    country_code: Optional[str] = None
     is_active: bool = True
     is_verified: bool = False
 
@@ -85,6 +123,7 @@ class MemberOut(BaseModel):
     name: str
     email: str
     phone: Optional[str] = None
+    country_code: Optional[str] = None
     role: str
     is_verified: bool = False
     is_active: bool = True

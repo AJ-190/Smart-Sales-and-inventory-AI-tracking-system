@@ -23,6 +23,7 @@ class Users(Base):
     is_verified = Column(Boolean, default=False)
     phone = Column(String, nullable=True)
     password = Column(String, nullable=False)
+    country_code = Column(String, nullable=True)
     role = Column(SAEnum(RoleEnum), default=RoleEnum.user, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
