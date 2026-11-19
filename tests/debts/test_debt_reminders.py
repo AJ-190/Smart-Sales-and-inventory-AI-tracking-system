@@ -593,6 +593,20 @@ def test_report_message_has_the_business_report_sections():
     assert order == sorted(order)
 
 
+def test_report_message_uses_the_user_country_currency():
+    summary = {
+        "total_sales": 3,
+        "total_revenue": 1200.5,
+        "total_profit": 300.25,
+    }
+
+    with patch.object(reciept, "get_summary", AsyncMock(return_value=summary)):
+        message = asyncio.run(make_report(country_code="NG").build_analytics_message())
+
+    assert "Total Revenue: NGN 1,200.50" in message
+    assert "Total Profit: NGN 300.25" in message
+
+
 def test_report_message_uses_the_schedule_title():
     for title in ("Daily Sales Summary", "Weekly Performance Overview", "Monthly Revenue Report"):
         with patch.object(reciept, "get_summary", AsyncMock(return_value={})):

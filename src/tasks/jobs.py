@@ -83,6 +83,7 @@ async def process_report_data(start_date, end_date, title: str = "Sales Summary"
                     start_date=start_date,
                     end_date=end_date,
                     title=title,
+                    country_code=user.country_code,
                 )
 
                 sent = await report_generator.send_report_smss()

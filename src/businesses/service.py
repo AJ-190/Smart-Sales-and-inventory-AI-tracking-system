@@ -538,6 +538,7 @@ async def business_authorized_access(current_user, business_id, db: AsyncSession
         user_access = (
             (await db.execute(
                 select(um.BusinessMember)
+                .join(bm.Business, bm.Business.business_id == um.BusinessMember.business_id)
                 .where(um.BusinessMember.user_id == int(current_user.user_id))
                 .where(um.BusinessMember.business_id == business_id)
                 .where(bm.Business.is_active == True)
@@ -558,7 +559,7 @@ async def leave_business(business_id, member_id, current_user: um.Users, session
         await session.execute(
             select(um.BusinessMember)
             .where(um.BusinessMember.business_id == business_id)
-            .where(um.BusinessMember.user_id == member_id)
+            .where(um.BusinessMember.member_id == member_id)
         )
     ).scalars().first()
 
@@ -588,7 +589,7 @@ async def leave_business(business_id, member_id, current_user: um.Users, session
         notification_schemas.SendNotification(
             user_id=current_user.user_id,
             business_id=business_id,
-            title="Business Membership Left",
+            title="Business Membership Leave",
             message=f"User with ID {member_.user_id} has left the business with ID {business_id}.",
         ),
         business_id,
@@ -607,6 +608,7 @@ async def update_business_member(business_id: int, member_id: int, post: schemas
         is_member = (
             await db.execute(
                 select(um.BusinessMember)
+                .join(bm.Business, bm.Business.business_id == um.BusinessMember.business_id)
                 .where(um.BusinessMember.business_id == business_id)
                 .where(bm.Business.is_active == True)
                 .where(um.BusinessMember.user_id == current_user.user_id)
@@ -619,6 +621,7 @@ async def update_business_member(business_id: int, member_id: int, post: schemas
     member = (
         await db.execute(
             select(um.BusinessMember)
+            .join(bm.Business, bm.Business.business_id == um.BusinessMember.business_id)
             .where(um.BusinessMember.member_id == member_id)
             .where(um.BusinessMember.business_id == business_id)
             .where(bm.Business.is_active == True)
@@ -685,11 +688,13 @@ async def block_report(current_user: um.Users, business_id: int, session: AsyncS
         user = (
             await session.execute(
                 select(um.BusinessMember)
+                .join(bm.Business, bm.Business.business_id == um.BusinessMember.business_id)
                 .where(um.BusinessMember.business_id == business_id)
                 .where(bm.Business.is_active == True)
                 .where(um.BusinessMember.user_id == current_user.user_id)
+                .where(um.ACTIVE_MEMBERSHIP)
             )
-        ).scalar_one_or_none()
+        ).scalars().first()
 
         if user is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found in the business")

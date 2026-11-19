@@ -7,6 +7,7 @@ from reportlab.pdfgen import canvas
 from src.tasks.debt_reminders import send_sms
 from src.analytics.service import get_summary
 from src.config import get_settings
+from src.users.schemas import CURRENCY_BY_COUNTRY
 from datetime import datetime
 
 
@@ -23,6 +24,7 @@ class RecieptReportGenerator:
         start_date: datetime,
         end_date: datetime,
         title: str = "Sales Summary",
+        country_code: str = "GH",
     ):
         self.phone = phone
         self.current_user = current_user
@@ -30,6 +32,7 @@ class RecieptReportGenerator:
         self.start_date = start_date
         self.end_date = end_date
         self.title = title
+        self.currency = CURRENCY_BY_COUNTRY.get((country_code or "").upper(), "GHS")
 
     async def build_analytics_message(self) -> str:
         """Render the analytics summary as an SMS business report."""
@@ -70,8 +73,8 @@ class RecieptReportGenerator:
             f"AUTOMATED REPORT\n"
             f"{self.title} | {start_str} - {end_str}\n"
             f"\n"
-            f"Total Revenue: GHS {total_revenue:,.2f}\n"
-            f"Total Profit: GHS {total_profit:,.2f}\n"
+            f"Total Revenue: {self.currency} {total_revenue:,.2f}\n"
+            f"Total Profit: {self.currency} {total_profit:,.2f}\n"
             f"Total Orders: {total_sales}\n"
             f"Units Sold: {sold_quantity}\n"
             f"\n"
@@ -130,11 +133,11 @@ class RecieptReportGenerator:
         for item in items:
             y -= 7 * mm
             c.drawString(20 * mm, y, item["name"])
-            c.drawRightString(width - 20 * mm, y, f"GHS {item['qty'] * item['unit_price']:.2f}")
+            c.drawRightString(width - 20 * mm, y, f"{self.currency} {item['qty'] * item['unit_price']:.2f}")
 
         y -= 12 * mm
         c.setFont("Helvetica-Bold", 12)
-        c.drawRightString(width - 20 * mm, y, f"Total: GHS {total:.2f}")
+        c.drawRightString(width - 20 * mm, y, f"Total: {self.currency} {total:.2f}")
 
         c.setFont("Helvetica", 7)
         c.drawCentredString(width / 2, 15 * mm, f"{business['name']} · generated via Business Bot")

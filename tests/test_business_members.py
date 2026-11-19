@@ -3,6 +3,8 @@ import pytest
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from src.users import models as um
+from src.businesses import models as bm
+from src.businesses import service as biz_service
 from src.auth import utils as auth_utils
 from fastapi.testclient import TestClient
 from src.db.database import get_db
@@ -777,4 +779,37 @@ def test_reapproved_member_returns_to_list(session):
     assert user_id in [m["user_id"] for m in res.json()]
 
     app.dependency_overrides.clear()
+
+
+def test_block_report_self_with_multiple_active_businesses(session):
+    async def _setup():
+        user = um.Users(
+            name="Report Admin",
+            email="report_admin@example.com",
+            password="TestPass123",
+            phone="6200000000",
+            role=um.RoleEnum.admin,
+        )
+        shop = bm.Business(name="Report Shop")
+        other = bm.Business(name="Other Active Shop")
+        session.add_all([user, shop, other])
+        await session.commit()
+        await session.refresh(user)
+        await session.refresh(shop)
+
+        member = um.BusinessMember(
+            user_id=user.user_id,
+            business_id=shop.business_id,
+            role=um.RoleEnum.admin,
+        )
+        session.add(member)
+        await session.commit()
+        await session.refresh(member)
+        return user, shop, member
+
+    user, shop, member = asyncio.run(_setup())
+
+    asyncio.run(biz_service.block_report(user, shop.business_id, session, 1, None))
+
+    assert member.get_report is True
 
